@@ -7,8 +7,4 @@ requires-python = ">=3.13"
 dependencies = []
 
 [dependency-groups]
-dev = [
-    "pre-commit>=4.6.0",
-    "ruff>=0.15.20",
-    "yamllint>=1.38.0",
-]
+dev = ["pre-commit>=4.6.0", "ruff>=0.15.20", "yamllint>=1.38.0"]
