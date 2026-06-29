@@ -1,6 +1,10 @@
 {
     "ignores": [
-        "**/.git"
+        "**/.git",
+        "venv/",
+        ".venv/",
+        "env/",
+        ".env/"
     ],
     "config": {
         "default": true,
