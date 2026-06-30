@@ -5,178 +5,246 @@ reflecting the platform's goal of identifying transient conformations,
 cryptic interfaces, and actionable protein states that are not apparent
 from static structures.
 
-**Lynceus** is a generic, modular computational platform for discovering
-molecules that recognize specific protein conformational states and
-couple that recognition to a desired biological outcome.
+**Lynceus** is a modular computational platform for discovering molecules that
+recognize specific protein conformational states and couple that recognition to a
+desired biological outcome.
 
-The platform is intentionally **mechanism-agnostic**. Rather than being
-limited to targeted degradation (e.g., PROTACs), it is designed to
-support any functional strategy that begins with selective recognition
-of a protein state.
+This document describes the implementation targeting **small molecule
+ligands against structured (folded) proteins**.
+
+---
 
 ## Core Principles
 
-- **Ensemble-first:** represent proteins as dynamic conformational
-    ensembles instead of single static structures.
-- **Surface-centric:** identify accessible surfaces and epitopes
-    rather than assuming classical binding pockets.
-- **Modular:** separate target recognition from downstream biological
-    function.
-- **Outcome-agnostic:** enable degradation, aggregation inhibition,
-    imaging, stabilization, or future modalities without architectural
-    changes.
-- **Extensible:** each module can evolve independently as new
-    algorithms or experimental data become available.
+- **Ensemble-first:** represent proteins as conformational ensembles rather than
+  single static structures.
+- **Surface-centric:** identify accessible pockets and epitopes rather than
+  assuming a single canonical binding site.
+- **Modular:** separate target recognition from downstream biological function.
+- **Extensible:** each module evolves independently as new algorithms or
+  experimental data become available.
+
+---
+
+## Scope
+
+| Dimension | Approach |
+| --- | --- |
+| Target class | Structured (folded) proteins; experimental PDB structures |
+| Recognition module | Small molecules |
+| Functional module | Binding (recognition only) |
+| Ensemble generation | Structural clustering of existing PDB conformers |
+| Complex generation | Ligand pose enumeration from docking |
+| Dynamic refinement | Pass-through (stub) |
+| Outcome scoring | Recognition affinity, ensemble robustness |
+
+---
 
 ## High-Level Architecture
 
-```text
+```mermaid
 
+flowchart TD
+
+
+
+```
+
+```text
 Target Representation
-        ↓
+        |
+        v
 Conformational Ensemble Generation
-        ↓
-Surface / Epitope Identification
-        ↓
-Recognition Module Discovery
-        ↓
-Functional Module Selection
-        ↓
-Candidate Complex Generation
-        ↓
-Dynamic Refinement
-        ↓
-Outcome-Specific Scoring
-        ↓
+        |
+        v
+Surface / Pocket Identification
+        |
+        v
+Recognition Module Discovery      <-- small molecules
+        |
+        v
+Functional Module Selection       <-- stub; outcome = "binding"
+        |
+        v
+Candidate Complex Generation      <-- ligand pose enumeration
+        |
+        v
+Dynamic Refinement                <-- pass-through stub
+        |
+        v
+Outcome-Specific Scoring          <-- affinity + ensemble robustness
+        |
+        v
 Candidate Ranking
 ```
+
+---
 
 ## Pipeline Modules
 
 ### 1. Target Representation
 
-Input may include:
+**Inputs:** experimental PDB structures only.
 
-- Experimental structures (PDB)
-- MD-generated ensembles
-- Cryo-EM structures
-- Predicted structures
-- Oligomers or aggregate models
+The module emits a `TargetRepresentation` carrying one or more structures and
+their associated metadata.
 
-The pipeline operates on ensembles regardless of source.
+**Output interface:** a `TargetRepresentation` has a name, a list of one or
+more PDB structures, and a source label (currently always `"pdb"`).
 
 ### 2. Conformational Ensemble Generation
 
-Generate representative conformational states using:
+**Behavior:** structural clustering of the input PDB conformers into
+representative states. No MD or enhanced sampling is performed.
 
-- Molecular dynamics
-- Enhanced sampling
-- Structural clustering
+Each cluster centroid becomes a candidate receptor state. Weights default to
+uniform across states.
 
-Representative clusters become candidate target states.
+**Output interface:** each `ConformerEntry` carries a structure, a state ID,
+a weight (uniform across states), and a set of annotations (e.g. secondary
+structure, RMSD to reference). A `ReceptorEnsemble` bundles the target
+representation with its list of conformer entries.
 
-### 3. Surface / Epitope Identification
+### 3. Surface / Pocket Identification
 
-Characterize candidate recognition regions using properties such as:
+Characterize candidate recognition regions across the ensemble using:
 
-- Solvent accessibility
-- Electrostatics
-- Hydrophobicity
-- Flexibility
-- Secondary structure persistence
-- Surface topology
+- Pocket detection (fpocket)
+- Solvent accessibility (FreeSASA)
+- Docking box definition from pocket centroids
+The output is a set of `PocketSite` records associated with each conformer,
+carrying geometry (centroid, dimensions) and surface properties.
 
-This supports both structured proteins and intrinsically disordered or aggregated systems.
+**Output interface:** a docking box is defined by a center coordinate and
+dimensions. Each `PocketSite` references its conformer and pocket ID, carries
+a docking box, a druggability score, and a solvent exposure value.
 
 ### 4. Recognition Module Discovery
 
-Potential recognition elements include:
+**Behavior:** small molecule virtual screening via an ML-guided docking
+funnel.
 
-- Small molecules
-- Peptides
-- Mini-proteins
-- Nanobodies
-- Macrocycles
-- Future binding scaffolds
+**Recognition module type:** the recognition module is a small molecule,
+identified by SMILES string, a molecule ID, and its source library.
+
+**Screening funnel:**
+
+1. Download compound library tranches (ZINC22 or equivalent)
+1. Standardize and filter (CNS-MPO, PAINS)
+1. Seed subset selection (random or diversity-based; configurable)
+1. Conformer generation for seed subset only
+1. Seed docking against primary receptor ensemble
+1. Surrogate model training (LightGBM on Morgan fingerprints)
+1. Full-library scoring and top-N% selection
+1. Conformer generation for selected subset
+1. Full ensemble docking of selected subset
+1. CNN rescoring of top docking hits (gnina)
 
 ### 5. Functional Module Selection
 
-Recognition is decoupled from biological function.
+**Behavior:** stub. No functional module is attached; the outcome is
+recorded as `"binding"`.
 
-Examples include:
-
-| Desired Outcome | Functional Module |
-| --- | --- |
-| Targeted degradation | E3 ligase recruiter |
-| Autophagic clearance | LC3/autophagy adaptor |
-| Secondary nucleation inhibition | Surface-blocking ligand |
-| Fibril end capping | End-binding ligand |
-| Aggregate stabilization | State-selective binder |
-| Imaging | Reporter/probe |
+**Output interface:** a `FunctionalModule` has an outcome label (always
+`"binding"`) and an optional payload (unused).
 
 ### 6. Candidate Complex Generation
 
-Enumerate plausible assemblies by combining:
+**Behavior:** ligand pose enumeration from docking. Each docking pose
+for a given (ligand, receptor conformer) pair is a candidate complex.
 
-- Target conformations
-- Recognition modules
-- Functional modules
-- Linker or interface geometries (when applicable)
-
-No single "correct" ternary complex is assumed; instead, the platform
-samples a population of plausible functional complexes.
+**Output interface:** a `CandidateComplex` pairs a recognition module with a
+functional module, and records the receptor conformer ID, pose ID, pose
+coordinates (an SDF block or file reference), and docking score.
 
 ### 7. Dynamic Refinement
 
-Evaluate candidates using molecular dynamics to assess:
+**Behavior:** pass-through stub. Input complexes are forwarded unchanged.
 
-- Binding persistence
-- Interface stability
-- Conformational adaptation
-- Linker flexibility (if relevant)
-- Overall complex robustness
+**Interface (in = out):** a `RefinedComplex` wraps the original candidate,
+a refinement method (`"none"` for the stub), refined pose coordinates, and
+stability metrics (empty for the stub).
 
 ### 8. Outcome-Specific Scoring
 
-Scoring depends on the desired biological outcome.
+**Behavior:** recognition affinity and ensemble robustness.
 
-Generic metrics:
+**Output interface:** a `ScoringResult` references its complex ID and
+mechanism (`"binding"`), and carries a scores dictionary (e.g. affinity:
+-8.2, ensemble robustness: 0.74) plus metadata.
 
-- Recognition affinity
-- Ensemble robustness
-- Interface stability
-- Selectivity
-- Conformational persistence
+**Score components:**
 
-Examples of outcome-specific metrics:
-
-- Degradation:
-  - productive
-  - recruitment geometry
-- Secondary nucleation inhibition:
-  - fibril surface occupancy and blocking persistence
-- Imaging:
-  - probe accessibility and specificity
+- `affinity`: primary docking score (minimum across ensemble for multi-conformer targets)
+- `cnn_score`: gnina CNN rescore where available
+- `ensemble_robustness`: fraction of ensemble conformers in which the ligand docks productively
 
 ### 9. Candidate Ranking
 
-Rank candidates across the entire ensemble rather than a single
-structure.
+Rank `ScoringResult` records across the full ensemble. Output includes ranked
+recognition modules, score breakdowns, and confidence metrics.
 
-Outputs may include:
+Ranking operates on the `scores` dict.
 
-- Recognition modules
-- Functional modules
-- Stable complex ensembles
-- Confidence metrics
-- Mechanism-specific rankings
+---
 
-## Current Direction
+## Repository Structure
 
-The initial implementation will:
+Follows Snakemake / Dagster best practices with clear separation of
+receptor-agnostic and receptor-dependent stages.
 
-1. Start from experimental PDB structures.
-1. Expand to MD-generated conformational ensembles.
-1. Cluster ensembles into representative states.
-1. Identify dynamic recognition surfaces.
-1. Support multiple functional outcomes without modifying the core architecture.
+```bash
+lynceus/
+  config/
+  workflow/
+    Snakefile
+    rules/
+      ligand_candidate.smk
+      receptor.smk
+      screening/
+    scripts/
+      ligand_candidate/
+      receptor/
+      screening/
+    envs/
+      ligand_candidate/
+      receptor/
+      screening/
+  results/
+    ligand_candidate/
+    receptor/
+    screening/{receptor_name}/
+  logs/
+  docs/
+  notebooks/
+```
+
+---
+
+## Configuration
+
+All pipeline parameters are defined in `config/config.yaml`.
+
+Key parameters:
+
+```yaml
+docking_engine: autodock_gpu       # vina | autodock_gpu
+ 
+ligand_candidate:
+  seed_subset_size: 50000
+  seed_selection_strategy: diversity  # random | diversity
+  top_n_fraction: 0.01
+ 
+ml_filter:
+  model: lightgbm
+  fingerprint_radius: 2
+  fingerprint_bits: 2048
+ 
+docking:
+  top_rescore_fraction: 0.05
+ 
+tools:
+  autodock_gpu: /usr/local/bin/AutoDock-GPU
+  gnina: /usr/local/bin/gnina
+  fpocket: /usr/local/bin/fpocket
+```
