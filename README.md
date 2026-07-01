@@ -1,182 +1,128 @@
 # Lynceus
 
-Named after the mythological figure renowned for extraordinary vision,
-reflecting the platform's goal of identifying transient conformations,
-cryptic interfaces, and actionable protein states that are not apparent
-from static structures.
+Named after the mythological figure renowned for extraordinary vision, reflecting the platform's goal of identifying transient conformations, cryptic interfaces, and corresponding actionable protein states.
 
-**Lynceus** is a generic, modular computational platform for discovering
-molecules that recognize specific protein conformational states and
-couple that recognition to a desired biological outcome.
+**Lynceus** is a modular computational platform for discovering molecules that recognize specific protein conformational states and couple that recognition to a desired biological outcome.
 
-The platform is intentionally **mechanism-agnostic**. Rather than being
-limited to targeted degradation (e.g., PROTACs), it is designed to
-support any functional strategy that begins with selective recognition
-of a protein state.
+## Motivation
 
-## Core Principles
+Most ligand discovery pipelines treat a target protein as a single rigid structure — typically whatever conformation happens to be available from a crystal structure or a single predicted model. This is a poor approximation of reality. Proteins are dynamic ensembles: they sample multiple conformational substates, some only transiently, and a substantial fraction of biologically important recognition events (allosteric regulation, cryptic pocket opening, order-disorder transitions, conformational selection in signaling) depend on states that are rare, short-lived, or simply absent from static structural databases.
 
-- **Ensemble-first:** represent proteins as dynamic conformational
-    ensembles instead of single static structures.
-- **Surface-centric:** identify accessible surfaces and epitopes
-    rather than assuming classical binding pockets.
-- **Modular:** separate target recognition from downstream biological
-    function.
-- **Outcome-agnostic:** enable degradation, aggregation inhibition,
-    imaging, stabilization, or future modalities without architectural
-    changes.
-- **Extensible:** each module can evolve independently as new
-    algorithms or experimental data become available.
+Lynceus is built around the premise that **conformational state is itself the design target**, not an afterthought to be handled by post-hoc induced-fit correction. The platform generates a representative ensemble of target states up front, screens against that ensemble (rather than a single structure), and uses a trained surrogate model to make ensemble-aware screening tractable at library scale. The output is not just "molecules that bind" but molecules with an associated *state preference* — candidates annotated by which conformational substate(s) they recognize — which is the information needed to couple binding to a specific functional or biological outcome (e.g., stabilizing an inactive state, blocking an interface that only forms transiently, or selectively engaging a disease-associated conformation over the wild-type/resting one).
+
+## Conceptual Overview
+
+The platform is organized into four stages, each producing a well-defined intermediate output that feeds the next:
+
+1. **Target** — define the protein(s) of interest and generate a structural ensemble representing their accessible conformational states.
+1. **Recognizer** — define and pre-filter the candidate molecule library that will be screened against the target ensemble.
+1. **Surrogate Model** — train a fast approximate model on a representative subsample of full target–candidate complexes, so the full library doesn't need to be exhaustively (and expensively) modeled against every target state.
+1. **Ensemble Screening** — apply the trained surrogate to the full filtered library, then generate detailed conformers and complexes only for the subset that the surrogate model identifies as promising.
+
+This staged design exists because the two most expensive operations in the pipeline — generating high-quality 3D conformers and generating/scoring target-candidate complexes — scale multiplicatively with library size and number of target states. The surrogate model stage exists specifically to avoid paying that multiplicative cost across the *entire* candidate library, reserving expensive, high-fidelity complex generation for a much smaller, pre-triaged set.
 
 ## High-Level Architecture
 
-```text
+```mermaid
 
-Target Representation
-        ↓
-Conformational Ensemble Generation
-        ↓
-Surface / Epitope Identification
-        ↓
-Recognition Module Discovery
-        ↓
-Functional Module Selection
-        ↓
-Candidate Complex Generation
-        ↓
-Dynamic Refinement
-        ↓
-Outcome-Specific Scoring
-        ↓
-Candidate Ranking
+flowchart TD
+
+  subgraph Target
+    direction TD
+
+    RetrieveTargets[/"Retrieve Target(s)"/] --> Targets@{ shape: st-rect, label: "Targets" }
+    Targets --> EnsembleGeneration{{"Target Ensemble Generation"}}
+    EnsembleGeneration --> TargetSurfaces@{shape: st-rect, label: "Target Surfaces"}
+  end
+
+  subgraph Recognizer
+    direction TD
+
+    IngestCandidates[/"Retrieve Candidates"/] --> RecognizerCandidates@{ shape: st-rect, label: "Candidates" }
+    RecognizerCandidates --> InitialFilter{"Physiochemical Filter(s)<br>(PAINS, CNS-MPO, etc.)"}
+    InitialFilter --> FilteredCandidates@{shape: st-rect, label: "Filtered Candidates"}
+  end
+
+  subgraph Surrogate Model
+    direction TD
+
+    FilteredCandidates -- "sample" --> TrainingCandidates@{ shape: st-rect, label: "Training Candidates" }
+    TrainingCandidates --> TrainingConformerGeneration{{"Training Conformer Generation"}}
+    TrainingConformerGeneration --> TrainingConformers@{shape: st-rect, label: "Training Conformers"}
+
+    TrainingConformers --> ModelComplexGeneration["Complex Generation"]
+    TargetSurfaces --> ModelComplexGeneration
+
+    ModelComplexGeneration --> TrainingComplexes@{shape: st-rect, label: "Training Complexes"}
+
+    TrainingComplexes --> TrainModel["Train Model"]
+    TrainModel --> SurrogateModel@{shape: cyl, label: "Surrogate Model"}
+  end
+
+  SurrogateModel --> SurrogateModelFilter{"Model Filter"}
+  
+  FilteredCandidates -- "full library" --> SurrogateModelFilter
+
+  SurrogateModelFilter --> MLFilteredCandidates@{shape: st-rect, label: "Filtered Candidate"}
+
+  MLFilteredCandidates --> MLFilteredCandidateConformerGeneration{{"Conformer Generation"}}
+
+  MLFilteredCandidateConformerGeneration --> MLFilteredCandidateConformers@{ shape: st-rect, label: "Candidate Conformers"}
+
+  MLFilteredCandidateConformers --> ComplexGeneration["Complex Generation"]
+  TargetSurfaces --> ComplexGeneration
+
+  ComplexGeneration --> Complexes@{shape: st-rect, label: "Complexes"}
+
 ```
 
-## Pipeline Modules
+## Stage Breakdown
 
-### 1. Target Representation
+### Stage 1 — Target
 
-Input may include:
+**Goal:** turn a protein of interest into a structural ensemble that captures its functionally relevant conformational diversity, rather than a single static pose.
 
-- Experimental structures (PDB)
-- MD-generated ensembles
-- Cryo-EM structures
-- Predicted structures
-- Oligomers or aggregate models
+- **Retrieve Target(s):** identify and pull the starting structural information for the protein(s) of interest. This may draw on experimentally determined structures, predicted structures, or a combination, and may include multiple distinct proteins if the project involves a family, a complex, or comparative targets (e.g., disease variant vs. wild-type).
+- **Target Ensemble Generation:** expand each starting structure into a set of conformers representing the protein's accessible states. The intent is to surface states that a single static structure would miss — alternate side-chain rotamers, loop conformations, domain motions, cryptic or transiently open pockets, and active/inactive backbone states. The output is a *population* of structures rather than one.
+- **Target Surfaces:** from the ensemble, derive the relevant surface/pocket representations that candidates will actually be screened against (e.g., binding site definitions, surface descriptors, or other representations of the regions of interest on each conformer). This is the structural information that downstream complex generation steps consume — it defines *where* and *against what shape* recognition is being evaluated for each state in the ensemble.
 
-The pipeline operates on ensembles regardless of source.
+**Output:** a labeled set of target surfaces, one or more per conformational state, that collectively represent the protein's relevant conformational landscape.
 
-### 2. Conformational Ensemble Generation
+### Stage 2 — Recognizer
 
-Generate representative conformational states using:
+**Goal:** assemble the candidate molecule space and reduce it to a tractable, drug-like (or otherwise fit-for-purpose) set before any structural modeling is performed.
 
-- Molecular dynamics
-- Enhanced sampling
-- Structural clustering
+- **Retrieve Candidates:** pull in the pool of candidate molecules to be screened. This may be a purchasable/synthesizable virtual library, a proprietary collection, a focused set around a known chemotype, or some combination.
+- **Physiochemical Filter(s):** apply cheap, structure-independent filters to remove candidates unlikely to be useful regardless of how well they might dock — e.g., pan-assay interference compounds (PAINS), property-based filters such as CNS multiparameter optimization (CNS-MPO) scoring when relevant, and other standard developability/liability screens. The point of doing this *before* any conformer or complex generation is cost: these filters are computationally cheap relative to 3D structure generation and complex modeling, so it's far more efficient to eliminate unsuitable candidates first.
 
-Representative clusters become candidate target states.
+**Output:** a filtered candidate library — large, but stripped of molecules that fail basic chemical viability or known liability criteria.
 
-### 3. Surface / Epitope Identification
+### Stage 3 — Surrogate Model
 
-Characterize candidate recognition regions using properties such as:
+**Goal:** train a fast approximate model that can predict target-state recognition without requiring full conformer and complex generation for every candidate in the library.
 
-- Solvent accessibility
-- Electrostatics
-- Hydrophobicity
-- Flexibility
-- Secondary structure persistence
-- Surface topology
+This stage exists because generating high-quality conformers and target–candidate complexes for the *entire* filtered library against the *entire* target ensemble is computationally prohibitive at scale. Instead, a representative subsample is processed in full fidelity, and that data is used to train a model that approximates the same judgment much more cheaply.
 
-This supports both structured proteins and intrinsically disordered or aggregated systems.
+- **Sample Training Candidates:** draw a representative subsample from the filtered candidate library — sized and selected so that it spans the chemical diversity of the full library well enough to train a generalizable model.
+- **Training Conformer Generation:** generate 3D conformers for the training subsample only.
+- **Complex Generation (training):** model the training conformers against the target surfaces produced in Stage 1, producing a set of training complexes spanning the relevant conformational states.
+- **Train Model:** use the training complexes to train the surrogate model. The model learns to approximate whatever signal the full complex-generation process would produce (e.g., expected recognition or fit against particular target states) directly from candidate (and target-state) features, without re-running full complex generation.
 
-### 4. Recognition Module Discovery
+**Output:** a trained surrogate model capable of scoring or filtering the full candidate library against the target ensemble at a fraction of the cost of exhaustive complex generation.
 
-Potential recognition elements include:
+### Stage 4 — Ensemble Screening
 
-- Small molecules
-- Peptides
-- Mini-proteins
-- Nanobodies
-- Macrocycles
-- Future binding scaffolds
+**Goal:** apply the trained surrogate model to the full filtered library to identify the subset of candidates worth carrying through to full-fidelity modeling, then generate detailed structural complexes for that subset.
 
-### 5. Functional Module Selection
+- **Model Filter:** score the *entire* filtered candidate library (not just the training subsample) using the trained surrogate model, and retain the subset predicted to be most promising. This is the step that makes ensemble-scale screening practical — the expensive full-fidelity steps that follow are only run on this much smaller, pre-triaged set.
+- **Conformer Generation:** generate full 3D conformers for the surrogate-filtered candidates — the same step performed in Stage 3, now applied to the larger downstream-filtered set rather than just the training subsample.
+- **Complex Generation:** model the resulting candidate conformers against the target surfaces from Stage 1, producing final target–candidate complexes spanning the relevant conformational states.
 
-Recognition is decoupled from biological function.
+**Output:** a set of high-fidelity target–candidate complexes, each implicitly or explicitly annotated with the target conformational state it corresponds to — the basis for downstream selection of candidates with a desired state preference and biological outcome.
 
-Examples include:
+## Design Notes
 
-| Desired Outcome | Functional Module |
-| --- | --- |
-| Targeted degradation | E3 ligase recruiter |
-| Autophagic clearance | LC3/autophagy adaptor |
-| Secondary nucleation inhibition | Surface-blocking ligand |
-| Fibril end capping | End-binding ligand |
-| Aggregate stabilization | State-selective binder |
-| Imaging | Reporter/probe |
-
-### 6. Candidate Complex Generation
-
-Enumerate plausible assemblies by combining:
-
-- Target conformations
-- Recognition modules
-- Functional modules
-- Linker or interface geometries (when applicable)
-
-No single "correct" ternary complex is assumed; instead, the platform
-samples a population of plausible functional complexes.
-
-### 7. Dynamic Refinement
-
-Evaluate candidates using molecular dynamics to assess:
-
-- Binding persistence
-- Interface stability
-- Conformational adaptation
-- Linker flexibility (if relevant)
-- Overall complex robustness
-
-### 8. Outcome-Specific Scoring
-
-Scoring depends on the desired biological outcome.
-
-Generic metrics:
-
-- Recognition affinity
-- Ensemble robustness
-- Interface stability
-- Selectivity
-- Conformational persistence
-
-Examples of outcome-specific metrics:
-
-- Degradation:
-  - productive
-  - recruitment geometry
-- Secondary nucleation inhibition:
-  - fibril surface occupancy and blocking persistence
-- Imaging:
-  - probe accessibility and specificity
-
-### 9. Candidate Ranking
-
-Rank candidates across the entire ensemble rather than a single
-structure.
-
-Outputs may include:
-
-- Recognition modules
-- Functional modules
-- Stable complex ensembles
-- Confidence metrics
-- Mechanism-specific rankings
-
-## Current Direction
-
-The initial implementation will:
-
-1. Start from experimental PDB structures.
-1. Expand to MD-generated conformational ensembles.
-1. Cluster ensembles into representative states.
-1. Identify dynamic recognition surfaces.
-1. Support multiple functional outcomes without modifying the core architecture.
+- **Why an ensemble, not a single structure?** Single-structure screening implicitly assumes the bound or relevant conformation is well-represented by whatever structure is available. For cryptic pockets, allosteric sites, and transient interfaces, this assumption frequently fails. Generating the ensemble up front means screening can target *specific* conformational states rather than only the most common/stable one.
+- **Why a surrogate model rather than full screening throughout?** Conformer generation and complex generation are both substantially more expensive than physiochemical filtering or model inference. Running them against an entire library, for every conformational state in the target ensemble, does not scale. The surrogate model is trained on a representative subsample precisely so that the expensive steps are only repeated, at full library scale, once a much smaller and better-justified set of candidates has been identified.
+- **Two distinct "Complex Generation" steps:** the diagram intentionally shows complex generation occurring twice — once in the Surrogate Model stage (training data) and once in the Ensemble Screening stage (final candidates). These share the same target surfaces but operate on different candidate populations and serve different purposes: one produces training data, the other produces the final deliverable.
+- **State-aware output:** because target surfaces are tagged by conformational state throughout the pipeline, the final complexes retain that state information. This is what allows downstream selection of molecules by *which* state they recognize, not just whether they bind at all — the property the platform is named for.
