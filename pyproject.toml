@@ -28,4 +28,3 @@ directory_type = "project"
 
 [tool.dg.project]
 root_module = "lynceus"
-registry_modules = ["dagster_tutorial.components.*"]
