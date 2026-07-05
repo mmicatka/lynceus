@@ -14,11 +14,11 @@ flowchart TD
     EnsembleGeneration --> TargetSurfaces@{shape: st-rect, label: "Target Surfaces"}
   end
 
-  subgraph Recognizer
+  subgraph Candidate
     direction TD
 
-    IngestCandidates[/"Retrieve Candidates"/] --> RecognizerCandidates@{ shape: st-rect, label: "Candidates" }
-    RecognizerCandidates --> InitialFilter{"Physiochemical Filter(s)<br>(PAINS, CNS-MPO, etc.)"}
+    RetrieveCandidates[/"Retrieve Candidates"/] --> Candidates@{ shape: st-rect, label: "Candidates" }
+    Candidates --> InitialFilter{"Physiochemical Filter(s)<br>(PAINS, CNS-MPO, etc.)"}
     InitialFilter --> FilteredCandidates@{shape: st-rect, label: "Filtered Candidates"}
   end
 
@@ -67,7 +67,7 @@ flowchart TD
 
 **Output:** a labeled set of target surfaces, one or more per conformational state, that collectively represent the protein's relevant conformational landscape.
 
-### Stage 2 — Recognizer
+### Stage 2 — Candidate
 
 **Goal:** assemble the candidate molecule space and reduce it to a tractable, drug-like (or otherwise fit-for-purpose) set before any structural modeling is performed.
 

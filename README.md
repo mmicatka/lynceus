@@ -15,7 +15,7 @@ Lynceus is built around the premise that **conformational state is itself the de
 The platform is organized into four stages, each producing a well-defined intermediate output that feeds the next:
 
 1. **Target** — define the protein(s) of interest and generate a structural ensemble representing their accessible conformational states.
-1. **Recognizer** — define and pre-filter the candidate molecule library that will be screened against the target ensemble.
+1. **Candidate** — define and pre-filter the candidate molecule library that will be screened against the target ensemble.
 1. **Surrogate Model** — train a fast approximate model on a representative subsample of full target–candidate complexes, so the full library doesn't need to be exhaustively (and expensively) modeled against every target state.
 1. **Ensemble Screening** — apply the trained surrogate to the full filtered library, then generate detailed conformers and complexes only for the subset that the surrogate model identifies as promising.
 
