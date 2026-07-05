@@ -6,21 +6,66 @@ Named after the mythological figure renowned for extraordinary vision, reflectin
 
 ## Motivation
 
-Most ligand discovery pipelines treat a target protein as a single rigid structure — typically whatever conformation happens to be available from a crystal structure or a single predicted model. This is a poor approximation of reality. Proteins are dynamic ensembles: they sample multiple conformational substates, some only transiently, and a substantial fraction of biologically important recognition events (allosteric regulation, cryptic pocket opening, order-disorder transitions, conformational selection in signaling) depend on states that are rare, short-lived, or simply absent from static structural databases.
+Most ligand discovery pipelines treat a target protein as a single rigid structure - typically whatever conformation happens to be available from a crystal structure or a single predicted model. This is a poor approximation of reality. Proteins are dynamic ensembles: they sample multiple conformational substates, some only transiently, and a substantial fraction of biologically important recognition events (allosteric regulation, cryptic pocket opening, order-disorder transitions, conformational selection in signaling) depend on states that are rare, short-lived, or simply absent from static structural databases.
 
-Lynceus is built around the premise that **conformational state is itself the design target**, not an afterthought to be handled by post-hoc induced-fit correction. The platform generates a representative ensemble of target states up front, screens against that ensemble (rather than a single structure), and uses a trained surrogate model to make ensemble-aware screening tractable at library scale. The output is not just "molecules that bind" but molecules with an associated *state preference* — candidates annotated by which conformational substate(s) they recognize — which is the information needed to couple binding to a specific functional or biological outcome (e.g., stabilizing an inactive state, blocking an interface that only forms transiently, or selectively engaging a disease-associated conformation over the wild-type/resting one).
-
-## Conceptual Overview
-
-The platform is organized into four stages, each producing a well-defined intermediate output that feeds the next:
-
-1. **Target** — define the protein(s) of interest and generate a structural ensemble representing their accessible conformational states.
-1. **Candidate** — define and pre-filter the candidate molecule library that will be screened against the target ensemble.
-1. **Surrogate Model** — train a fast approximate model on a representative subsample of full target–candidate complexes, so the full library doesn't need to be exhaustively (and expensively) modeled against every target state.
-1. **Ensemble Screening** — apply the trained surrogate to the full filtered library, then generate detailed conformers and complexes only for the subset that the surrogate model identifies as promising.
-
-This staged design exists because the two most expensive operations in the pipeline — generating high-quality 3D conformers and generating/scoring target-candidate complexes — scale multiplicatively with library size and number of target states. The surrogate model stage exists specifically to avoid paying that multiplicative cost across the *entire* candidate library, reserving expensive, high-fidelity complex generation for a much smaller, pre-triaged set.
+Lynceus is built around the premise that **conformational state is itself the design target**, not an afterthought to be handled by post-hoc induced-fit correction. The platform generates a representative ensemble of target states up front, screens against that ensemble (rather than a single structure), and uses a trained surrogate model to make ensemble-aware screening tractable at library scale. The outputs are candidates (small molecules, proteins, etc.) with an associated *state preference*, the information needed to couple binding to a specific functional or biological outcome (e.g., stabilizing an inactive state, blocking an interface that only forms transiently, or selectively engaging a disease-associated conformation over the wild-type/resting one).
 
 ## Architecture
 
-See [docs/architecture.md](docs/architecture.md)
+```mermaid
+
+flowchart TD
+
+  subgraph Target
+    direction TD
+
+    RetrieveTargets[/"Retrieve Target(s)"/] --> Targets@{ shape: st-rect, label: "Targets" }
+    Targets --> EnsembleGeneration{{"Target Ensemble Generation"}}
+    EnsembleGeneration --> TargetSurfaces@{shape: st-rect, label: "Target Surfaces"}
+  end
+
+  subgraph Candidate
+    direction TD
+
+    RetrieveCandidates[/"Retrieve Candidates"/] --> Candidates@{ shape: st-rect, label: "Candidates" }
+    Candidates --> PhysioChemFilter{"Physiochemical Filter(s)<br>(PAINS, CNS-MPO, etc.)"}
+    PhysioChemFilter --> PhysioChemFilteredCandidates@{shape: st-rect, label: "Filtered Candidates"}
+  end
+
+  subgraph Surrogate Model
+    direction TD
+
+    PhysioChemFilteredCandidates -- "sample" --> TrainingCandidates@{ shape: st-rect, label: "Training Candidates" }
+    TrainingCandidates --> TrainingConformerGeneration{{"Training Conformer Generation"}}
+    TrainingConformerGeneration --> TrainingConformers@{shape: st-rect, label: "Training Conformers"}
+
+    TrainingConformers --> ModelComplexGeneration["Complex Generation"]
+    TargetSurfaces --> ModelComplexGeneration
+
+    ModelComplexGeneration --> TrainingComplexes@{shape: st-rect, label: "Training Complexes"}
+
+    TrainingComplexes --> TrainModel["Train Model"]
+    TrainModel --> SurrogateModel@{shape: cyl, label: "Surrogate Model"}
+  end
+
+  subgraph Surrogate Model Filter
+    direction TD
+
+    SurrogateModel --> SurrogateModelFilter{"Model Filter"}
+    PhysioChemFilteredCandidates -- "full library" --> SurrogateModelFilter
+    SurrogateModelFilter --> SurrogateFilteredCandidates@{shape: st-rect, label: "Surrogate Filtered Candidates"}
+  end
+
+  subgraph Complex Generation
+    direction TD
+
+    SurrogateFilteredCandidates --> SurrogateFilteredCandidateConformerGeneration{{"Conformer Generation"}}
+    SurrogateFilteredCandidateConformerGeneration --> CandidateConformers@{ shape: st-rect, label: "Candidate Conformers"}
+
+    CandidateConformers --> ComplexGeneration["Complex Generation"]
+    TargetSurfaces --> ComplexGeneration
+
+    ComplexGeneration --> Complexes@{shape: st-rect, label: "Complexes"}
+  end
+
+```

@@ -1,7 +1,0 @@
----
-# configs/dev.yaml
-
-candidate:
-  batch_size: 50000
-
-# target...
