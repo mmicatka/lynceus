@@ -5,7 +5,7 @@ from pathlib import Path
 import dagster as dg
 
 from lynceus.candidate import CANDIDATE_ASSETS
-from lynceus.configuration.configuration import get_configs_from_directory
+from lynceus.configuration import load_configs
 
 
 REPO_ROOT = Path(__file__).parent.parent.parent
@@ -24,7 +24,7 @@ def _build_job_variants(configs_dir: Path) -> list[dg.JobDefinition]:
             config=config.run_config,
             description=f"Full pipeline job using config from {config.path.name}",
         )
-        for config in get_configs_from_directory(configs_dir)
+        for config in load_configs(configs_dir)
     ]
 
 

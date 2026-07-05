@@ -25,7 +25,7 @@ SECTION_TO_OPS: dict[str, tuple[str, ...]] = {
 }
 
 
-def sections_to_op_config(raw_config: dict) -> dict[str, dict]:
+def _sections_to_op_config(raw_config: dict) -> dict[str, dict]:
     values_by_op: dict[str, dict] = {}
     for section, values in raw_config.items():
         for op_name in SECTION_TO_OPS.get(section, ()):
@@ -45,12 +45,12 @@ def _load_yaml(path: Path) -> dict | None:
     return loaded
 
 
-def build_run_config(raw_config: dict) -> dg.RunConfig:
-    values_by_op = sections_to_op_config(raw_config)
+def _build_run_config(raw_config: dict) -> dg.RunConfig:
+    values_by_op = _sections_to_op_config(raw_config)
     return dg.RunConfig(ops={op: {"config": v} for op, v in values_by_op.items()})
 
 
-def get_configs_from_directory(
+def load_configs(
     configs_dir: Path,
     *,
     pattern: str = "*.yaml",
@@ -64,7 +64,7 @@ def get_configs_from_directory(
         if loaded is None:
             continue
 
-        run_config = build_run_config(loaded)
+        run_config = _build_run_config(loaded)
         configs.append(LynceusConfig(name=path.stem, path=path, run_config=run_config))
 
     if not configs:
