@@ -2,7 +2,7 @@
   "name": "lynceus-gpu",
   "build": {
     "dockerfile": "../../Dockerfile",
-    // "target": "dev-gpu"
+    "target": "dev-gpu"
   },
   "runArgs": [
     "--gpus=all"
@@ -33,9 +33,9 @@
       }
     }
   },
-  "mounts": [
-    "source=${localWorkspaceFolder}/data,target=/workspaces/lynceus/data,type=bind"
-  ],
+  // "mounts": [
+  //   "source=${localWorkspaceFolder}/data,target=/workspaces/lynceus/data,type=bind"
+  // ],
   "remoteUser": "appuser",
   "postCreateCommand": "uvx tool install pre-commit && pre-commit install"
 }
