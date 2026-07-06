@@ -2,7 +2,7 @@
   "name": "lynceus-gpu",
   "build": {
     "dockerfile": "../../Dockerfile",
-    "target": "dev-gpu"
+    "target": "dev-cpu"
   },
   "runArgs": [
     "--gpus=all"

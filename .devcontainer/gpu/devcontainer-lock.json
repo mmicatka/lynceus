@@ -1,0 +1,9 @@
+{
+  "features": {
+    "ghcr.io/nils-geistmann/devcontainers-features/zsh:0": {
+      "version": "0.0.8",
+      "resolved": "ghcr.io/nils-geistmann/devcontainers-features/zsh@sha256:fd57a61a5187480b5e73f8041be5b67005be48f06503736df6cfdd8d0f38f3c4",
+      "integrity": "sha256:fd57a61a5187480b5e73f8041be5b67005be48f06503736df6cfdd8d0f38f3c4"
+    }
+  }
+}
