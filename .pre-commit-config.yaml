@@ -15,3 +15,8 @@ repos:
     rev: v1.38.0
     hooks:
       - id: yamllint
+
+  - repo: https://github.com/seqeralabs/nf-lint-pre-commit
+    rev: v0.3.0
+    hooks:
+      - id: nextflow-lint
