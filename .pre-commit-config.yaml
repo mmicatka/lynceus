@@ -5,10 +5,9 @@ repos:
     hooks:
       - id: markdownlint-cli2
 
-  - repo: local
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v2.3.0
     hooks:
-      - id: yamllint
-        name: yamllint
-        entry: yamllint .
-        language: system
-        types: [yaml]
+      - id: check-yaml
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
