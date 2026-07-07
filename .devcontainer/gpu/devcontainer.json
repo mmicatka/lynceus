@@ -38,7 +38,7 @@
     }
   },
   "mounts": [
-    "source=${localWorkspaceFolder}/data,target=/workspaces/lynceus/data,type=bind"
+    "source=${localWorkspaceFolder}/results,target=/workspaces/lynceus/results,type=bind"
   ],
   "remoteUser": "appuser"
 }
