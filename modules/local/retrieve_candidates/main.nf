@@ -1,27 +1,28 @@
 // modules/local/retrieve_candidates/main.nf
 
 process RETRIEVE_CANDIDATES {
-  tag "${uri_list}"
-  label 'process_single'
+    tag "${uri_list}"
+    label 'process_single'
 
-  container "${workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container
-    ? 'oras://community.wave.seqera.io/library/aria2:1.37.0--pip_2f2088ab4b32e5f6'
-    : 'community.wave.seqera.io/library/aria2:1.37.0--262f3fe0d4293673'}"
+    container "quay.io/biocontainers/aria2:1.36.0"
+    containerOptions '--entrypoint ""'
 
-  input:
-  path uri_list
+    publishDir "${params.outdir}/candidate/retrieve", mode: 'copy'
 
-  output:
-  path "candidates/*", emit: candidates
-  path "aria2c.log", emit: log
-  path "versions.yml", emit: versions
+    input:
+    path uri_list
 
-  when:
-  task.ext.when == null || task.ext.when
+    output:
+    path "candidates/*", emit: candidates
+    path "aria2c.log", emit: log
+    path "versions.yml", emit: versions
 
-  script:
-  def args = task.ext.args ?: '--max-connection-per-server=4 --max-concurrent-downloads=8 --continue=true --retry-wait=5 --max-tries=3'
-  """
+    when:
+    task.ext.when == null || task.ext.when
+
+    script:
+    def args = task.ext.args ?: '--max-connection-per-server=4 --max-concurrent-downloads=8 --continue=true --retry-wait=5 --max-tries=3'
+    """
     mkdir -p candidates
 
     aria2c \\
@@ -37,8 +38,8 @@ process RETRIEVE_CANDIDATES {
     END_VERSIONS
     """
 
-  stub:
-  """
+    stub:
+    """
     mkdir -p candidates
     touch candidates/stub_candidate.txt
     touch aria2c.log
