@@ -6,7 +6,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get install -y \
     aria2 git curl ca-certificates build-essential cmake wget \
-    software-properties-common sudo unzip zip openjdk-17-jdk \
+    software-properties-common sudo unzip zip openjdk-25-jdk \
     && rm -rf /var/lib/apt/lists/*
 
 RUN curl -s https://get.nextflow.io | bash \
