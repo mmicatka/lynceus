@@ -8,7 +8,8 @@
     "--gpus=all"
   ],
   "features": {
-    "ghcr.io/nils-geistmann/devcontainers-features/zsh:0": {}
+    "ghcr.io/nils-geistmann/devcontainers-features/zsh:0": {},
+    "ghcr.io/devcontainers-extra/features/pre-commit:2": {}
   },
   "customizations": {
     "vscode": {
@@ -39,6 +40,5 @@
   "mounts": [
     "source=${localWorkspaceFolder}/data,target=/workspaces/lynceus/data,type=bind"
   ],
-  "remoteUser": "appuser",
-  "postCreateCommand": "uvx tool install pre-commit && pre-commit install"
+  "remoteUser": "appuser"
 }
