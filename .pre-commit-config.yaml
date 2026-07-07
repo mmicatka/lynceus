@@ -9,6 +9,6 @@ repos:
     hooks:
       - id: yamllint
         name: yamllint
-        entry: uvx yamllint .
+        entry: yamllint .
         language: system
         types: [yaml]

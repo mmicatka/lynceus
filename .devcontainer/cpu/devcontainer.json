@@ -6,7 +6,8 @@
   },
   "features": {
     "ghcr.io/nils-geistmann/devcontainers-features/zsh:0": {},
-    "ghcr.io/devcontainers-extra/features/pre-commit:2": {}
+    "ghcr.io/devcontainers-extra/features/pre-commit:2": {},
+    "ghcr.io/devcontainers-extra/features/yamllint:2": {}
   },
   "customizations": {
     "vscode": {
