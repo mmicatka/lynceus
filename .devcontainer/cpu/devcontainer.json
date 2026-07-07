@@ -1,0 +1,41 @@
+{
+  "name": "lynceus-cpu",
+  "build": {
+    "dockerfile": "../../Dockerfile",
+    "target": "dev-cpu"
+  },
+  "features": {
+    "ghcr.io/nils-geistmann/devcontainers-features/zsh:0": {},
+    "ghcr.io/devcontainers-extra/features/pre-commit:2": {}
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "bierner.markdown-mermaid",
+        "charliermarsh.ruff",
+        "davidanson.vscode-markdownlint",
+        "ms-azuretools.vscode-docker",
+        "ms-python.python",
+        "ms-toolsai.datawrangler",
+        "ms-toolsai.jupyter",
+        "nextflow.nextflow",
+        "redhat.vscode-yaml",
+        "tamasfe.even-better-toml"
+      ],
+      "settings": {
+        "terminal.integrated.stickyScroll.enabled": false,
+        "editor.formatOnSave": true,
+        "[markdown]": {
+          "editor.defaultFormatter": "DavidAnson.vscode-markdownlint"
+        },
+        "[python]": {
+          "editor.defaultFormatter": "charliermarsh.ruff"
+        }
+      }
+    }
+  },
+  "mounts": [
+    "source=${localWorkspaceFolder}/data,target=/workspaces/lynceus/data,type=bind"
+  ],
+  "remoteUser": "appuser"
+}
