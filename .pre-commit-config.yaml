@@ -1,14 +1,22 @@
 ---
 repos:
   - repo: https://github.com/DavidAnson/markdownlint-cli2
-    rev: v0.22.1
+    rev: v0.23.0
     hooks:
       - id: markdownlint-cli2
 
-  - repo: local
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.38.0
     hooks:
       - id: yamllint
-        name: yamllint
-        entry: uvx yamllint .
-        language: system
-        types: [yaml]
+
+  - repo: https://github.com/seqeralabs/nf-lint-pre-commit
+    rev: v0.3.0
+    hooks:
+      - id: nextflow-lint

@@ -17,7 +17,6 @@ Lynceus is built around the premise that **conformational state is itself the de
 flowchart TD
 
   subgraph Target
-    direction TD
 
     RetrieveTargets[/"Retrieve Target(s)"/] --> Targets@{ shape: st-rect, label: "Targets" }
     Targets --> EnsembleGeneration{{"Target Ensemble Generation"}}
@@ -25,16 +24,12 @@ flowchart TD
   end
 
   subgraph Candidate
-    direction TD
-
     RetrieveCandidates[/"Retrieve Candidates"/] --> Candidates@{ shape: st-rect, label: "Candidates" }
     Candidates --> PhysioChemFilter{"Physiochemical Filter(s)<br>(PAINS, CNS-MPO, etc.)"}
     PhysioChemFilter --> PhysioChemFilteredCandidates@{shape: st-rect, label: "Filtered Candidates"}
   end
 
   subgraph Surrogate Model
-    direction TD
-
     PhysioChemFilteredCandidates -- "sample" --> TrainingCandidates@{ shape: st-rect, label: "Training Candidates" }
     TrainingCandidates --> TrainingConformerGeneration{{"Training Conformer Generation"}}
     TrainingConformerGeneration --> TrainingConformers@{shape: st-rect, label: "Training Conformers"}
@@ -49,16 +44,12 @@ flowchart TD
   end
 
   subgraph Surrogate Model Filter
-    direction TD
-
     SurrogateModel --> SurrogateModelFilter{"Model Filter"}
     PhysioChemFilteredCandidates -- "full library" --> SurrogateModelFilter
     SurrogateModelFilter --> SurrogateFilteredCandidates@{shape: st-rect, label: "Surrogate Filtered Candidates"}
   end
 
   subgraph Complex Generation
-    direction TD
-
     SurrogateFilteredCandidates --> SurrogateFilteredCandidateConformerGeneration{{"Conformer Generation"}}
     SurrogateFilteredCandidateConformerGeneration --> CandidateConformers@{ shape: st-rect, label: "Candidate Conformers"}
 
