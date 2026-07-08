@@ -13,8 +13,6 @@ RUN curl -s https://get.nextflow.io | bash \
     && mv nextflow /usr/local/bin/ \
     && chmod +x /usr/local/bin/nextflow
 
-RUN curl -LsSf https://astral.sh/uv/install.sh | bash
-
 ARG USERNAME=appuser
 ARG USER_UID=1000
 ARG USER_GID=1000
@@ -24,14 +22,22 @@ RUN groupadd --gid ${USER_GID} ${USERNAME} || groupmod -n ${USERNAME} $(getent g
     && echo "${USERNAME} ALL=(root) NOPASSWD:ALL" > /etc/sudoers.d/${USERNAME} \
     && chmod 0440 /etc/sudoers.d/${USERNAME}
 
+# install uv as user
+USER ${USERNAME}
+RUN curl -LsSf https://astral.sh/uv/install.sh | bash
+
+USER root
+
 # Dev CPU
 FROM base AS dev-cpu
 RUN apt-get update \
-    && apt-get install -y tree graphviz  \
+    && apt-get install -y tree graphviz zsh \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /workspaces/lynceus
 USER appuser
+
+RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
 
 # GPU Base
 FROM base AS base-gpu
@@ -58,8 +64,10 @@ ENV GPU_LIBRARY_PATH=/usr/local/cuda/lib64
 FROM base-gpu AS dev-gpu
 
 RUN apt-get update \
-    && apt-get install -y tree graphviz  \
+    && apt-get install -y tree graphviz zsh \
     && rm -rf /var/lib/apt/lists/*
+
+RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
 
 WORKDIR /workspaces/lynceus
 USER appuser
