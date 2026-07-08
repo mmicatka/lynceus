@@ -5,7 +5,6 @@
     "target": "dev-cpu"
   },
   "features": {
-    "ghcr.io/nils-geistmann/devcontainers-features/zsh:0": {},
     "ghcr.io/devcontainers-extra/features/pre-commit:2": {},
     "ghcr.io/devcontainers-extra/features/yamllint:2": {},
     "ghcr.io/devcontainers/features/docker-in-docker:4": {}
@@ -26,6 +25,7 @@
       ],
       "settings": {
         "terminal.integrated.stickyScroll.enabled": false,
+        "terminal.integrated.defaultProfile.linux": "zsh",
         "editor.formatOnSave": true,
         "[markdown]": {
           "editor.defaultFormatter": "DavidAnson.vscode-markdownlint"
