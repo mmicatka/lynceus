@@ -3,5 +3,10 @@
 		{
 			"path": "modules/local/preprocess_candidates"
 		}
-	]
+	],
+	"settings": {
+		"python.venvFolders": [
+			".venv"
+		]
+	}
 }

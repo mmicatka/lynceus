@@ -34,8 +34,13 @@ from rdkit.Chem.FilterCatalog import FilterCatalog, FilterCatalogParams
 from src.cns_mpo import cns_mpo_from_mol
 
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(message)s",
+    stream=sys.stderr,
+)
 logger = logging.getLogger(__name__)
+
 
 # RDKit prints a lot of low-level parsing warnings to stderr by default;
 # we handle/report parse failures ourselves, so silence RDKit's own logger.
