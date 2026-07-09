@@ -13,7 +13,7 @@ build-preprocess:
 
 ## Dev environment: loads conf/examples/dev.yaml
 run-dev:
-	nextflow run main.nf -params-file conf/examples/dev.yaml
+	nextflow run main.nf -resume -params-file conf/examples/dev.yaml
 
 clean:
 	rm -rf work/
