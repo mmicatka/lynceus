@@ -3,6 +3,9 @@ name = "lynceus-dev"
 version = "0.1.0"
 description = "Add your description here"
 requires-python = ">=3.12"
+dependencies = [
+    "pre-commit>=4.6.0",
+]
 
 [tool.uv.workspace]
 members = ["modules/local/preprocess_candidates", "libs/*"]
