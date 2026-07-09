@@ -2,6 +2,16 @@
 name = "lynceus-dev"
 version = "0.1.0"
 description = "Add your description here"
-readme = "README.md"
 requires-python = ">=3.12"
-dependencies = ["jupyter>=1.1.1", "pandas>=3.0.3", "pyarrow>=24.0.0"]
+
+[tool.uv.workspace]
+members = ["modules/local/preprocess_candidates", "libs/*"]
+
+[dependency-groups]
+dev = [
+    "jupyter>=1.1.1",
+    "mypy>=2.2.0",
+    "pandas>=3.0.3",
+    "pyarrow>=24.0.0",
+    "ruff>=0.15.21",
+]
