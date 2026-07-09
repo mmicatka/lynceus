@@ -4,15 +4,12 @@
 # so environment-specific parameters never need to be typed by hand or
 # forgotten on the command line.
 
-.PHONY: build build-preprocessrun-test run-dev clean
+.PHONY: build build-preprocess run-test run-dev clean
 
 build: build-preprocess
 
 build-preprocess:
 	docker build -t lynceus/preprocess-candidates:0.1.0 modules/local/preprocess_candidates
-
-build-filter:
-	docker build -t lynceus/physiochem-filter:0.1.0 modules/local/physiochem_filter
 
 ## Dev environment: loads conf/examples/dev.yaml
 run-dev:

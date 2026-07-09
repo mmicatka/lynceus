@@ -13,8 +13,6 @@ WORKDIR /app
 COPY pyproject.toml ./
 COPY src ./src
 
-# Install dependencies into the system environment (no virtualenv needed
-# inside a container that only ever runs this one thing).
-RUN uv pip install --system --no-cache .
+RUN uv pip install --system .
 
 ENTRYPOINT []

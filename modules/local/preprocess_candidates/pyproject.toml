@@ -3,7 +3,11 @@ name = "preprocess-candidates"
 version = "0.1.0"
 description = "Add your description here"
 requires-python = ">=3.12"
-dependencies = ["polars>=1.42.1", "rdkit>=2026.3.3"]
+dependencies = [
+    "polars>=1.42.1",
+    "pyarrow>=24.0.0",
+    "rdkit>=2026.3.3",
+]
 
 [build-system]
 requires = ["hatchling"]
