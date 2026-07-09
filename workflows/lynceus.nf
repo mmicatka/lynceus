@@ -7,9 +7,12 @@ workflow LYNCEUS {
   main:
   ch_versions = channel.empty()
 
-  ch_uri_list = channel.fromPath(params.uri_list, checkIfExists: true)
+  def use_local = params.candidates_local_path as boolean
 
-  CANDIDATE(ch_uri_list)
+  ch_uri_list = use_local ? [] : file(params.uri_list, checkIfExists: true)
+  ch_local_path = use_local ? file(params.candidates_local_path, checkIfExists: true) : []
+
+  CANDIDATE(ch_uri_list, ch_local_path)
   ch_versions = ch_versions.mix(CANDIDATE.out.versions)
 
   emit:

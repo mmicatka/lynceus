@@ -81,20 +81,20 @@ def iter_smi_gz(path: Path):
             yield line_num, smiles, catalog_id
 
 
-def process_file(input_path: Path, output_path: Path, log_every: int = 1000) -> None:
+def process_file(input_path: Path, output_path: Path, log_every: int = 100) -> None:
     pains_catalog = build_pains_catalog()
 
     records = []
     n_seen = 0
     n_failed = 0
 
-    start_time = time.now()
+    start_time = time.perf_counter()
 
     for line_num, smiles, catalog_id in iter_smi_gz(input_path):
         n_seen += 1
 
         if n_seen % log_every == 0:
-            elapsed = time.time() - start_time
+            elapsed = time.perf_counter() - start_time
             records_per_sec = n_seen / elapsed if elapsed > 0 else 0
             logger.info(
                 "%s: processed %d records in %.2f seconds (%.2f rec/sec), %d failed/skipped",

@@ -1,6 +1,8 @@
 // modules/local/preprocess_candidates/main.nf
 
 process PREPROCESS_CANDIDATES {
+    debug true
+
     tag "${smi_gz}"
     label 'process_medium'
 

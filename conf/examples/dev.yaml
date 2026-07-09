@@ -2,4 +2,6 @@
 # conf/examples/dev.yaml
 
 uri_list: assets/candidate_uris.txt
+candidates_local_path: assets/.local/*
+
 outdir: results/dev
