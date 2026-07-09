@@ -14,5 +14,6 @@ workflow LYNCEUS {
 
   emit:
   candidates = CANDIDATE.out.candidates
+  parquet = CANDIDATE.out.parquet
   versions = ch_versions
 }
