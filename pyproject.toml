@@ -14,4 +14,5 @@ dev = [
     "pandas>=3.0.3",
     "pyarrow>=24.0.0",
     "ruff>=0.15.21",
+    "yamllint>=1.38.0",
 ]
