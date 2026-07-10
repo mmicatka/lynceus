@@ -8,8 +8,8 @@ workflow CANDIDATE {
   take:
   uri_list // path: file containing one download URI per line, or [] to skip
   local_path // path: local candidate file(s)/glob, or [] to skip
-  filter_config // path: YAML physiochemical filter configuration
-  partition_size // val:  max rows per output parquet partition
+  config // path: YAML physiochemical filter configuration
+  batch_size // val:  max rows per output parquet partition
 
   main:
   ch_versions = channel.empty()
@@ -37,7 +37,7 @@ workflow CANDIDATE {
 
   ch_all_parquet = PREPROCESS_CANDIDATES.out.parquet.collect()
 
-  PHYSIOCHEMICAL_FILTER(ch_all_parquet, filter_config, partition_size)
+  PHYSIOCHEMICAL_FILTER(ch_all_parquet, config, batch_size)
   ch_versions = ch_versions.mix(PHYSIOCHEMICAL_FILTER.out.versions)
 
   emit:

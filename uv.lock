@@ -1440,10 +1440,14 @@ version = "0.1.0"
 source = { editable = "modules/local/physiochemical_filter" }
 dependencies = [
     { name = "duckdb" },
+    { name = "pyyaml" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "duckdb", specifier = ">=1.5.4" }]
+requires-dist = [
+    { name = "duckdb", specifier = ">=1.5.4" },
+    { name = "pyyaml", specifier = ">=6.0.3" },
+]
 
 [[package]]
 name = "pillow"

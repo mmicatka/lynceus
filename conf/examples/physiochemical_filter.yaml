@@ -1,4 +1,5 @@
 ---
+# conf/examples/physiochemical_filter.yaml
 properties:
   molecular_weight:
     max: 700

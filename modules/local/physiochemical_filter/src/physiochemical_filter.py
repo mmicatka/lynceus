@@ -43,7 +43,7 @@ def _apply_cns_mpo_filter(
         return rel
     min_score = cns_mpo_cfg.get("min_score", 4.0)
     n_before = rel.count("*").fetchone()[0]
-    rel = rel.filter(f"cns_mpo_score >= {min_score}")
+    rel = rel.filter(f"cns_mpo >= {min_score}")
     n_after = rel.count("*").fetchone()[0]
     report["fail_reasons"]["cns_mpo"] = report["fail_reasons"].get("cns_mpo", 0) + (
         n_before - n_after
@@ -176,4 +176,5 @@ def main():
 
 
 if __name__ == "__main__":
+    logger.info("here")
     main()
