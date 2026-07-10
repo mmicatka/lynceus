@@ -1,3 +1,6 @@
+---
+#conf/params.yaml
+
 # Default parameters for the Lynceus pipeline.
 # Override with: nextflow run main.nf -params-file my_params.yaml
 # or: nextflow run main.nf --uri_list path/to/uris.txt

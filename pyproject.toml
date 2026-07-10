@@ -1,0 +1,21 @@
+[project]
+name = "lynceus-dev"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.12"
+dependencies = [
+    "pre-commit>=4.6.0",
+]
+
+[tool.uv.workspace]
+members = ["modules/local/preprocess_candidates", "libs/*"]
+
+[dependency-groups]
+dev = [
+    "jupyter>=1.1.1",
+    "mypy>=2.2.0",
+    "pandas>=3.0.3",
+    "pyarrow>=24.0.0",
+    "ruff>=0.15.21",
+    "yamllint>=1.38.0",
+]

@@ -3,3 +3,5 @@ results/
 .nextflow.log*
 .nextflow/
 work/
+
+assets/.local

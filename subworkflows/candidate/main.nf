@@ -1,19 +1,40 @@
 // subworkflows/candidate/main.nf
 
 include { RETRIEVE_CANDIDATES } from '../../modules/local/retrieve_candidates/main'
+include { PREPROCESS_CANDIDATES } from '../../modules/local/preprocess_candidates/main'
 
 workflow CANDIDATE {
   take:
-  uri_list // path: file containing one download URI per line
+  uri_list // path: file containing one download URI per line, or [] to skip
+  local_path // path: local candidate file(s)/glob, or [] to skip
 
   main:
   ch_versions = channel.empty()
 
-  RETRIEVE_CANDIDATES(uri_list)
-  ch_versions = ch_versions.mix(RETRIEVE_CANDIDATES.out.versions)
+  if (local_path) {
+    // Bypass aria2c entirely — use already-staged local candidate file(s)
+    ch_candidates = channel.fromPath(local_path, checkIfExists: true)
+    ch_download_log = channel.empty()
+  }
+  else {
+    RETRIEVE_CANDIDATES(uri_list)
+    ch_versions = ch_versions.mix(RETRIEVE_CANDIDATES.out.versions)
+
+    ch_candidates = RETRIEVE_CANDIDATES.out.candidates
+    ch_download_log = RETRIEVE_CANDIDATES.out.log
+  }
+
+  // Fan out: one PREPROCESS_CANDIDATES process per downloaded .smi.gz file.
+  ch_smi_gz = ch_candidates
+    .flatten()
+    .filter { file -> file.name.endsWith('.smi.gz') }
+
+  PREPROCESS_CANDIDATES(ch_smi_gz)
+  ch_versions = ch_versions.mix(PREPROCESS_CANDIDATES.out.versions)
 
   emit:
-  candidates = RETRIEVE_CANDIDATES.out.candidates // path: downloaded candidate files
-  download_log = RETRIEVE_CANDIDATES.out.log // path: aria2c.log
+  candidates = ch_candidates // path: candidate files (downloaded or local)
+  download_log = ch_download_log // path: aria2c.log, empty if local_path used
+  parquet = PREPROCESS_CANDIDATES.out.parquet // path: per-file descriptor parquet
   versions = ch_versions // channel: [ versions.yml ]
 }
