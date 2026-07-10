@@ -261,7 +261,7 @@ def _parse_workers(value: str) -> int:
     return n
 
 
-def parse_args():
+def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument(
         "--input",

@@ -2,11 +2,14 @@
 
 include { RETRIEVE_CANDIDATES } from '../../modules/local/retrieve_candidates/main'
 include { PREPROCESS_CANDIDATES } from '../../modules/local/preprocess_candidates/main'
+include { PHYSIOCHEMICAL_FILTER } from '../../modules/local/physiochemical_filter/main'
 
 workflow CANDIDATE {
   take:
   uri_list // path: file containing one download URI per line, or [] to skip
   local_path // path: local candidate file(s)/glob, or [] to skip
+  filter_config // path: YAML physiochemical filter configuration
+  partition_size // val:  max rows per output parquet partition
 
   main:
   ch_versions = channel.empty()
@@ -32,9 +35,16 @@ workflow CANDIDATE {
   PREPROCESS_CANDIDATES(ch_smi_gz)
   ch_versions = ch_versions.mix(PREPROCESS_CANDIDATES.out.versions)
 
+  ch_all_parquet = PREPROCESS_CANDIDATES.out.parquet.collect()
+
+  PHYSIOCHEMICAL_FILTER(ch_all_parquet, filter_config, partition_size)
+  ch_versions = ch_versions.mix(PHYSIOCHEMICAL_FILTER.out.versions)
+
   emit:
   candidates = ch_candidates // path: candidate files (downloaded or local)
   download_log = ch_download_log // path: aria2c.log, empty if local_path used
   parquet = PREPROCESS_CANDIDATES.out.parquet // path: per-file descriptor parquet
+  filtered_parquet = PHYSIOCHEMICAL_FILTER.out.parquet // path: filtered + repartitioned parquet
+  filter_report = PHYSIOCHEMICAL_FILTER.out.report // path: filter_report.json
   versions = ch_versions // channel: [ versions.yml ]
 }

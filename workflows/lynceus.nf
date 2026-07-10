@@ -12,7 +12,7 @@ workflow LYNCEUS {
   ch_uri_list = use_local ? [] : file(params.uri_list, checkIfExists: true)
   ch_local_path = use_local ? file(params.candidates_local_path, checkIfExists: true) : []
 
-  CANDIDATE(ch_uri_list, ch_local_path)
+  CANDIDATE(ch_uri_list, ch_local_path, params.filter.config, params.filter.batch_size)
   ch_versions = ch_versions.mix(CANDIDATE.out.versions)
 
   emit:

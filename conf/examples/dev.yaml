@@ -5,3 +5,7 @@ uri_list: assets/candidate_uris.txt
 candidates_local_path: assets/.local/*
 
 outdir: results/dev
+
+filter:
+  config: conf/examples/physiochemical_filter.yaml
+  batch_size: 100000
