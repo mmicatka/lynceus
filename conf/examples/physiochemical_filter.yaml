@@ -1,0 +1,14 @@
+---
+# conf/examples/physiochemical_filter.yaml
+properties:
+  molecular_weight:
+    max: 700
+  heavy_atom_count:
+    max: 50
+
+pains:
+  enabled: true
+
+cns_mpo:
+  enabled: true # real CNS-MPO scorer (Wager et al. 2010) is now wired in
+  min_score: 4.0

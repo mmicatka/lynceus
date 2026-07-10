@@ -3,12 +3,19 @@ name = "lynceus-dev"
 version = "0.1.0"
 description = "Add your description here"
 requires-python = ">=3.12"
-dependencies = [
-    "pre-commit>=4.6.0",
-]
+
+dependencies = ["physiochemical-filter", "preprocess-candidates"]
 
 [tool.uv.workspace]
-members = ["modules/local/preprocess_candidates", "libs/*"]
+members = [
+    "modules/local/preprocess_candidates",
+    "modules/local/physiochemical_filter",
+    "libs/*",
+]
+
+[tool.uv.sources]
+preprocess-candidates = { workspace = true }
+physiochemical-filter = { workspace = true }
 
 [dependency-groups]
 dev = [
@@ -18,4 +25,5 @@ dev = [
     "pyarrow>=24.0.0",
     "ruff>=0.15.21",
     "yamllint>=1.38.0",
+    "pre-commit>=4.6.0",
 ]

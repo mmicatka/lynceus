@@ -1,9 +1,12 @@
 [project]
-name = "preprocess-candidates"
+name = "physiochemical-filter"
 version = "0.1.0"
-description = "Preprocesses candidates"
+description = "Performs physiochemical-based filtering"
 requires-python = ">=3.12"
-dependencies = ["polars>=1.42.1", "pyarrow>=24.0.0", "rdkit>=2026.3.3"]
+dependencies = [
+    "duckdb>=1.5.4",
+    "pyyaml>=6.0.3",
+]
 
 [build-system]
 requires = ["hatchling"]
