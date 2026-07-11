@@ -1,0 +1,143 @@
+# libs/protein-conformational-ensemble/src/pce/manifest.py
+
+from __future__ import annotations
+
+from typing import Any
+
+import yaml
+
+from pce.errors import (
+    SemanticValidationError,
+    UnsupportedCapabilityError,
+    UnsupportedSchemaVersionError,
+)
+from pce.models import KNOWN_CAPABILITIES, Manifest, TrajectoryStructure
+from pce.schema import validate_schema
+from pce.weight_scheme import WEIGHT_SEMANTICS
+
+SUPPORTED_SCHEMA_VERSIONS = frozenset({"1.0.0"})
+
+_WEIGHT_SUM_TOLERANCE = 1e-9
+
+
+def parse_manifest_yaml(text: str) -> Manifest:
+    raw: dict[str, Any] = yaml.safe_load(text)
+    return parse_manifest_dict(raw)
+
+
+def parse_manifest_dict(raw: dict[str, Any]) -> Manifest:
+    validate_schema(raw)
+
+    schema_version = raw["schema_version"]
+    if schema_version not in SUPPORTED_SCHEMA_VERSIONS:
+        msg = (
+            f"Unsupported schema_version {schema_version!r}; this consumer supports "
+            f"{sorted(SUPPORTED_SCHEMA_VERSIONS)} (§2.5)"
+        )
+        raise UnsupportedSchemaVersionError(msg)
+
+    manifest = Manifest.from_dict(raw)
+    validate_semantics(manifest)
+    return manifest
+
+
+def validate_semantics(manifest: Manifest) -> None:
+    errors: list[str] = []
+
+    _check_member_ids_unique(manifest, errors)
+    _check_topology_reference(manifest, errors)
+    _check_residue_mappings(manifest, errors)
+    _check_weight_scheme(manifest, errors)
+    _check_capabilities(manifest, errors)
+
+    if errors:
+        details = "\n".join(f"  - {e}" for e in errors)
+        msg = (
+            f"Manifest failed semantic validation ({len(errors)} error(s)):\n{details}"
+        )
+        raise SemanticValidationError(msg)
+
+
+def _check_member_ids_unique(manifest: Manifest, errors: list[str]) -> None:
+    seen: set[str] = set()
+    for member in manifest.members:
+        if member.id in seen:
+            errors.append(f"Duplicate member id {member.id!r} (§2.4)")
+        seen.add(member.id)
+
+
+def _check_topology_reference(manifest: Manifest, errors: list[str]) -> None:
+    ref = manifest.topology_reference
+    if ref.member_id is not None and manifest.member_by_id(ref.member_id) is None:
+        errors.append(
+            f"topology_reference.member_id {ref.member_id!r} does not reference "
+            "an existing member (§3.4)"
+        )
+
+
+def _check_residue_mappings(manifest: Manifest, errors: list[str]) -> None:
+    del manifest, errors  # documented no-op; see docstring
+
+
+def _check_weight_scheme(manifest: Manifest, errors: list[str]) -> None:
+    weighted_members = [m for m in manifest.members if m.weight is not None]
+
+    if weighted_members and manifest.weight_scheme is None:
+        errors.append(
+            "weight_scheme is required because at least one member declares a weight (§3.3.1)"
+        )
+        return
+
+    if manifest.weight_scheme is None:
+        return
+
+    scheme_type = manifest.weight_scheme.type
+    if scheme_type not in WEIGHT_SEMANTICS:
+        errors.append(f"Unknown weight_scheme.type {scheme_type!r} (§3.3.2)")
+
+    if scheme_type == "custom" and manifest.weight_scheme.custom_semantics is None:
+        errors.append(
+            "weight_scheme.type is 'custom' but custom_semantics is missing; "
+            "required companion field (§3.3.2)"
+        )
+
+    for member in weighted_members:
+        member_type = member.weight.type if member.weight is not None else None
+        if member_type is not None and member_type != scheme_type:
+            errors.append(
+                f"Member {member.id!r} has weight.type={member_type!r}, which "
+                f"contradicts ensemble-level weight_scheme.type={scheme_type!r} (§3.3.1)"
+            )
+
+    if manifest.weight_scheme.normalized:
+        total = sum(m.weight.value for m in weighted_members if m.weight is not None)
+        if abs(total - 1.0) > _WEIGHT_SUM_TOLERANCE:
+            errors.append(
+                f"weight_scheme.normalized is true but member weights sum to {total!r}, "
+                f"not 1.0 +/- {_WEIGHT_SUM_TOLERANCE} (§3.3.1)"
+            )
+
+
+def _check_capabilities(manifest: Manifest, errors: list[str]) -> None:
+    has_trajectory_member = any(
+        isinstance(m.structure, TrajectoryStructure) for m in manifest.members
+    )
+    declared = set(manifest.capabilities_required)
+
+    if has_trajectory_member and "trajectory_backed" not in declared:
+        errors.append(
+            "At least one member uses topology_uri/trajectory_uri but "
+            "capabilities_required does not include 'trajectory_backed' (§3.1.1)"
+        )
+
+
+def check_capabilities_supported(
+    manifest: Manifest, supported: frozenset[str] = KNOWN_CAPABILITIES
+) -> None:
+    unsupported = set(manifest.capabilities_required) - set(supported)
+    if unsupported:
+        msg = (
+            f"Manifest requires capabilities not supported by this consumer: "
+            f"{sorted(unsupported)} (§3.1.1)"
+        )
+        raise UnsupportedCapabilityError(msg)
