@@ -28,3 +28,6 @@ dev = [
     "yamllint>=1.38.0",
     "pre-commit>=4.6.0",
 ]
+
+[tool.mypy]
+exclude = ['^\.venv/']

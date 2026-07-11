@@ -47,7 +47,7 @@ def _build_reservoir(input_glob: str, reservoir_size: int, seed: int) -> pl.Data
         return res_df
 
 
-def main() -> int:
+def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--input-glob",
@@ -73,13 +73,11 @@ def main() -> int:
         )
     except Exception as e:
         logger.error("DuckDB sampling failed: %s", e)
-        return 1
 
     if reservoir_df.is_empty():
         logger.error(
             "Reservoir is empty - check your --input-glob pattern or file contents."
         )
-        return 1
 
     # TODO: Add diversity sampling here
     out_df = reservoir_df

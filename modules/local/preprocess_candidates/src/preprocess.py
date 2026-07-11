@@ -85,6 +85,10 @@ def _build_fingerprint_gen(
 def _preprocess_record(
     record: tuple[str, str],
 ) -> dict:
+
+    if not _pains_catalog:
+        return {}
+
     smiles, catalog_id = record
 
     mol = Chem.MolFromSmiles(smiles)
