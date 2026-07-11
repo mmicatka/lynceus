@@ -30,3 +30,9 @@ repos:
     rev: v2.2.0
     hooks:
       - id: mypy
+        args:
+          [
+            --explicit-package-bases,
+            --namespace-packages,
+            --ignore-missing-imports,
+          ]
