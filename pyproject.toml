@@ -29,6 +29,5 @@ dev = [
     "pre-commit>=4.6.0",
 ]
 
-[[tool.mypy.overrides]]
-module = "rdkit.*"
-follow_imports = "skip"
+[tool.mypy]
+exclude = ['^\.venv/']
