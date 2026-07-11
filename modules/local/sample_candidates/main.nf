@@ -12,13 +12,11 @@ process SAMPLE_CANDIDATES {
     path "versions.yml", emit: versions
 
     script:
-    def reservoir_size = params.sample_candidates_reservoir_size ?: 25000
-    def seed = params.sample_candidates_seed ?: 42
     """
-    python3 -m src.sample_candidates.py \\
+    python3 -m src.sample_candidates \\
         --input-glob "candidates_*.parquet" \\
-        --reservoir-size ${reservoir_size} \\
-        --seed ${seed} \\
+        --reservoir-size 20000 \\
+        --seed 1000 \\
         --output training_candidates.parquet
 
     cat <<-END_VERSIONS > versions.yml

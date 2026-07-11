@@ -4,7 +4,7 @@
 # so environment-specific parameters never need to be typed by hand or
 # forgotten on the command line.
 
-.PHONY: build build-preprocess build-physiochemical-filter build-sample run-test run-dev clean
+.PHONY: build build-preprocess build-physiochemical-filter build-sample run-test run-dev clean reset
 
 build: build-preprocess build-physiochemical-filter build-sample
 
@@ -25,3 +25,6 @@ clean:
 	rm -rf work/
 	rm -rf .nextflow*
 	rm -f nextflow.log*
+
+reset: clean
+	rm -rf results/*

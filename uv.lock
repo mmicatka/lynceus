@@ -2073,6 +2073,7 @@ source = { editable = "modules/local/sample_candidates" }
 dependencies = [
     { name = "duckdb" },
     { name = "polars" },
+    { name = "pyarrow" },
     { name = "rdkit" },
 ]
 
@@ -2080,6 +2081,7 @@ dependencies = [
 requires-dist = [
     { name = "duckdb", specifier = ">=1.5.4" },
     { name = "polars", specifier = ">=1.42.1" },
+    { name = "pyarrow", specifier = ">=24.0.0" },
     { name = "rdkit", specifier = ">=2026.3.3" },
 ]
 
