@@ -4,15 +4,18 @@
 # so environment-specific parameters never need to be typed by hand or
 # forgotten on the command line.
 
-.PHONY: build build-preprocess build-physiochemical-filter run-test run-dev clean
+.PHONY: build build-preprocess build-physiochemical-filter build-sample run-test run-dev clean reset
 
-build: build-preprocess build-physiochemical-filter
+build: build-preprocess build-physiochemical-filter build-sample
 
 build-preprocess:
 	docker build -t lynceus/preprocess-candidates:0.1.0 modules/local/preprocess_candidates
 
 build-physiochemical-filter:
 	docker build -t lynceus/physiochemical-filter:0.1.0 modules/local/physiochemical_filter
+
+build-sample:
+	docker build -t lynceus/sample:0.1.0 modules/local/sample_candidates
 
 ## Dev environment: loads conf/examples/dev.yaml
 run-dev:
@@ -22,3 +25,6 @@ clean:
 	rm -rf work/
 	rm -rf .nextflow*
 	rm -f nextflow.log*
+
+reset: clean
+	rm -rf results/*

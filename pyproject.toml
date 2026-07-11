@@ -8,9 +8,10 @@ dependencies = ["physiochemical-filter", "preprocess-candidates"]
 
 [tool.uv.workspace]
 members = [
+    "libs/*",
     "modules/local/preprocess_candidates",
     "modules/local/physiochemical_filter",
-    "libs/*",
+    "modules/local/sample_candidates",
 ]
 
 [tool.uv.sources]

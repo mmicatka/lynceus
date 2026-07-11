@@ -3,6 +3,7 @@
 include { RETRIEVE_CANDIDATES } from '../../modules/local/retrieve_candidates/main'
 include { PREPROCESS_CANDIDATES } from '../../modules/local/preprocess_candidates/main'
 include { PHYSIOCHEMICAL_FILTER } from '../../modules/local/physiochemical_filter/main'
+include { SAMPLE_CANDIDATES } from '../../modules/local/sample_candidates/main'
 
 workflow CANDIDATE {
   take:
@@ -39,6 +40,8 @@ workflow CANDIDATE {
 
   PHYSIOCHEMICAL_FILTER(ch_all_parquet, config, batch_size)
   ch_versions = ch_versions.mix(PHYSIOCHEMICAL_FILTER.out.versions)
+
+  SAMPLE_CANDIDATES(PHYSIOCHEMICAL_FILTER.out.parquet.collect())
 
   emit:
   candidates = ch_candidates // path: candidate files (downloaded or local)
