@@ -1,10 +1,16 @@
+# pyproject.toml
+
 [project]
 name = "lynceus-dev"
 version = "0.1.0"
 description = "Add your description here"
 requires-python = ">=3.12"
 
-dependencies = ["physiochemical-filter", "preprocess-candidates"]
+dependencies = [
+    "physiochemical-filter",
+    "preprocess-candidates",
+    "protein-conformational-ensemble",
+]
 
 [tool.uv.workspace]
 members = [
@@ -12,11 +18,16 @@ members = [
     "modules/local/preprocess_candidates",
     "modules/local/physiochemical_filter",
     "modules/local/sample_candidates",
+    "modules/local/generate_manifest",
+    "modules/local/retrieve_pdb",
 ]
 
 [tool.uv.sources]
 preprocess-candidates = { workspace = true }
 physiochemical-filter = { workspace = true }
+sample-candidates = { workspace = true }
+generate-manifest = { workspace = true }
+protein-conformational-ensemble = { workspace = true }
 
 [dependency-groups]
 dev = [
@@ -28,6 +39,3 @@ dev = [
     "yamllint>=1.38.0",
     "pre-commit>=4.6.0",
 ]
-
-[tool.mypy]
-exclude = ['^\.venv/']

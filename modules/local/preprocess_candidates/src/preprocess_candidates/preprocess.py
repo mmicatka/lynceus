@@ -1,4 +1,4 @@
-# modules/local/preprocess_candidates/src/preprocess.py
+# modules/local/preprocess_candidates/src/preprocess_candidates/preprocess.py
 
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ import pyarrow.parquet as pq
 from rdkit import Chem, RDLogger
 from rdkit.Chem import Descriptors, rdFingerprintGenerator
 from rdkit.Chem.FilterCatalog import FilterCatalog, FilterCatalogParams
-from src.cns_mpo import cns_mpo_from_mol
+from .cns_mpo import cns_mpo_from_mol
 
 
 logging.basicConfig(

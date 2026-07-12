@@ -1,0 +1,103 @@
+# modules/local/generate_manifest/src/generate_manifest.py
+
+from __future__ import annotations
+
+import argparse
+import sys
+from pathlib import Path
+from typing import Any
+
+import yaml
+
+try:
+    from pce.generation import MemberSpec, generate_ensemble
+    from pce.models import WeightScheme
+except ImportError as exc:  # pragma: no cover - fails loudly in CI/dry-run
+    print(
+        f"FATAL: could not import pce library ({exc}). "
+        "Confirm the pce dependency in pyproject.toml resolves correctly "
+        "inside this module's container.",
+        file=sys.stderr,
+    )
+    raise
+
+_STRUCTURE_SUFFIXES = {".cif", ".pdb", ".mmcif"}
+_WEIGHTS_FILENAME = "weights.yaml"
+
+
+def _discover_member_specs(
+    members_dir: Path,
+) -> tuple[list[MemberSpec], WeightScheme | None]:
+    weights_path = members_dir / _WEIGHTS_FILENAME
+    weights_data: dict[str, Any] | None = None
+    if weights_path.exists():
+        with weights_path.open() as f:
+            weights_data = yaml.safe_load(f)
+
+    structure_files = sorted(
+        p for p in members_dir.iterdir() if p.suffix.lower() in _STRUCTURE_SUFFIXES
+    )
+    if not structure_files:
+        raise ValueError(
+            f"No structure files ({sorted(_STRUCTURE_SUFFIXES)}) found under {members_dir}"
+        )
+
+    weight_values: dict[str, float] = (weights_data or {}).get("values", {})
+    weight_type = (weights_data or {}).get("type")
+
+    specs = []
+    for path in structure_files:
+        member_id = path.stem
+        weight_value = weight_values.get(member_id)
+        specs.append(
+            MemberSpec(
+                id=member_id,
+                source_path=path,
+                weight_value=weight_value,
+                weight_type=weight_type if weight_value is not None else None,
+            )
+        )
+
+    weight_scheme = None
+    if weights_data is not None:
+        weight_scheme = WeightScheme(
+            type=weights_data["type"],
+            normalized=weights_data.get("normalized", False),
+            custom_semantics=weights_data.get("custom_semantics"),
+        )
+
+    return specs, weight_scheme
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Generate a multi-member PCE manifest from a directory of member structures."
+    )
+    parser.add_argument("--members-dir", type=Path, required=True)
+    parser.add_argument("--ensemble-id", type=str, required=True)
+    parser.add_argument("--outdir", type=Path, required=True)
+    parser.add_argument(
+        "--topology-member-id",
+        type=str,
+        default=None,
+        help="Defaults to the first member found (alphabetical by filename) if omitted.",
+    )
+    args = parser.parse_args()
+
+    member_specs, weight_scheme = _discover_member_specs(args.members_dir)
+
+    manifest = generate_ensemble(
+        ensemble_id=args.ensemble_id,
+        member_specs=member_specs,
+        package_root=args.outdir,
+        weight_scheme=weight_scheme,
+        topology_member_id=args.topology_member_id,
+    )
+
+    print(
+        f"Wrote PCE manifest: {args.outdir / 'manifest.yaml'} ({len(manifest.members)} members)"
+    )
+
+
+if __name__ == "__main__":
+    main()

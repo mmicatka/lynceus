@@ -9,3 +9,18 @@ outdir: results/dev
 filter:
   config: conf/examples/physiochemical_filter.yaml
   batch_size: 100000
+
+#### TARGET #####
+
+target:
+  ensemble:
+    ensemble_id: "1STP_static_v1"
+    type: "static"
+    components:
+      - pdb_id: "1STP"
+        weight: 1.0
+
+    capabilities_required:
+      - "standalone_cif"
+
+  outdir: "results/target_ensemble_generation/1stp"

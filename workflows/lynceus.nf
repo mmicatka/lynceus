@@ -1,6 +1,7 @@
 // workflows/lynceus.nf
 
 include { CANDIDATE } from '../subworkflows/candidate/main'
+include { TARGET } from '../subworkflows/target/main'
 
 workflow LYNCEUS {
 
@@ -15,6 +16,8 @@ workflow LYNCEUS {
 
   CANDIDATE(ch_uri_list, ch_local_path, filter_config, params.filter.batch_size)
   ch_versions = ch_versions.mix(CANDIDATE.out.versions)
+
+  TARGET(params.target.ensemble)
 
   emit:
   candidates = CANDIDATE.out.candidates

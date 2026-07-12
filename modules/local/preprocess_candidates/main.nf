@@ -24,7 +24,7 @@ process PREPROCESS_CANDIDATES {
     def prefix = smi_gz.simpleName
     // strips both .gz and .smi (multi-extension aware)
     """
-    python3 -m src.preprocess \\
+    python3 -m preprocess_candidates.preprocess \\
         --input ${smi_gz} \\
         --output ${prefix}.parquet
 
