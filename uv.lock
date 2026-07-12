@@ -1084,6 +1084,7 @@ source = { virtual = "." }
 dependencies = [
     { name = "physiochemical-filter" },
     { name = "preprocess-candidates" },
+    { name = "protein-conformational-ensemble" },
 ]
 
 [package.dev-dependencies]
@@ -1101,6 +1102,7 @@ dev = [
 requires-dist = [
     { name = "physiochemical-filter", editable = "modules/local/physiochemical_filter" },
     { name = "preprocess-candidates", editable = "modules/local/preprocess_candidates" },
+    { name = "protein-conformational-ensemble", editable = "libs/protein-conformational-ensemble" },
 ]
 
 [package.metadata.requires-dev]
@@ -1694,7 +1696,7 @@ wheels = [
 [[package]]
 name = "protein-conformational-ensemble"
 version = "0.1.0"
-source = { virtual = "libs/protein-conformational-ensemble" }
+source = { editable = "libs/protein-conformational-ensemble" }
 dependencies = [
     { name = "blake3" },
     { name = "jsonschema" },
