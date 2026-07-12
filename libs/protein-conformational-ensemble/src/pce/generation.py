@@ -117,30 +117,3 @@ def generate_ensemble(
     manifest_path.write_bytes(manifest_yaml)
 
     return final_manifest
-
-
-def generate_degenerate_ensemble(
-    *,
-    ensemble_id: str,
-    structure_path: Path,
-    package_root: Path,
-    member_id: str | None = None,
-    provenance: dict | None = None,
-) -> Manifest:
-    resolved_member_id = member_id or ensemble_id
-
-    spec = MemberSpec(
-        id=resolved_member_id,
-        source_path=structure_path,
-        weight_value=1.0,
-        weight_type="uniform",
-        provenance=provenance,
-    )
-
-    return generate_ensemble(
-        ensemble_id=ensemble_id,
-        member_specs=[spec],
-        package_root=package_root,
-        weight_scheme=WeightScheme(type="uniform", normalized=True),
-        topology_member_id=resolved_member_id,
-    )

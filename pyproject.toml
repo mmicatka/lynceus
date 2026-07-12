@@ -25,6 +25,8 @@ members = [
 [tool.uv.sources]
 preprocess-candidates = { workspace = true }
 physiochemical-filter = { workspace = true }
+sample-candidates = { workspace = true }
+generate-manifest = { workspace = true }
 protein-conformational-ensemble = { workspace = true }
 
 [dependency-groups]
@@ -37,6 +39,3 @@ dev = [
     "yamllint>=1.38.0",
     "pre-commit>=4.6.0",
 ]
-
-[tool.mypy]
-exclude = ['^\.venv/']

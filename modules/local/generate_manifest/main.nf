@@ -1,24 +1,22 @@
 // modules/local/generate_manifest/main.nf
 
 process GENERATE_MANIFEST {
-  tag "${ensemble_id}"
-  label 'process_single'
-  container 'lynceus/generate-manifest:latest'
+    tag "${ensemble_id}"
+    label 'process_single'
+    container 'lynceus/generate-manifest:0.1.0'
 
-  input:
-  tuple val(ensemble_id), path(members_dir)
-  path config_yaml
+    input:
+    tuple val(ensemble_id), path(ensemble_dir)
 
-  output:
-  tuple val(ensemble_id), path("${ensemble_id}"), emit: pce_package
-  path "versions.yml", emit: versions
+    output:
+    tuple val(ensemble_id), path("${ensemble_id}"), emit: pce_package
+    path "versions.yml", emit: versions
 
-  script:
-  """
-    python -m src.generate_manifest \\
-        --members-dir ${members_dir} \\
+    script:
+    """
+    python -m generate_manifest.generate_manifest \\
+        --members-dir ${ensemble_dir} \\
         --ensemble-id ${ensemble_id} \\
-        --config ${config_yaml} \\
         --outdir ${ensemble_id}
 
     cat <<-END_VERSIONS > versions.yml
@@ -28,8 +26,8 @@ process GENERATE_MANIFEST {
     END_VERSIONS
     """
 
-  stub:
-  """
+    stub:
+    """
     mkdir -p ${ensemble_id}
     touch ${ensemble_id}/manifest.yaml
 

@@ -75,7 +75,6 @@ def main() -> None:
     )
     parser.add_argument("--members-dir", type=Path, required=True)
     parser.add_argument("--ensemble-id", type=str, required=True)
-    parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--outdir", type=Path, required=True)
     parser.add_argument(
         "--topology-member-id",
@@ -85,14 +84,6 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    with args.config.open() as f:
-        config = yaml.safe_load(f) or {}
-
-    manifest_cfg = config.get("manifest", {})
-    capabilities_required = tuple(
-        manifest_cfg.get("capabilities_required", ["standalone_cif"])
-    )
-
     member_specs, weight_scheme = _discover_member_specs(args.members_dir)
 
     manifest = generate_ensemble(
@@ -101,7 +92,6 @@ def main() -> None:
         package_root=args.outdir,
         weight_scheme=weight_scheme,
         topology_member_id=args.topology_member_id,
-        capabilities_required=capabilities_required,
     )
 
     print(

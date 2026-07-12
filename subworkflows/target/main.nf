@@ -1,6 +1,7 @@
 // subworkflows/target/main.nf
 
 include { RETRIEVE_PDB } from '../../modules/local/retrieve_pdb/main'
+include { GENERATE_MANIFEST } from '../../modules/local/generate_manifest/main'
 
 workflow TARGET {
   take:
@@ -17,6 +18,8 @@ workflow TARGET {
 
   RETRIEVE_PDB(ch_retrieve_input)
   ch_versions = ch_versions.mix(RETRIEVE_PDB.out.versions)
+
+  GENERATE_MANIFEST(RETRIEVE_PDB.out.structure_dir)
 
   emit:
   structure_dir = RETRIEVE_PDB.out.structure_dir

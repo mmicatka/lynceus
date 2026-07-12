@@ -10,8 +10,12 @@ COPY --from=ghcr.io/astral-sh/uv:0.11.28-python3.12-trixie /usr/local/bin/uv /us
 
 WORKDIR /app
 
-COPY pyproject.toml ./
-COPY src ./src
+COPY pyproject.toml uv.lock ./
+COPY libs/protein-conformational-ensemble ./libs/protein-conformational-ensemble
+
+COPY modules/local/generate_manifest ./modules/local/generate_manifest
+
+WORKDIR /app/modules/local/generate_manifest
 
 RUN uv pip install --system .
 
