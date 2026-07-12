@@ -16,7 +16,7 @@ workflow LYNCEUS {
   CANDIDATE(ch_uri_list, ch_local_path, params.filter, params.filter.batch_size)
   ch_versions = ch_versions.mix(CANDIDATE.out.versions)
 
-  TARGET(params.target)
+  TARGET(params.target.ensemble)
 
   emit:
   candidates = CANDIDATE.out.candidates

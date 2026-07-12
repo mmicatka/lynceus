@@ -5,4 +5,14 @@ name = "generate-manifest"
 version = "0.1.0"
 description = "Add your description here"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = ["protein-conformational-ensemble"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/generate_manifest"]
+
+[tool.uv.sources]
+protein-conformational-ensemble = { workspace = true }

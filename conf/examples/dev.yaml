@@ -14,10 +14,12 @@ filter:
 
 target:
   ensemble:
-    - ensemble_id: "1STP_degenerate_v1"
-      pdb_id: "1STP"
+    ensemble_id: "1STP_static_v1"
+    type: "static"
+    components:
+      - pdb_id: "1STP"
+        weight: 1.0
 
-  degenerate_pce:
     capabilities_required:
       - "standalone_cif"
 

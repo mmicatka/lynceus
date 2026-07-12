@@ -6,7 +6,7 @@
 
 .PHONY: build build-preprocess build-physiochemical-filter build-sample run-test run-dev clean reset
 
-build: build-preprocess build-physiochemical-filter build-sample
+build: build-preprocess build-physiochemical-filter build-sample build-retrieve-pdb
 
 build-preprocess:
 	docker build -t lynceus/preprocess-candidates:0.1.0 modules/local/preprocess_candidates
@@ -16,6 +16,9 @@ build-physiochemical-filter:
 
 build-sample:
 	docker build -t lynceus/sample:0.1.0 modules/local/sample_candidates
+
+build-retrieve-pdb:
+	docker build -t lynceus/retrieve_pdb:0.1.0 modules/local/retrieve_pdb
 
 ## Dev environment: loads conf/examples/dev.yaml
 run-dev:

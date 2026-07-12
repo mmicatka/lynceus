@@ -18,6 +18,8 @@ members = [
     "modules/local/preprocess_candidates",
     "modules/local/physiochemical_filter",
     "modules/local/sample_candidates",
+    "modules/local/generate_manifest",
+    "modules/local/retrieve_pdb",
 ]
 
 [tool.uv.sources]
