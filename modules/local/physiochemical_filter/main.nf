@@ -23,7 +23,7 @@ process PHYSIOCHEMICAL_FILTER {
 
     script:
     """
-    python3 -m src.physiochemical_filter \\
+    python3 -m physiochemical_filter.physiochemical_filter \\
         --input ${parquet_files} \\
         --config ${filter_config} \\
         --output-dir partitions \\
