@@ -18,9 +18,9 @@ build-sample:
 	docker build -t lynceus/sample:0.1.0 modules/local/sample_candidates
 
 build-retrieve-pdb:
-	docker build -t lynceus/retrieve_pdb:0.1.0 modules/local/retrieve_pdb
+	docker build -t lynceus/retrieve-pdb:0.1.0 modules/local/retrieve_pdb
 
-## Dev environment: loads conf/examples/dev.yaml
+# Dev environment: loads conf/examples/dev.yaml
 run-dev:
 	nextflow run main.nf -resume -params-file conf/examples/dev.yaml
 

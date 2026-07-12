@@ -3,7 +3,7 @@
 process RETRIEVE_PDB {
     tag "${ensemble_id}"
     label 'process_single'
-    container 'lynceus/download-pdb:0.1.0'
+    container 'lynceus/retrieve-pdb:0.1.0'
     maxRetries 2
     errorStrategy 'retry'
 
@@ -17,7 +17,7 @@ process RETRIEVE_PDB {
     script:
     def pdb_ids_str = pdb_ids.join(' ')
     """
-    python -m src.download_pdb \\
+    python -m retrieve_pdb.retrieve_pdb \\
         --pdb-ids ${pdb_ids_str} \\
         --outdir structure_dir
 
