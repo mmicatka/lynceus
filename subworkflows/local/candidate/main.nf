@@ -1,9 +1,8 @@
 // subworkflows/candidate/main.nf
 
-include { RETRIEVE_CANDIDATES } from '../../modules/local/retrieve_candidates/main'
-include { PREPROCESS_CANDIDATES } from '../../modules/local/preprocess_candidates/main'
-include { PHYSIOCHEMICAL_FILTER } from '../../modules/local/physiochemical_filter/main'
-include { SAMPLE_CANDIDATES } from '../../modules/local/sample_candidates/main'
+include { RETRIEVE_CANDIDATES } from '../../../modules/local/retrieve_candidates'
+include { PREPROCESS_CANDIDATES } from '../../../modules/local/preprocess_candidates'
+include { PHYSIOCHEMICAL_FILTER } from '../../../modules/local/physiochemical_filter'
 
 workflow CANDIDATE {
   take:
@@ -41,13 +40,8 @@ workflow CANDIDATE {
   PHYSIOCHEMICAL_FILTER(ch_all_parquet, config, batch_size)
   ch_versions = ch_versions.mix(PHYSIOCHEMICAL_FILTER.out.versions)
 
-  SAMPLE_CANDIDATES(PHYSIOCHEMICAL_FILTER.out.parquet.collect())
-
   emit:
-  candidates = ch_candidates // path: candidate files (downloaded or local)
-  download_log = ch_download_log // path: aria2c.log, empty if local_path used
-  parquet = PREPROCESS_CANDIDATES.out.parquet // path: per-file descriptor parquet
-  filtered_parquet = PHYSIOCHEMICAL_FILTER.out.parquet // path: filtered + repartitioned parquet
+  filtered_parquets = PHYSIOCHEMICAL_FILTER.out.parquet.collect() // path: filtered + repartitioned parquet
   filter_report = PHYSIOCHEMICAL_FILTER.out.report // path: filter_report.json
   versions = ch_versions // channel: [ versions.yml ]
 }

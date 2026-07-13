@@ -5,7 +5,7 @@ process SAMPLE_CANDIDATES {
     container "lynceus/sample:0.1.0"
 
     input:
-    path candidates_parquet, stageAs: 'candidates_*.parquet'
+    path candidates_parquets, stageAs: 'candidates_*.parquet'
 
     output:
     path ("training_candidates.parquet"), emit: training_candidates

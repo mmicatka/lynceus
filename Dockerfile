@@ -5,8 +5,11 @@ FROM ubuntu:24.04 AS base
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get install -y \
-    aria2 git curl ca-certificates build-essential cmake wget \
-    software-properties-common sudo unzip zip openjdk-25-jdk \
+    aria2 \
+    git \
+    curl  ca-certificates build-essential cmake wget \
+    software-properties-common sudo unzip zip openjdk-25-jdk  \
+    swig libboost-all-dev python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
 RUN curl -s https://get.nextflow.io | bash \
