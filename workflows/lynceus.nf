@@ -1,7 +1,8 @@
 // workflows/lynceus.nf
 
-include { CANDIDATE } from '../subworkflows/candidate/main'
-include { TARGET } from '../subworkflows/target/main'
+include { CANDIDATE } from '../subworkflows/local/candidate'
+include { TARGET } from '../subworkflows/local/target'
+include { SURROGATE_MODEL_TRAIN } from '../subworkflows/local/surrogate_model'
 
 workflow LYNCEUS {
 
@@ -19,8 +20,10 @@ workflow LYNCEUS {
 
   TARGET(params.target.ensemble)
 
+  SURROGATE_MODEL_TRAIN(CANDIDATE.out.filtered_parquets)
+  ch_versions = ch_versions.mix(SURROGATE_MODEL_TRAIN.out.versions)
+
   emit:
-  candidates = CANDIDATE.out.candidates
-  parquet = CANDIDATE.out.parquet
+  training_candidates = SURROGATE_MODEL_TRAIN.out.training_candidates
   versions = ch_versions
 }

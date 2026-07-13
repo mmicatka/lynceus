@@ -1,7 +1,7 @@
 // subworkflows/target/main.nf
 
-include { RETRIEVE_PDB } from '../../modules/local/retrieve_pdb/main'
-include { GENERATE_MANIFEST } from '../../modules/local/generate_manifest/main'
+include { RETRIEVE_PDB } from '../../../modules/local/retrieve_pdb/main'
+include { GENERATE_MANIFEST } from '../../../modules/local/generate_manifest/main'
 
 workflow TARGET {
   take:
