@@ -1,0 +1,9 @@
+# modules/local/detect_putative_sites/pyproject.toml
+
+[project]
+name = "detect-putative-sites"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = []
