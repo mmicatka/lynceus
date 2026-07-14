@@ -13,7 +13,7 @@ process DETECT_PUTATIVE_SITES {
 
     script:
     """
-    python3 -m preprocess_candidates.preprocess \\
+    python3 -m detect_putative_sites.detect_putative_sites \\
         --structure ${structure} \\
         --member-id ${member_id} \\
         --weight ${weight} \\

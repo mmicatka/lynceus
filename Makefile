@@ -23,6 +23,9 @@ build-retrieve-pdb:
 build-generate-manifest:
 	docker build -f modules/local/generate_manifest/Dockerfile -t lynceus/generate-manifest:0.1.0 .
 
+build-detect-putative-sites:
+	docker build -f modules/local/detect_putative_sites/Dockerfile -t lynceus/detect-putative-sites:0.1.0 .
+
 # Dev environment: loads conf/examples/dev.yaml
 run-dev:
 	nextflow run main.nf -resume -params-file conf/examples/dev.yaml

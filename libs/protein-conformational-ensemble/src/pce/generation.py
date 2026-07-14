@@ -22,7 +22,7 @@ from pce.models import (
     Weight,
     WeightScheme,
 )
-from pce.package import MANIFEST_FILENAME
+from pce.ensemble import MANIFEST_FILENAME
 
 _PLACEHOLDER_HASH = "blake3:" + "0" * 64
 
