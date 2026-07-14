@@ -12,9 +12,7 @@ process DETECT_PUTATIVE_SITES {
     script:
     """
     python3 -m detect_putative_sites.detect_putative_sites \\
-        --structure ${structure} \\
-        --member-id ${member_id} \\
-        --weight ${weight} \\
-        --out ${member_id}.sites.json
+        --ensemble ${ensemble_dir} \\
+        --out ${ensemble_id}.sites.json
     """
 }

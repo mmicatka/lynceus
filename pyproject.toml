@@ -7,9 +7,12 @@ description = "Add your description here"
 requires-python = ">=3.12"
 
 dependencies = [
-    "physiochemical-filter",
-    "preprocess-candidates",
+    # libs
+    "lynceus-chem",
     "protein-conformational-ensemble",
+    # members
+    "preprocess-candidates",
+    "detect-putative-sites",
 ]
 
 [tool.uv.workspace]
@@ -29,6 +32,8 @@ physiochemical-filter = { workspace = true }
 sample-candidates = { workspace = true }
 generate-manifest = { workspace = true }
 protein-conformational-ensemble = { workspace = true }
+detect-putative-sites = { workspace = true }
+lynceus-chem = { workspace = true }
 
 [dependency-groups]
 dev = [
