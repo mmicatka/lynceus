@@ -5,4 +5,9 @@ name = "detect-putative-sites"
 version = "0.1.0"
 description = "Add your description here"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "protein-conformational-ensemble",
+]
+
+[tool.uv.sources]
+protein-conformational-ensemble = { workspace = true }

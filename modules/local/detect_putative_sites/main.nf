@@ -3,13 +3,11 @@
 process DETECT_PUTATIVE_SITES {
     debug true
 
-    tag "${member_id}"
-
     input:
-    tuple val(member_id), val(weight), path(structure)
+    tuple val(ensemble_id), path(ensemble_dir)
 
     output:
-    tuple val(member_id), path("${member_id}.sites.json"), emit: sites
+    path ("${ensemble_id}.sites.json"), emit: sites
 
     script:
     """

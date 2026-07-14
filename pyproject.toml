@@ -15,6 +15,7 @@ dependencies = [
 [tool.uv.workspace]
 members = [
     "libs/*",
+    "modules/local/detect_putative_sites",
     "modules/local/preprocess_candidates",
     "modules/local/physiochemical_filter",
     "modules/local/sample_candidates",

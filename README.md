@@ -17,10 +17,9 @@ Lynceus is built around the premise that **conformational state is itself the de
 flowchart TD
 
   subgraph Target
-
     RetrieveTargets[/"Retrieve Target(s)"/] --> Targets@{ shape: st-rect, label: "Targets" }
     Targets --> EnsembleGeneration{{"Target Ensemble Generation"}}
-    EnsembleGeneration --> TargetSurfaces@{shape: st-rect, label: "Target Surfaces"}
+    EnsembleGeneration --> PutativeBindingSites@{shape: st-rect, label: "Putative Binding Sites"}
   end
 
   subgraph Candidate
@@ -35,7 +34,7 @@ flowchart TD
     TrainingConformerGeneration --> TrainingConformers@{shape: st-rect, label: "Training Conformers"}
 
     TrainingConformers --> ModelComplexGeneration["Complex Generation"]
-    TargetSurfaces --> ModelComplexGeneration
+    PutativeBindingSites --> ModelComplexGeneration
 
     ModelComplexGeneration --> TrainingComplexes@{shape: st-rect, label: "Training Complexes"}
 
@@ -54,7 +53,7 @@ flowchart TD
     SurrogateFilteredCandidateConformerGeneration --> CandidateConformers@{ shape: st-rect, label: "Candidate Conformers"}
 
     CandidateConformers --> ComplexGeneration["Complex Generation"]
-    TargetSurfaces --> ComplexGeneration
+    PutativeBindingSites --> ComplexGeneration
 
     ComplexGeneration --> Complexes@{shape: st-rect, label: "Complexes"}
   end
