@@ -9,24 +9,28 @@ from typing import Protocol
 from blake3 import blake3
 
 from pce.canonical import canonical_serialize
-from pce.models import Manifest, Member, TrajectoryStructure
+from pce.models import Manifest, ConformationalState, TrajectoryStructure
 
 ALGORITHM_PREFIX = "blake3"
 
 
 class StructureBytesResolver(Protocol):
-    def __call__(self, member: Member, package_root: Path) -> bytes: ...
+    def __call__(
+        self, conformational_state: ConformationalState, package_root: Path
+    ) -> bytes: ...
 
 
 def _blake3_digest(data: bytes) -> bytes:
     return blake3(data).digest()
 
 
-def default_structure_bytes(member: Member, package_root: Path) -> bytes:
-    structure = member.structure
+def default_structure_bytes(
+    conformational_state: ConformationalState, package_root: Path
+) -> bytes:
+    structure = conformational_state.structure
     if isinstance(structure, TrajectoryStructure):
         msg = (
-            f"Member {member.id!r} is trajectory-backed; extracting the exact "
+            f"Member {conformational_state.id!r} is trajectory-backed; extracting the exact "
             "frame_index byte range requires a trajectory-format-aware reader "
             "(e.g. MDAnalysis/mdtraj), which is out of scope for this reference "
             "implementation. Supply a custom StructureBytesResolver -- see "
@@ -39,14 +43,16 @@ def default_structure_bytes(member: Member, package_root: Path) -> bytes:
 
 
 def extract_trajectory_frame_bytes(
-    member: Member,
+    conformational_state: ConformationalState,
     package_root: Path,
     *,
     frame_reader: Callable[[Path, Path, int, str], bytes] | None = None,
 ) -> bytes:
-    structure = member.structure
+    structure = conformational_state.structure
     if not isinstance(structure, TrajectoryStructure):
-        msg = f"Member {member.id!r} is not trajectory-backed"
+        msg = (
+            f"Conformational State {conformational_state.id!r} is not trajectory-backed"
+        )
         raise TypeError(msg)
 
     if frame_reader is None:
@@ -70,14 +76,14 @@ def extract_trajectory_frame_bytes(
     return frame_bytes + topology_bytes
 
 
-def member_leaf_hash(
-    member: Member,
+def conformational_state_leaf_hash(
+    conformational_state: ConformationalState,
     package_root: Path,
     *,
     structure_bytes: StructureBytesResolver = default_structure_bytes,
 ) -> bytes:
-    canonical_entry = canonical_serialize(member.to_canonical())
-    struct_bytes = structure_bytes(member, package_root)
+    canonical_entry = canonical_serialize(conformational_state.to_canonical())
+    struct_bytes = structure_bytes(conformational_state, package_root)
     struct_digest = _blake3_digest(struct_bytes)
     return _blake3_digest(canonical_entry + struct_digest)
 
@@ -103,10 +109,12 @@ def compute_content_hash(
     *,
     structure_bytes: StructureBytesResolver = default_structure_bytes,
 ) -> str:
-    ordered_members = sorted(manifest.members, key=lambda m: m.id)
+    ordered_conformational_states = sorted(
+        manifest.conformational_states, key=lambda c: c.id
+    )
     leaves = [
-        member_leaf_hash(m, package_root, structure_bytes=structure_bytes)
-        for m in ordered_members
+        conformational_state_leaf_hash(m, package_root, structure_bytes=structure_bytes)
+        for m in ordered_conformational_states
     ]
     root = merkle_root(leaves)
     return f"{ALGORITHM_PREFIX}:{root.hex()}"

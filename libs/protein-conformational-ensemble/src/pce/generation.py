@@ -16,7 +16,7 @@ from pce.manifest import SUPPORTED_SCHEMA_VERSIONS, validate_semantics
 from pce.models import (
     CAPABILITY_STANDALONE_CIF,
     Manifest,
-    Member,
+    ConformationalState,
     StandaloneStructure,
     TopologyReference,
     Weight,
@@ -30,7 +30,7 @@ GENERATED_SCHEMA_VERSION = max(SUPPORTED_SCHEMA_VERSIONS)
 
 
 @dataclass(frozen=True, slots=True)
-class MemberSpec:
+class ConformationalStateSpec:
     id: str
     source_path: Path
     weight_value: float | None = None
@@ -38,18 +38,22 @@ class MemberSpec:
     provenance: dict | None = None
 
 
-def _copy_structure_into_package(spec: MemberSpec, package_root: Path) -> str:
+def _copy_structure_into_package(
+    spec: ConformationalStateSpec, package_root: Path
+) -> str:
     dest_name = f"{spec.id}{spec.source_path.suffix}"
     dest_path = package_root / dest_name
     shutil.copyfile(spec.source_path, dest_path)
     return dest_name
 
 
-def _build_member(spec: MemberSpec, uri: str) -> Member:
+def _build_conformational_state(
+    spec: ConformationalStateSpec, uri: str
+) -> ConformationalState:
     weight = None
     if spec.weight_value is not None:
         weight = Weight(value=spec.weight_value, type=spec.weight_type)
-    return Member(
+    return ConformationalState(
         id=spec.id,
         structure=StandaloneStructure(uri=uri),
         weight=weight,
@@ -60,15 +64,15 @@ def _build_member(spec: MemberSpec, uri: str) -> Member:
 def generate_ensemble(
     *,
     ensemble_id: str,
-    member_specs: list[MemberSpec],
+    conformational_states_specs: list[ConformationalStateSpec],
     package_root: Path,
     weight_scheme: WeightScheme | None = None,
-    topology_member_id: str | None = None,
+    topology_conformational_state_id: str | None = None,
     capabilities_required: tuple[str, ...] = (CAPABILITY_STANDALONE_CIF,),
     structure_bytes: StructureBytesResolver = default_structure_bytes,
 ) -> Manifest:
-    if not member_specs:
-        msg = "generate_ensemble() requires at least one MemberSpec"
+    if not conformational_states_specs:
+        msg = "generate_ensemble() requires at least one ConformationalStateSpec"
         raise ValueError(msg)
 
     package_root.mkdir(parents=True, exist_ok=True)
@@ -76,23 +80,26 @@ def generate_ensemble(
     # Copy structures first; URIs must exist on disk before hashing.
     uris = {
         spec.id: _copy_structure_into_package(spec, package_root)
-        for spec in member_specs
+        for spec in conformational_states_specs
     }
-    members = tuple(_build_member(spec, uris[spec.id]) for spec in member_specs)
+    conformational_states = tuple(
+        _build_conformational_state(spec, uris[spec.id])
+        for spec in conformational_states_specs
+    )
 
-    any_weighted = any(m.weight is not None for m in members)
+    any_weighted = any(c.weight is not None for c in conformational_states)
     if any_weighted and weight_scheme is None:
         msg = (
-            "At least one member has a weight but no weight_scheme was provided. "
-            "Per PCE_MANIFEST_CONTRACT.md, weight_scheme is required the moment "
-            "any member declares a weight."
+            "At least one conformational state has a weight but no weight_scheme "
+            "was provided. Per PCE_MANIFEST_CONTRACT.md, weight_scheme is required the moment "
+            "any conformational state declares a weight."
         )
         raise ValueError(msg)
     if not any_weighted:
         weight_scheme = None  # never emit an unused weight_scheme
 
-    topo_id = topology_member_id or member_specs[0].id
-    topology_reference = TopologyReference(member_id=topo_id)
+    topo_id = topology_conformational_state_id or conformational_states_specs[0].id
+    topology_reference = TopologyReference(conformational_state_id=topo_id)
 
     provisional = Manifest(
         schema_version=GENERATED_SCHEMA_VERSION,
@@ -100,7 +107,7 @@ def generate_ensemble(
         content_hash=_PLACEHOLDER_HASH,
         parent_ensemble=None,
         topology_reference=topology_reference,
-        members=members,
+        conformational_states=conformational_states,
         weight_scheme=weight_scheme,
         capabilities_required=capabilities_required,
     )

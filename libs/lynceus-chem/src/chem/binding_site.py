@@ -33,7 +33,7 @@ class ResidueRef(_StrictModel):
 class BindingSite(_StrictModel):
     schema_version: str = Field(pattern=r"^\d+\.\d+\.\d+$")
     site_id: str = Field(min_length=1)
-    member_id: str = Field(min_length=1)
+    conformational_state_id: str = Field(min_length=1)
     center: Point3
     extent: BoundingVolume
     correspondence_cluster: str | None = None

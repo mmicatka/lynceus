@@ -6,7 +6,7 @@
 
 .PHONY: build build-preprocess build-physiochemical-filter build-sample run-test run-dev clean reset
 
-build: build-preprocess build-physiochemical-filter build-sample build-retrieve-pdb build-generate-manifest
+build: build-preprocess build-physiochemical-filter build-sample build-retrieve-pdb build-generate-manifest build-detect-putative-sites
 
 build-preprocess:
 	docker build -t lynceus/preprocess-candidates:0.1.0 modules/local/preprocess_candidates

@@ -1,3 +1,5 @@
+# libs/lynceus-chem/pyproject.toml
+
 [project]
 name = "lynceus-chem"
 version = "0.1.0"
@@ -11,4 +13,4 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 sources = ["src"]
-packages = ["src/lynceus-chem"]
+packages = ["src/chem"]

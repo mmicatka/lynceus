@@ -115,7 +115,7 @@ class ResidueMapping:
 
 
 @dataclass(frozen=True, slots=True)
-class Member:
+class ConformationalState:
     id: str
     structure: Structure
     weight: Weight | None = None
@@ -124,7 +124,7 @@ class Member:
     thermodynamics: dict[str, Any] | None = None
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> Member:
+    def from_dict(cls, data: dict[str, Any]) -> ConformationalState:
         return cls(
             id=data["id"],
             structure=structure_from_dict(data["structure"]),
@@ -190,13 +190,13 @@ class ExternalTopologyReference:
 
 @dataclass(frozen=True, slots=True)
 class TopologyReference:
-    member_id: str | None = None
+    conformational_state_id: str | None = None
     external_reference: ExternalTopologyReference | None = None
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> TopologyReference:
         return cls(
-            member_id=data.get("member_id"),
+            conformational_state_id=data.get("conformational_state_id"),
             external_reference=(
                 ExternalTopologyReference.from_dict(data["external_reference"])
                 if "external_reference" in data
@@ -206,7 +206,7 @@ class TopologyReference:
 
     def to_canonical(self) -> dict[str, Any]:
         return _omit_none(
-            member_id=self.member_id,
+            conformational_state_id=self.conformational_state_id,
             external_reference=(
                 self.external_reference.to_canonical()
                 if self.external_reference is not None
@@ -244,7 +244,7 @@ class Manifest:
     content_hash: str
     parent_ensemble: ParentEnsemble | None
     topology_reference: TopologyReference
-    members: tuple[Member, ...]
+    conformational_states: tuple[ConformationalState, ...]
     weight_scheme: WeightScheme | None = None
     capabilities_required: tuple[str, ...] = field(default=(CAPABILITY_STANDALONE_CIF,))
     metadata: dict[str, Any] | None = None
@@ -261,7 +261,9 @@ class Manifest:
             if parent is not None
             else None,
             topology_reference=TopologyReference.from_dict(data["topology_reference"]),
-            members=tuple(Member.from_dict(m) for m in data["members"]),
+            conformational_states=tuple(
+                ConformationalState.from_dict(c) for c in data["conformational_states"]
+            ),
             weight_scheme=(
                 WeightScheme.from_dict(data["weight_scheme"])
                 if "weight_scheme" in data
@@ -286,7 +288,9 @@ class Manifest:
                 else None
             ),
             capabilities_required=list(self.capabilities_required),
-            members=[m.to_canonical() for m in self.members],
+            conformational_states=[
+                c.to_canonical() for c in self.conformational_states
+            ],
             metadata=self.metadata,
             dynamics=self.dynamics,
         )
@@ -297,5 +301,10 @@ class Manifest:
         )
         return canonical
 
-    def member_by_id(self, member_id: str) -> Member | None:
-        return next((m for m in self.members if m.id == member_id), None)
+    def conformational_state_by_id(
+        self, conformational_state_id: str
+    ) -> ConformationalState | None:
+        return next(
+            (m for m in self.conformational_states if m.id == conformational_state_id),
+            None,
+        )

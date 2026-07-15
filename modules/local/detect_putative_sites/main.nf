@@ -3,6 +3,8 @@
 process DETECT_PUTATIVE_SITES {
     debug true
 
+    container 'lynceus/detect-putative-sites:0.1.0'
+
     input:
     tuple val(ensemble_id), path(ensemble_dir)
 

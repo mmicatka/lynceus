@@ -204,9 +204,9 @@ def _preprocess(
     output_path: Path,
     morgan_radius: int,
     morgan_n_bits: int,
-    workers: int,
+    num_workers: int,
 ) -> None:
-    logger.info("starting preprocessing with %d workers", workers)
+    logger.info("starting preprocessing with %d workers", num_workers)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -220,7 +220,7 @@ def _preprocess(
 
     try:
         with Pool(
-            processes=workers,
+            processes=num_workers,
             initializer=_init_worker,
             initargs=(morgan_radius, morgan_n_bits),
         ) as pool:
@@ -256,7 +256,7 @@ def _preprocess(
     logger.info("Wrote %d records to %s", n_written, output_path)
 
 
-def _parse_workers(value: str) -> int:
+def _parse_num_workers(value: str) -> int:
     if value == "auto":
         return os.cpu_count() or 1
     n = int(value)
@@ -279,7 +279,9 @@ def _parse_args() -> argparse.Namespace:
         type=Path,
         help="Path to write the output .parquet file",
     )
-    p.add_argument("--workers", metavar="N|auto", default="auto", type=_parse_workers)
+    p.add_argument(
+        "--num-workers", metavar="N|auto", default="auto", type=_parse_num_workers
+    )
     p.add_argument("--morgan-radius", type=int, default=2)
     p.add_argument("--morgan-n-bits", type=int, default=2048)
 
@@ -293,7 +295,7 @@ def main():
         output_path=args.output,
         morgan_radius=args.morgan_radius,
         morgan_n_bits=args.morgan_n_bits,
-        workers=args.workers,
+        num_workers=args.num_workers,
     )
 
 
