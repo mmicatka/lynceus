@@ -2,7 +2,7 @@
 
 include { RETRIEVE_PDB } from '../../../modules/local/retrieve_pdb'
 include { GENERATE_MANIFEST } from '../../../modules/local/generate_manifest'
-include { DETECT_PUTATIVE_SITES } from '../../../modules/local/detect_putative_sites'
+include { DETECT_PUTATIVE_BINDING_SITES } from '../../../modules/local/detect_putative_binding_sites'
 
 
 workflow TARGET {
@@ -23,9 +23,10 @@ workflow TARGET {
 
   GENERATE_MANIFEST(RETRIEVE_PDB.out.structure_dir)
 
-  DETECT_PUTATIVE_SITES(GENERATE_MANIFEST.out.pce_package)
+  DETECT_PUTATIVE_BINDING_SITES(GENERATE_MANIFEST.out.pce_package)
 
   emit:
   structure_dir = RETRIEVE_PDB.out.structure_dir
+  putative_binding_sites = DETECT_PUTATIVE_BINDING_SITES.out.sites
   versions = ch_versions
 }

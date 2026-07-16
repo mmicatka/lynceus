@@ -6,7 +6,7 @@
 
 .PHONY: build build-preprocess build-physiochemical-filter build-sample run-test run-dev clean reset
 
-build: build-preprocess build-physiochemical-filter build-sample build-retrieve-pdb build-generate-manifest build-detect-putative-sites
+build: build-preprocess build-physiochemical-filter build-sample build-retrieve-pdb build-generate-manifest build-detect-putative-binding-sites
 
 build-preprocess:
 	docker build -t lynceus/preprocess-candidates:0.1.0 modules/local/preprocess_candidates
@@ -23,8 +23,8 @@ build-retrieve-pdb:
 build-generate-manifest:
 	docker build -f modules/local/generate_manifest/Dockerfile -t lynceus/generate-manifest:0.1.0 .
 
-build-detect-putative-sites:
-	docker build -f modules/local/detect_putative_sites/Dockerfile -t lynceus/detect-putative-sites:0.1.0 .
+build-detect-putative-binding-sites:
+	docker build -f modules/local/detect_putative_binding_sites/Dockerfile -t lynceus/detect-putative-binding-sites:0.1.0 .
 
 # Dev environment: loads conf/examples/dev.yaml
 run-dev:

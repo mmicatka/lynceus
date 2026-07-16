@@ -1,7 +1,7 @@
-# modules/local/detect_putative_sites/pyproject.toml
+# modules/local/detect_putative_binding_sites/pyproject.toml
 
 [project]
-name = "detect-putative-sites"
+name = "detect-putative-binding-sites"
 version = "0.1.0"
 description = "Add your description here"
 requires-python = ">=3.12"
@@ -9,7 +9,7 @@ dependencies = ["lynceus-chem", "protein-conformational-ensemble"]
 
 [tool.hatch.build.targets.wheel]
 sources = ["src"]
-packages = ["src/detect_putative_sites"]
+packages = ["src/detect_putative_binding_sites"]
 
 [tool.uv.sources]
 protein-conformational-ensemble = { workspace = true }
