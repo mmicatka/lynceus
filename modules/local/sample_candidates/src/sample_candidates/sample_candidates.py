@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import logging
 from pathlib import Path
+import time
 
 import duckdb
 import polars as pl
@@ -28,6 +29,8 @@ def _build_reservoir(input_glob: str, reservoir_size: int, seed: int) -> pl.Data
         input_glob,
     )
 
+    start_time = time.perf_counter()
+
     # We use a context manager to ensure the in-memory connection safely closes
     with duckdb.connect() as con:
         # Construct the sampling query using DuckDB's native reservoir algorithm
@@ -41,8 +44,12 @@ def _build_reservoir(input_glob: str, reservoir_size: int, seed: int) -> pl.Data
         # Execute the query and instantly materialize it as a Polars DataFrame
         res_df = con.execute(query).pl()
 
+        elapsed_time = time.perf_counter() - start_time
+
         logger.info(
-            "DuckDB sampling complete. Materialized %d rows in %f.", res_df.height
+            "DuckDB sampling complete. Materialized %d rows in %f.",
+            res_df.height,
+            elapsed_time,
         )
         return res_df
 

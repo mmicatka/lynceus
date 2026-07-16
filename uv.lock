@@ -1136,6 +1136,7 @@ dependencies = [
     { name = "lynceus-chem" },
     { name = "preprocess-candidates" },
     { name = "protein-conformational-ensemble" },
+    { name = "sample-candidates" },
 ]
 
 [package.dev-dependencies]
@@ -1155,6 +1156,7 @@ requires-dist = [
     { name = "lynceus-chem", editable = "libs/lynceus-chem" },
     { name = "preprocess-candidates", editable = "modules/local/preprocess_candidates" },
     { name = "protein-conformational-ensemble", editable = "libs/protein-conformational-ensemble" },
+    { name = "sample-candidates", editable = "modules/local/sample_candidates" },
 ]
 
 [package.metadata.requires-dev]

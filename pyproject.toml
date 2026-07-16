@@ -13,6 +13,7 @@ dependencies = [
     # members
     "preprocess-candidates",
     "detect-putative-binding-sites",
+    "sample-candidates",
 ]
 
 [tool.uv.workspace]
