@@ -7,14 +7,19 @@ description = "Add your description here"
 requires-python = ">=3.12"
 
 dependencies = [
-    "physiochemical-filter",
-    "preprocess-candidates",
+    # libs
+    "lynceus-chem",
     "protein-conformational-ensemble",
+    # members
+    "preprocess-candidates",
+    "detect-putative-binding-sites",
+    "sample-candidates",
 ]
 
 [tool.uv.workspace]
 members = [
     "libs/*",
+    "modules/local/detect_putative_binding_sites",
     "modules/local/preprocess_candidates",
     "modules/local/physiochemical_filter",
     "modules/local/sample_candidates",
@@ -28,6 +33,8 @@ physiochemical-filter = { workspace = true }
 sample-candidates = { workspace = true }
 generate-manifest = { workspace = true }
 protein-conformational-ensemble = { workspace = true }
+detect-putative-binding-sites = { workspace = true }
+lynceus-chem = { workspace = true }
 
 [dependency-groups]
 dev = [

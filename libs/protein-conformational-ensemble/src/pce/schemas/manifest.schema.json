@@ -10,7 +10,7 @@
     "content_hash",
     "parent_ensemble",
     "topology_reference",
-    "members"
+    "conformational_states"
   ],
   "additionalProperties": false,
   "properties": {
@@ -52,11 +52,11 @@
         "standalone_cif"
       ]
     },
-    "members": {
+    "conformational_states": {
       "type": "array",
       "minItems": 1,
       "items": {
-        "$ref": "#/$defs/member"
+        "$ref": "#/$defs/conformational_state"
       }
     },
     "metadata": {
@@ -94,7 +94,7 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "member_id": {
+        "conformational_state_id": {
           "type": "string",
           "minLength": 1
         },
@@ -118,7 +118,7 @@
       "oneOf": [
         {
           "required": [
-            "member_id"
+            "conformational_state_id"
           ]
         },
         {
@@ -278,7 +278,7 @@
         }
       ]
     },
-    "member": {
+    "conformational_state": {
       "type": "object",
       "required": [
         "id",

@@ -44,7 +44,7 @@ def parse_manifest_dict(raw: dict[str, Any]) -> Manifest:
 def validate_semantics(manifest: Manifest) -> None:
     errors: list[str] = []
 
-    _check_member_ids_unique(manifest, errors)
+    _check_conformational_state_ids_unique(manifest, errors)
     _check_topology_reference(manifest, errors)
     _check_residue_mappings(manifest, errors)
     _check_weight_scheme(manifest, errors)
@@ -58,20 +58,27 @@ def validate_semantics(manifest: Manifest) -> None:
         raise SemanticValidationError(msg)
 
 
-def _check_member_ids_unique(manifest: Manifest, errors: list[str]) -> None:
+def _check_conformational_state_ids_unique(
+    manifest: Manifest, errors: list[str]
+) -> None:
     seen: set[str] = set()
-    for member in manifest.members:
-        if member.id in seen:
-            errors.append(f"Duplicate member id {member.id!r} (§2.4)")
-        seen.add(member.id)
+    for conformational_state in manifest.conformational_states:
+        if conformational_state.id in seen:
+            errors.append(
+                f"Duplicate conformational_state id {conformational_state.id!r} (§2.4)"
+            )
+        seen.add(conformational_state.id)
 
 
 def _check_topology_reference(manifest: Manifest, errors: list[str]) -> None:
     ref = manifest.topology_reference
-    if ref.member_id is not None and manifest.member_by_id(ref.member_id) is None:
+    if (
+        ref.conformational_state_id is not None
+        and manifest.conformational_state_by_id(ref.conformational_state_id) is None
+    ):
         errors.append(
-            f"topology_reference.member_id {ref.member_id!r} does not reference "
-            "an existing member (§3.4)"
+            f"topology_reference.conformational_state_id {ref.conformational_state_id!r} does not reference "
+            "an existing conformational_state (§3.4)"
         )
 
 
@@ -80,11 +87,13 @@ def _check_residue_mappings(manifest: Manifest, errors: list[str]) -> None:
 
 
 def _check_weight_scheme(manifest: Manifest, errors: list[str]) -> None:
-    weighted_members = [m for m in manifest.members if m.weight is not None]
+    weighted_conformational_states = [
+        m for m in manifest.conformational_states if m.weight is not None
+    ]
 
-    if weighted_members and manifest.weight_scheme is None:
+    if weighted_conformational_states and manifest.weight_scheme is None:
         errors.append(
-            "weight_scheme is required because at least one member declares a weight (§3.3.1)"
+            "weight_scheme is required because at least one conformational_state declares a weight (§3.3.1)"
         )
         return
 
@@ -101,32 +110,44 @@ def _check_weight_scheme(manifest: Manifest, errors: list[str]) -> None:
             "required companion field (§3.3.2)"
         )
 
-    for member in weighted_members:
-        member_type = member.weight.type if member.weight is not None else None
-        if member_type is not None and member_type != scheme_type:
+    for conformational_state in weighted_conformational_states:
+        conformational_state_type = (
+            conformational_state.weight.type
+            if conformational_state.weight is not None
+            else None
+        )
+        if (
+            conformational_state_type is not None
+            and conformational_state_type != scheme_type
+        ):
             errors.append(
-                f"Member {member.id!r} has weight.type={member_type!r}, which "
+                f"conformational_state {conformational_state.id!r} has weight.type={conformational_state_type!r}, which "
                 f"contradicts ensemble-level weight_scheme.type={scheme_type!r} (§3.3.1)"
             )
 
     if manifest.weight_scheme.normalized:
-        total = sum(m.weight.value for m in weighted_members if m.weight is not None)
+        total = sum(
+            m.weight.value
+            for m in weighted_conformational_states
+            if m.weight is not None
+        )
         if abs(total - 1.0) > _WEIGHT_SUM_TOLERANCE:
             errors.append(
-                f"weight_scheme.normalized is true but member weights sum to {total!r}, "
+                f"weight_scheme.normalized is true but conformational_state weights sum to {total!r}, "
                 f"not 1.0 +/- {_WEIGHT_SUM_TOLERANCE} (§3.3.1)"
             )
 
 
 def _check_capabilities(manifest: Manifest, errors: list[str]) -> None:
-    has_trajectory_member = any(
-        isinstance(m.structure, TrajectoryStructure) for m in manifest.members
+    has_trajectory_conformational_state = any(
+        isinstance(m.structure, TrajectoryStructure)
+        for m in manifest.conformational_states
     )
     declared = set(manifest.capabilities_required)
 
-    if has_trajectory_member and "trajectory_backed" not in declared:
+    if has_trajectory_conformational_state and "trajectory_backed" not in declared:
         errors.append(
-            "At least one member uses topology_uri/trajectory_uri but "
+            "At least one conformational_state uses topology_uri/trajectory_uri but "
             "capabilities_required does not include 'trajectory_backed' (§3.1.1)"
         )
 

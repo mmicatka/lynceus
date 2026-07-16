@@ -10,7 +10,7 @@ from typing import Any
 import yaml
 
 try:
-    from pce.generation import MemberSpec, generate_ensemble
+    from pce.generation import ConformationalStateSpec, generate_ensemble
     from pce.models import WeightScheme
 except ImportError as exc:  # pragma: no cover - fails loudly in CI/dry-run
     print(
@@ -27,7 +27,7 @@ _WEIGHTS_FILENAME = "weights.yaml"
 
 def _discover_member_specs(
     members_dir: Path,
-) -> tuple[list[MemberSpec], WeightScheme | None]:
+) -> tuple[list[ConformationalStateSpec], WeightScheme | None]:
     weights_path = members_dir / _WEIGHTS_FILENAME
     weights_data: dict[str, Any] | None = None
     if weights_path.exists():
@@ -50,7 +50,7 @@ def _discover_member_specs(
         member_id = path.stem
         weight_value = weight_values.get(member_id)
         specs.append(
-            MemberSpec(
+            ConformationalStateSpec(
                 id=member_id,
                 source_path=path,
                 weight_value=weight_value,
@@ -88,14 +88,14 @@ def main() -> None:
 
     manifest = generate_ensemble(
         ensemble_id=args.ensemble_id,
-        member_specs=member_specs,
+        conformational_states_specs=member_specs,
         package_root=args.outdir,
         weight_scheme=weight_scheme,
-        topology_member_id=args.topology_member_id,
+        topology_conformational_state_id=args.topology_member_id,
     )
 
     print(
-        f"Wrote PCE manifest: {args.outdir / 'manifest.yaml'} ({len(manifest.members)} members)"
+        f"Wrote PCE manifest: {args.outdir / 'manifest.yaml'} ({len(manifest.conformational_states)} members)"
     )
 
 

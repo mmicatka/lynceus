@@ -25,5 +25,6 @@ workflow LYNCEUS {
 
   emit:
   training_candidates = SURROGATE_MODEL_TRAIN.out.training_candidates
+  putative_binding_sites = TARGET.out.putative_binding_sites
   versions = ch_versions
 }

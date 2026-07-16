@@ -41,7 +41,7 @@ def load_ensemble(
         msg = (
             f"content_hash mismatch for ensemble {manifest.id!r}: recomputed hash does "
             "not match manifest's declared content_hash. This indicates corruption or "
-            "drift (§2.3.1)."
+            "drift."
         )
         raise ContentHashMismatchError(msg)
 
