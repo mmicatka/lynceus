@@ -8,8 +8,6 @@ process PREPROCESS_CANDIDATES {
 
     container "lynceus/preprocess-candidates:0.1.0"
 
-    publishDir "${params.outdir}/candidate/preprocess", mode: 'copy'
-
     input:
     path smi_gz
 
@@ -32,18 +30,6 @@ process PREPROCESS_CANDIDATES {
     "${task.process}":
         rdkit: \$(python3 -c "import rdkit; print(rdkit.__version__)")
         polars: \$(python3 -c "import polars; print(polars.__version__)")
-    END_VERSIONS
-    """
-
-    stub:
-    def prefix = smi_gz.simpleName
-    """
-    touch ${prefix}.parquet
-
-    cat <<-END_VERSIONS > versions.yml
-    "${task.process}":
-        rdkit: stub
-        polars: stub
     END_VERSIONS
     """
 }

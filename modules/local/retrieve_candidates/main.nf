@@ -7,8 +7,6 @@ process RETRIEVE_CANDIDATES {
     container "quay.io/biocontainers/aria2:1.36.0"
     containerOptions '--entrypoint ""'
 
-    publishDir "${params.outdir}/candidate/retrieve", mode: 'copy'
-
     input:
     path uri_list
 

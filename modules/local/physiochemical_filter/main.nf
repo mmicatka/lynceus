@@ -6,8 +6,6 @@ process PHYSIOCHEMICAL_FILTER {
 
     container "lynceus/physiochemical-filter:0.1.0"
 
-    publishDir "${params.outdir}/candidate/physiochemical_filter", mode: 'copy'
-
     input:
     path parquet_files, stageAs: 'input??/*'
     path filter_config

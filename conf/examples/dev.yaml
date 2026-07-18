@@ -24,3 +24,6 @@ target:
       - "standalone_cif"
 
   outdir: "results/target_ensemble_generation/1stp"
+
+docking:
+  batch_size: 1000
