@@ -8,6 +8,7 @@ requires-python = ">=3.12"
 
 dependencies = [
     # libs
+    "lynceus-candidates",
     "lynceus-chem",
     "protein-conformational-ensemble",
     # members
@@ -35,6 +36,7 @@ generate-manifest = { workspace = true }
 protein-conformational-ensemble = { workspace = true }
 detect-putative-binding-sites = { workspace = true }
 lynceus-chem = { workspace = true }
+lynceus-candidates = { workspace = true }
 
 [dependency-groups]
 dev = [
