@@ -1,4 +1,5 @@
-# modules/local/retrieve_pdb/src/retrieve_pdb.py
+# libs/lynceus-chem/src/lynceus_chem/utils/retrieve_pdb.py
+
 
 from __future__ import annotations
 
@@ -67,18 +68,22 @@ def download_structures(pdb_ids: list[str], outdir: Path) -> dict[str, Path]:
     return results
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Download structure files for a list of PDB IDs, serially, via httpx."
+def _parse_args() -> argparse.Namespace:
+    p = argparse.ArgumentParser(
+        description="Retrieve structure files for a list of PDB IDs, serially, via httpx."
     )
-    parser.add_argument(
+    p.add_argument(
         "--pdb-ids",
         type=str,
         required=True,
         help="Comma-separated list of PDB IDs, e.g. '1STP' or '1STP,3PTB'.",
     )
-    parser.add_argument("--outdir", type=Path, required=True)
-    args = parser.parse_args()
+    p.add_argument("--outdir", type=Path, required=True)
+    return p.parse_args()
+
+
+def retrieve_pdbs():
+    args = _parse_args()
 
     pdb_ids = [p.strip() for p in args.pdb_ids.split(",") if p.strip()]
     if not pdb_ids:
@@ -93,7 +98,3 @@ def main() -> None:
 
     for pdb_id, path in results.items():
         print(f"Downloaded {pdb_id} -> {path}")
-
-
-if __name__ == "__main__":
-    main()

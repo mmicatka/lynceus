@@ -1121,6 +1121,7 @@ name = "lynceus-chem"
 version = "0.1.0"
 source = { editable = "libs/lynceus-chem" }
 dependencies = [
+    { name = "httpx" },
     { name = "numpy" },
     { name = "polars" },
     { name = "pyarrow" },
@@ -1129,6 +1130,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "httpx", specifier = ">=0.28.1" },
     { name = "numpy", specifier = ">=2.5.1" },
     { name = "polars", specifier = ">=1.42.1" },
     { name = "pyarrow", specifier = ">=24.0.0" },
