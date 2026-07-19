@@ -25,6 +25,7 @@ members = [
     "modules/local/sample_candidates",
     "modules/local/generate_manifest",
     "modules/local/retrieve_pdb",
+    "modules/local/generate_docking_boxes",
 ]
 
 [tool.uv.sources]
@@ -45,4 +46,5 @@ dev = [
     "ruff>=0.15.21",
     "yamllint>=1.38.0",
     "pre-commit>=4.6.0",
+    "mbake>=1.4.6",
 ]

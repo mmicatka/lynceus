@@ -1,0 +1,16 @@
+# modules/local/generate_docking_boxes/pyproject.toml
+
+[project]
+name = "generate-docking-boxes"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.12"
+dependencies = []
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+sources = ["src"]
+packages = ["src/generate_docking_boxes"]

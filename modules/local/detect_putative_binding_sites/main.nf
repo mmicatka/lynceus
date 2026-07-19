@@ -9,7 +9,7 @@ process DETECT_PUTATIVE_BINDING_SITES {
     tuple val(ensemble_id), path(ensemble_dir)
 
     output:
-    path ("${ensemble_id}.sites.json"), emit: sites
+    tuple val(ensemble_id), path("${ensemble_id}.sites.json"), emit: sites
 
     script:
     """

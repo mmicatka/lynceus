@@ -2,23 +2,22 @@
 
 
 process GENERATE_DOCKING_BOXES {
-  tag "${conformational_state_id}"
-  label 'process_single'
+    label 'process_single'
 
-  container "lynceus/generate-docking-boxes:0.1.0"
+    container "lynceus/generate-docking-boxes:0.1.0"
 
-  input:
-  tuple val(conformational_state_id), path(sites_json)
+    input:
+    path sites_json
 
-  output:
-  tuple val(conformational_state_id), path("*.boxes.json"), emit: boxes
-  path "versions.yml", emit: versions
+    output:
+    path "boxes/*.boxes.json", emit: boxes
+    path "versions.yml", emit: versions
 
-  script:
-  """
+    script:
+    """
   python3 -m generate_docking_boxes.generate_docking_boxes \\
       --sites-json '${sites_json}' \\
-      --output '${conformational_state_id}.boxes.json'
+      --output boxes.json'
 
   cat <<-END_VERSIONS > versions.yml
   "${task.process}":
@@ -26,9 +25,10 @@ process GENERATE_DOCKING_BOXES {
   END_VERSIONS
   """
 
-  stub:
-  """
-  touch ${conformational_state_id}.boxes.json
+    stub:
+    """
+  mkdir -p boxes
+  touch boxes/stub.boxes.json
 
   cat <<-END_VERSIONS > versions.yml
   "${task.process}":

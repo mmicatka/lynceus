@@ -4,26 +4,15 @@
 # so environment-specific parameters never need to be typed by hand or
 # forgotten on the command line.
 
-.PHONY: build build-preprocess build-physiochemical-filter build-sample run-test run-dev clean reset
+.PHONY: build run-dev clean	reset
 
-build: build-preprocess build-physiochemical-filter build-sample build-retrieve-pdb build-generate-manifest build-detect-putative-binding-sites
-
-build-preprocess:
+build:
 	docker build -t lynceus/preprocess-candidates:0.1.0 modules/local/preprocess_candidates
-
-build-physiochemical-filter:
 	docker build -t lynceus/physiochemical-filter:0.1.0 modules/local/physiochemical_filter
-
-build-sample:
+	docker build -t lynceus/physiochemical-filter:0.1.0 modules/local/physiochemical_filter
 	docker build -t lynceus/sample:0.1.0 modules/local/sample_candidates
-
-build-retrieve-pdb:
 	docker build -t lynceus/retrieve-pdb:0.1.0 modules/local/retrieve_pdb
-
-build-generate-manifest:
 	docker build -f modules/local/generate_manifest/Dockerfile -t lynceus/generate-manifest:0.1.0 .
-
-build-detect-putative-binding-sites:
 	docker build -f modules/local/detect_putative_binding_sites/Dockerfile -t lynceus/detect-putative-binding-sites:0.1.0 .
 
 # Dev environment: loads conf/examples/dev.yaml
