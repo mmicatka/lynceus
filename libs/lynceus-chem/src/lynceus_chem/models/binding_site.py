@@ -1,4 +1,5 @@
-# libs/lynceus-chem/src/lynceus-chem/binding_site.py
+# libs/lynceus-chem/src/lynceus_chem/models/binding_site.py
+
 
 from typing import Annotated, Any, Literal, Union
 from pydantic import BaseModel, ConfigDict, Field

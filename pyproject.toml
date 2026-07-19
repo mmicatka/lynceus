@@ -9,7 +9,6 @@ requires-python = ">=3.12"
 dependencies = [
     # libs
     "lynceus-chem",
-    "lynceus-chem-old",
     "protein-conformational-ensemble",
     # members
     "detect-putative-binding-sites",
@@ -18,22 +17,22 @@ dependencies = [
 
 [tool.uv.workspace]
 members = [
-    "libs/*",
+    "libs/lynceus-chem",
+    "libs/protein-conformational-ensemble",
     "modules/local/detect_putative_binding_sites",
     "modules/local/physiochemical_filter",
     "modules/local/sample_candidates",
     "modules/local/generate_manifest",
-    "modules/local/retrieve_pdb",
 ]
 
 [tool.uv.sources]
+lynceus-chem = { workspace = true }
+protein-conformational-ensemble = { workspace = true }
+
 physiochemical-filter = { workspace = true }
 sample-candidates = { workspace = true }
 generate-manifest = { workspace = true }
-protein-conformational-ensemble = { workspace = true }
 detect-putative-binding-sites = { workspace = true }
-lynceus-chem-old = { workspace = true }
-lynceus-chem = { workspace = true }
 
 [dependency-groups]
 dev = [

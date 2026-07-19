@@ -9,6 +9,7 @@ dependencies = [
     "numpy>=2.5.1",
     "polars>=1.42.1",
     "pyarrow>=24.0.0",
+    "pydantic>=2.13.4",
     "rdkit>=2026.3.3",
 ]
 

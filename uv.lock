@@ -18,11 +18,9 @@ members = [
     "detect-putative-binding-sites",
     "generate-manifest",
     "lynceus-chem",
-    "lynceus-chem-old",
     "lynceus-dev",
     "physiochemical-filter",
     "protein-conformational-ensemble",
-    "retrieve-pdb",
     "sample-candidates",
 ]
 
@@ -506,13 +504,13 @@ name = "detect-putative-binding-sites"
 version = "0.1.0"
 source = { editable = "modules/local/detect_putative_binding_sites" }
 dependencies = [
-    { name = "lynceus-chem-old" },
+    { name = "lynceus-chem" },
     { name = "protein-conformational-ensemble" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "lynceus-chem-old", editable = "libs/lynceus-chem-old" },
+    { name = "lynceus-chem", editable = "libs/lynceus-chem" },
     { name = "protein-conformational-ensemble", editable = "libs/protein-conformational-ensemble" },
 ]
 
@@ -1125,6 +1123,7 @@ dependencies = [
     { name = "numpy" },
     { name = "polars" },
     { name = "pyarrow" },
+    { name = "pydantic" },
     { name = "rdkit" },
 ]
 
@@ -1134,19 +1133,9 @@ requires-dist = [
     { name = "numpy", specifier = ">=2.5.1" },
     { name = "polars", specifier = ">=1.42.1" },
     { name = "pyarrow", specifier = ">=24.0.0" },
+    { name = "pydantic", specifier = ">=2.13.4" },
     { name = "rdkit", specifier = ">=2026.3.3" },
 ]
-
-[[package]]
-name = "lynceus-chem-old"
-version = "0.1.0"
-source = { editable = "libs/lynceus-chem-old" }
-dependencies = [
-    { name = "pydantic" },
-]
-
-[package.metadata]
-requires-dist = [{ name = "pydantic", specifier = ">=2.13.4" }]
 
 [[package]]
 name = "lynceus-dev"
@@ -1155,7 +1144,6 @@ source = { virtual = "." }
 dependencies = [
     { name = "detect-putative-binding-sites" },
     { name = "lynceus-chem" },
-    { name = "lynceus-chem-old" },
     { name = "protein-conformational-ensemble" },
     { name = "sample-candidates" },
 ]
@@ -1175,7 +1163,6 @@ dev = [
 requires-dist = [
     { name = "detect-putative-binding-sites", editable = "modules/local/detect_putative_binding_sites" },
     { name = "lynceus-chem", editable = "libs/lynceus-chem" },
-    { name = "lynceus-chem-old", editable = "libs/lynceus-chem-old" },
     { name = "protein-conformational-ensemble", editable = "libs/protein-conformational-ensemble" },
     { name = "sample-candidates", editable = "modules/local/sample_candidates" },
 ]
@@ -2187,17 +2174,6 @@ sdist = { url = "https://files.pythonhosted.org/packages/ac/c3/e2a2b89f2d3e2179a
 wheels = [
     { url = "https://files.pythonhosted.org/packages/a0/f4/c67b0b3f1b9245e8d266f0f112c500d50e5b4e83cb6f3b71b6528104182a/requests-2.34.2-py3-none-any.whl", hash = "sha256:2a0d60c172f83ac6ab31e4554906c0f3b3588d37b5cb939b1c061f4907e278e0", size = 73075, upload-time = "2026-05-14T19:25:26.443Z" },
 ]
-
-[[package]]
-name = "retrieve-pdb"
-version = "0.1.0"
-source = { editable = "modules/local/retrieve_pdb" }
-dependencies = [
-    { name = "httpx" },
-]
-
-[package.metadata]
-requires-dist = [{ name = "httpx", specifier = ">=0.28.1" }]
 
 [[package]]
 name = "rfc3339-validator"
