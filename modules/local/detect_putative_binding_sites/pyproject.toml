@@ -5,7 +5,7 @@ name = "detect-putative-binding-sites"
 version = "0.1.0"
 description = "Add your description here"
 requires-python = ">=3.12"
-dependencies = ["lynceus-chem", "protein-conformational-ensemble"]
+dependencies = ["lynceus-chem-old", "protein-conformational-ensemble"]
 
 [tool.hatch.build.targets.wheel]
 sources = ["src"]

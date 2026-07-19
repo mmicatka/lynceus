@@ -1,4 +1,4 @@
-# modules/local/preprocess_candidates/Dockerfile
+# containers/lynceus-chem/Dockerfile
 
 FROM python:3.12-slim-trixie
 

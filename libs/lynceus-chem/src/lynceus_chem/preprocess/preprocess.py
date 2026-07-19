@@ -1,7 +1,4 @@
-# modules/local/preprocess_candidates/src/preprocess_candidates/preprocess.py
-
-
-from __future__ import annotations
+# libs/lynceus-chem/src/lynceus_chem/preprocess/preprocess.py
 
 import argparse
 import gzip
@@ -9,8 +6,8 @@ import json
 import logging
 from multiprocessing import Pool
 import os
-import sys
 from pathlib import Path
+import sys
 from typing import Any, Iterator
 
 import numpy as np
@@ -20,8 +17,8 @@ import pyarrow.parquet as pq
 from rdkit import Chem, RDLogger
 from rdkit.Chem import Descriptors, rdFingerprintGenerator
 from rdkit.Chem.FilterCatalog import FilterCatalog, FilterCatalogParams
-from .cns_mpo import cns_mpo_from_mol
 
+from .cns_mpo import cns_mpo_from_mol
 
 logging.basicConfig(
     level=logging.INFO,
@@ -288,7 +285,7 @@ def _parse_args() -> argparse.Namespace:
     return p.parse_args()
 
 
-def main():
+def preprocess():
     args = _parse_args()
     _preprocess(
         input_path=args.input,
@@ -297,7 +294,3 @@ def main():
         morgan_n_bits=args.morgan_n_bits,
         num_workers=args.num_workers,
     )
-
-
-if __name__ == "__main__":
-    main()

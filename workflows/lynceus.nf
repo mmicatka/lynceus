@@ -2,11 +2,8 @@
 
 include { CANDIDATE } from '../subworkflows/local/candidate'
 include { TARGET } from '../subworkflows/local/target'
-include { SURROGATE_MODEL_TRAIN } from '../subworkflows/local/surrogate_model'
 
 workflow LYNCEUS {
-
-  main:
   ch_versions = channel.empty()
 
   def use_local = params.candidates_local_path as boolean
@@ -19,12 +16,4 @@ workflow LYNCEUS {
   ch_versions = ch_versions.mix(CANDIDATE.out.versions)
 
   TARGET(params.target.ensemble)
-
-  SURROGATE_MODEL_TRAIN(CANDIDATE.out.filtered_parquets)
-  ch_versions = ch_versions.mix(SURROGATE_MODEL_TRAIN.out.versions)
-
-  emit:
-  training_candidates = SURROGATE_MODEL_TRAIN.out.training_candidates
-  putative_binding_sites = TARGET.out.putative_binding_sites
-  versions = ch_versions
 }

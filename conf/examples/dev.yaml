@@ -22,5 +22,3 @@ target:
 
     capabilities_required:
       - "standalone_cif"
-
-  outdir: "results/target_ensemble_generation/1stp"

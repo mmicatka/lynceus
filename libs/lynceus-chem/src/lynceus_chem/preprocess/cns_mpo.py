@@ -1,4 +1,4 @@
-# modules/local/preprocess_candidates/src/cns_mpo.py
+# libs/lynceus-chem/src/lynceus_chem/preprocess/cns_mpo.py
 
 import math
 from typing import Optional
