@@ -1,4 +1,4 @@
-# containers/lynceus-chem/Dockerfile
+# libs/lynceus-chem/Dockerfile
 
 FROM python:3.12-slim-trixie
 

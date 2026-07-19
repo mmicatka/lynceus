@@ -9,9 +9,11 @@ license = { text = "MIT" }
 requires-python = ">=3.12"
 dependencies = ["blake3>=1.0.9", "jsonschema>=4.26.0", "pyyaml>=6.0.3"]
 
+[project.scripts]
+generate-manifest = "pce.cli:generate_manifest"
+
 [dependency-groups]
 dev = ["mypy>=2.2.0", "pytest>=9.1.1", "ruff>=0.15.21"]
-
 
 [build-system]
 requires = ["hatchling"]
