@@ -1,4 +1,4 @@
-# modules/local/preprocess_candidates/Dockerfile
+# libs/protein-conformational-ensemble/Dockerfile
 
 FROM python:3.12-slim-trixie
 
@@ -10,8 +10,7 @@ COPY --from=ghcr.io/astral-sh/uv:0.11.28-python3.12-trixie /usr/local/bin/uv /us
 
 WORKDIR /app
 
-COPY pyproject.toml ./
-COPY src ./src
+COPY . ./
 
 RUN uv pip install --system .
 

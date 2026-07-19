@@ -1,4 +1,4 @@
-# modules/local/generate_manifest/Dockerfile
+# libs/lynceus-chem/Dockerfile
 
 FROM python:3.12-slim-trixie
 
@@ -10,12 +10,8 @@ COPY --from=ghcr.io/astral-sh/uv:0.11.28-python3.12-trixie /usr/local/bin/uv /us
 
 WORKDIR /app
 
-COPY pyproject.toml uv.lock ./
-COPY libs/protein-conformational-ensemble ./libs/protein-conformational-ensemble
-
-COPY modules/local/generate_manifest ./modules/local/generate_manifest
-
-WORKDIR /app/modules/local/generate_manifest
+COPY pyproject.toml ./
+COPY src ./src
 
 RUN uv pip install --system .
 

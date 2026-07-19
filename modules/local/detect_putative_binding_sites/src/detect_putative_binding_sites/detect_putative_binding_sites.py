@@ -13,6 +13,7 @@ import tempfile
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
+from lynceus_chem.models.binding_site import BindingSite, Sphere
 from pce.ensemble import Ensemble, load_ensemble
 from pce.models import (
     ConformationalState,
@@ -21,7 +22,6 @@ from pce.models import (
     Structure,
     TrajectoryStructure,
 )
-from chem.binding_site import BindingSite, Sphere
 
 logging.basicConfig(
     level=logging.INFO,
@@ -292,14 +292,10 @@ def _parse_args() -> argparse.Namespace:
     return p.parse_args()
 
 
-def _main():
+def detect_putative_binding_sites():
     args = _parse_args()
     putative_binding_sites: list[BindingSite] = _detect_putative_binding_sites_ensemble(
         args.ensemble, args.workers
     )
 
     _write_putative_binding_sites(putative_binding_sites, args.out)
-
-
-if __name__ == "__main__":
-    _main()

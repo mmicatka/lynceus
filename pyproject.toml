@@ -10,31 +10,30 @@ dependencies = [
     # libs
     "lynceus-chem",
     "protein-conformational-ensemble",
-    # members
-    "preprocess-candidates",
+    # utils
     "detect-putative-binding-sites",
+    "physiochemical-filter",
     "sample-candidates",
 ]
 
 [tool.uv.workspace]
 members = [
-    "libs/*",
+    # libs
+    "libs/lynceus-chem",
+    "libs/protein-conformational-ensemble",
+    # utils
     "modules/local/detect_putative_binding_sites",
-    "modules/local/preprocess_candidates",
     "modules/local/physiochemical_filter",
     "modules/local/sample_candidates",
-    "modules/local/generate_manifest",
-    "modules/local/retrieve_pdb",
 ]
 
 [tool.uv.sources]
-preprocess-candidates = { workspace = true }
+lynceus-chem = { workspace = true }
+protein-conformational-ensemble = { workspace = true }
+
 physiochemical-filter = { workspace = true }
 sample-candidates = { workspace = true }
-generate-manifest = { workspace = true }
-protein-conformational-ensemble = { workspace = true }
 detect-putative-binding-sites = { workspace = true }
-lynceus-chem = { workspace = true }
 
 [dependency-groups]
 dev = [

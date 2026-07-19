@@ -1,25 +1,12 @@
-# modules/local/generate_manifest/src/generate_manifest.py
-
-from __future__ import annotations
+# libs/protein-conformational-ensemble/src/pce/cli/generate_manifest.py
 
 import argparse
-import sys
 from pathlib import Path
 from typing import Any
 
+from pce.generation import ConformationalStateSpec, generate_ensemble
+from pce.models import WeightScheme
 import yaml
-
-try:
-    from pce.generation import ConformationalStateSpec, generate_ensemble
-    from pce.models import WeightScheme
-except ImportError as exc:  # pragma: no cover - fails loudly in CI/dry-run
-    print(
-        f"FATAL: could not import pce library ({exc}). "
-        "Confirm the pce dependency in pyproject.toml resolves correctly "
-        "inside this module's container.",
-        file=sys.stderr,
-    )
-    raise
 
 _STRUCTURE_SUFFIXES = {".cif", ".pdb", ".mmcif"}
 _WEIGHTS_FILENAME = "weights.yaml"
@@ -69,21 +56,24 @@ def _discover_member_specs(
     return specs, weight_scheme
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(
+def _parse_args() -> argparse.Namespace:
+    p = argparse.ArgumentParser(
         description="Generate a multi-member PCE manifest from a directory of member structures."
     )
-    parser.add_argument("--members-dir", type=Path, required=True)
-    parser.add_argument("--ensemble-id", type=str, required=True)
-    parser.add_argument("--outdir", type=Path, required=True)
-    parser.add_argument(
+    p.add_argument("--members-dir", type=Path, required=True)
+    p.add_argument("--ensemble-id", type=str, required=True)
+    p.add_argument("--outdir", type=Path, required=True)
+    p.add_argument(
         "--topology-member-id",
         type=str,
         default=None,
         help="Defaults to the first member found (alphabetical by filename) if omitted.",
     )
-    args = parser.parse_args()
+    return p.parse_args()
 
+
+def generate_manifest():
+    args = _parse_args()
     member_specs, weight_scheme = _discover_member_specs(args.members_dir)
 
     manifest = generate_ensemble(
@@ -97,7 +87,3 @@ def main() -> None:
     print(
         f"Wrote PCE manifest: {args.outdir / 'manifest.yaml'} ({len(manifest.conformational_states)} members)"
     )
-
-
-if __name__ == "__main__":
-    main()

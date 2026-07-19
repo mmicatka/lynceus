@@ -3,12 +3,9 @@
 process PREPROCESS_CANDIDATES {
     debug true
 
-    tag "${smi_gz}"
     label 'process_medium'
 
-    container "lynceus/preprocess-candidates:0.1.0"
-
-    publishDir "${params.outdir}/candidate/preprocess", mode: 'copy'
+    container "lynceus/lynceus-chem:0.1.0"
 
     input:
     path smi_gz
@@ -24,7 +21,7 @@ process PREPROCESS_CANDIDATES {
     def prefix = smi_gz.simpleName
     // strips both .gz and .smi (multi-extension aware)
     """
-    python3 -m preprocess_candidates.preprocess \\
+    lynceus-chem-preprocess \\
         --input ${smi_gz} \\
         --output ${prefix}.parquet
 
