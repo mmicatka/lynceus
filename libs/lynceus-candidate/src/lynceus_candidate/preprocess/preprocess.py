@@ -1,4 +1,4 @@
-# libs/lynceus-candidates/src/lynceus_candidates/preprocess/preprocess.py
+# libs/lynceus-candidate/src/lynceus_candidates/preprocess/preprocess.py
 
 import logging
 import sys
