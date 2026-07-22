@@ -8,13 +8,13 @@
 
 build:
 	$(MAKE) build-lynceus-chem
-	$(MAKE) build-protein-confomrational-ensemble
+	$(MAKE) build-protein-conformational-ensemble
 	$(MAKE) build-detect-putative-binding-sites
 
 build-lynceus-chem:
 	docker build -t lynceus/lynceus-chem:0.1.0 libs/lynceus-chem
 
-build-protein-confomrational-ensemble:
+build-protein-conformational-ensemble:
 	docker build -t lynceus/protein-conformational-ensemble:0.1.0 libs/protein-conformational-ensemble
 
 build-detect-putative-binding-sites:
