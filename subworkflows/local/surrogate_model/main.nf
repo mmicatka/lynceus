@@ -5,6 +5,8 @@ include { SAMPLE_CANDIDATES } from '../../../modules/local/sample_candidates'
 
 workflow SURROGATE_MODEL_TRAIN {
     take:
+    pce // protein conformational ensemble
+    putative_binding_sites // putative binding sites
     candidates // path: filtered + repartitioned candidate parquets
 
     main:
