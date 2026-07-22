@@ -18,5 +18,5 @@ workflow LYNCEUS {
 
   TARGET(params.target.ensemble)
 
-  SURROGATE_MODEL_TRAIN(TARGET.out.structure_dir, TARGET.out.putative_binding_sites, CANDIDATE.out.filtered_parquets)
+  SURROGATE_MODEL_TRAIN(TARGET.out.structure_dir, CANDIDATE.out.filtered_parquets)
 }

@@ -8,7 +8,7 @@ process SAMPLE_CANDIDATES {
     path candidates_parquets, stageAs: 'candidates_*.parquet'
 
     output:
-    path ("training_candidates.parquet"), emit: training_candidates
+    path ("candidates.parquet"), emit: candidates
     path "versions.yml", emit: versions
 
     script:
@@ -17,7 +17,7 @@ process SAMPLE_CANDIDATES {
         --input-glob "candidates_*.parquet" \\
         --reservoir-size 20000 \\
         --seed 1000 \\
-        --output training_candidates.parquet
+        --output candidates.parquet
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

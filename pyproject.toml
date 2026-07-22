@@ -25,6 +25,7 @@ members = [
     "modules/local/detect_putative_binding_sites",
     "modules/local/physiochemical_filter",
     "modules/local/sample_candidates",
+    "modules/local/docking_prep/docking-prep",
 ]
 
 [tool.uv.sources]
