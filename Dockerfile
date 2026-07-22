@@ -7,7 +7,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y \
     aria2 \
     git \
-    curl  ca-certificates build-essential cmake wget \
+    curl ca-certificates build-essential cmake wget \
     software-properties-common sudo unzip zip openjdk-25-jdk  \
     swig libboost-all-dev python3-dev \
     && rm -rf /var/lib/apt/lists/*
@@ -15,6 +15,11 @@ RUN apt-get update && apt-get install -y \
 RUN curl -s https://get.nextflow.io | bash \
     && mv nextflow /usr/local/bin/ \
     && chmod +x /usr/local/bin/nextflow
+
+ENV P2RANK_HOME=/opt/p2rank_2.5.1
+ENV PATH="${P2RANK_HOME}:${PATH}"
+
+RUN curl -sSL https://github.com/rdk/p2rank/releases/download/2.5.1/p2rank_2.5.1.tar.gz | tar -xz -C /opt
 
 ARG USERNAME=appuser
 ARG USER_UID=1000

@@ -1,17 +1,18 @@
 # modules/local/surface_extract/src/detect_putative_binding_sites/detect_putative_binding_sites.py
 
-
 import argparse
+import csv
 import json
 import logging
 import os
-import re
 import shutil
 import subprocess
 import sys
 import tempfile
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
+
+import gemmi
 
 from lynceus_chem.models.binding_site import BindingSite, Sphere
 from pce.ensemble import Ensemble, load_ensemble
@@ -30,25 +31,25 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# fpocket output file naming conventions (fpocket 4.x): given input
-# structure.cif, `fpocket -f structure.cif` writes a sibling directory
-# structure_out/, with structure_out/<name>_info.txt summarizing all
-# pockets and structure_out/pockets/pocket{N}_atm.cif per pocket.
-# fpocket dispatches its parser by file extension, so inputs and its
-# own pocket outputs stay in the same format (mmCIF here, matching
-# Lynceus's structure file convention).
-_POCKET_HEADER_RE = re.compile(r"^Pocket\s+(\d+)\s*:?\s*$")
-_POCKET_SCORE_RE = re.compile(r"^\s*Score\s*:\s*([-\d.]+)\s*$")
+# Exact header written by p2rank's PredictionSummary.toCSV() (PredictionSummary.groovy,
+# rdk/p2rank, as of v2.6 / develop branch). Verified against source rather than assumed,
+# since a silently-wrong column name here would fail parsing without a clear signal.
+_P2RANK_PREDICTIONS_HEADER = (
+    "name",
+    "rank",
+    "score",
+    "probability",
+    "sas_points",
+    "surf_atoms",
+    "center_x",
+    "center_y",
+    "center_z",
+    "residue_ids",
+    "surf_atom_ids",
+)
 
 
 def _uri_to_path(uri: str, ensemble_root: Path) -> Path:
-    """Resolve a manifest `uri` to a local filesystem path.
-
-    Per `pce.package.load_ensemble`, `Ensemble.root` is the package
-    directory and manifest `uri` fields are relative to it (the loader
-    never rewrites them to absolute paths). `file://` uris and already-
-    absolute paths are passed through as-is.
-    """
     if uri.startswith("file://"):
         return Path(uri[len("file://") :])
     path = Path(uri)
@@ -66,7 +67,7 @@ def _structure_to_local_cif(
 
     if isinstance(structure, TrajectoryStructure):
         raise NotImplementedError(
-            "trajectory-backed structures are not yet supported for fpocket "
+            "trajectory-backed structures are not yet supported for p2rank "
             "detection; frame extraction to a standalone structure file is "
             "unimplemented"
         )
@@ -74,86 +75,80 @@ def _structure_to_local_cif(
     raise TypeError(f"unrecognized structure type: {type(structure).__name__}")
 
 
-def _run_fpocket(local_input: Path) -> Path:
+def _run_p2rank(local_input: Path, workdir: Path) -> Path:
+    """Run `prank predict` on a single structure file.
+
+    Uses the explicit `predict` subcommand (rather than relying on any
+    implicit/default command) so behavior doesn't depend on the installed
+    p2rank version's default. Output directory is explicitly pinned via
+    `-o` rather than inferred, since p2rank's default output location
+    convention is not part of the documented contract we want to depend on.
+    """
+    out_dir = workdir / "p2rank_out"
+
     subprocess.run(
-        ["fpocket", "-f", str(local_input)],
+        ["prank", "predict", "-f", str(local_input), "-o", str(out_dir)],
         check=True,
         capture_output=True,
         text=True,
     )
 
-    out_dir = local_input.parent / f"{local_input.stem}_out"
-    if not out_dir.is_dir():
-        raise RuntimeError(f"fpocket did not produce expected output dir: {out_dir}")
-    return out_dir
-
-
-def _parse_pocket_scores(info_file: Path) -> dict[int, float]:
-    scores: dict[int, float] = {}
-    current_pocket: int | None = None
-
-    with open(info_file) as _f:
-        for line in _f:
-            header_match = _POCKET_HEADER_RE.match(line)
-            if header_match:
-                current_pocket = int(header_match.group(1))
-                continue
-            score_match = _POCKET_SCORE_RE.match(line)
-            if score_match and current_pocket is not None:
-                scores[current_pocket] = float(score_match.group(1))
-
-    return scores
-
-
-def _parse_atom_site_coords(cif_path: Path) -> list[tuple[float, float, float]]:
-    lines = Path(cif_path).read_text().splitlines()
-
-    columns: list[str] = []
-    in_atom_site_loop = False
-    data_start: int | None = None
-
-    for i, line in enumerate(lines):
-        stripped = line.strip()
-        if stripped == "loop_":
-            in_atom_site_loop = False
-            columns = []
-            continue
-        if stripped.startswith("_atom_site."):
-            in_atom_site_loop = True
-            columns.append(stripped[len("_atom_site.") :])
-            continue
-        if in_atom_site_loop and columns and not stripped.startswith("_"):
-            data_start = i
-            break
-
-    if data_start is None:
-        return []
-
-    x_idx = columns.index("Cartn_x")
-    y_idx = columns.index("Cartn_y")
-    z_idx = columns.index("Cartn_z")
-
-    points: list[tuple[float, float, float]] = []
-    for line in lines[data_start:]:
-        stripped = line.strip()
-        if not stripped or stripped.startswith(("#", "_", "loop_")):
-            break
-        fields = stripped.split()
-        if len(fields) <= max(x_idx, y_idx, z_idx):
-            continue
-        points.append(
-            (float(fields[x_idx]), float(fields[y_idx]), float(fields[z_idx]))
+    predictions_csv = out_dir / f"{local_input.name}_predictions.csv"
+    if not predictions_csv.is_file():
+        raise RuntimeError(
+            f"p2rank did not produce expected predictions file: {predictions_csv}"
         )
+    return predictions_csv
 
-    return points
+
+def _parse_predictions_csv(predictions_csv: Path) -> list[dict[str, str]]:
+    """Parse p2rank's `*_predictions.csv` into row dicts.
+
+    Uses csv.DictReader keyed on the actual header row (not positional
+    columns) and explicitly validates the expected columns are present.
+    This is deliberately defensive: p2rank has changed this format across
+    versions before (e.g. residue/probability columns added in 2.x), and a
+    silent positional-index mismatch would produce wrong coordinates rather
+    than an obvious error.
+    """
+    with open(predictions_csv, newline="") as _f:
+        reader = csv.DictReader(_f, skipinitialspace=True)
+        fieldnames = tuple(_f_name.strip() for _f_name in (reader.fieldnames or ()))
+
+        missing = set(_P2RANK_PREDICTIONS_HEADER) - set(fieldnames)
+        if missing:
+            raise RuntimeError(
+                f"p2rank predictions CSV {predictions_csv} is missing expected "
+                f"columns {sorted(missing)}; found columns {fieldnames}. "
+                "This likely means the installed p2rank version's output "
+                "format has changed and this parser needs updating."
+            )
+
+        return [{_k.strip(): _v.strip() for _k, _v in row.items()} for row in reader]
 
 
-def _centroid(points: list[tuple[float, float, float]]) -> tuple[float, float, float]:
-    n = len(points)
-    sx = sum(p[0] for p in points) / n
-    sy = sum(p[1] for p in points) / n
-    sz = sum(p[2] for p in points) / n
-    return (sx, sy, sz)
+def _resolve_atom_coords(structure_path: Path) -> dict[int, tuple[float, float, float]]:
+    """Build a PDB-serial -> (x, y, z) lookup from the exact structure file
+    p2rank was run against, so serial numbers in surf_atom_ids resolve
+    unambiguously.
+    """
+    parsed = gemmi.read_structure(str(structure_path))
+
+    coords_by_serial: dict[int, tuple[float, float, float]] = {}
+    for model in parsed:
+        for chain in model:
+            for residue in chain:
+                for atom in residue:
+                    coords_by_serial[atom.serial] = (
+                        atom.pos.x,
+                        atom.pos.y,
+                        atom.pos.z,
+                    )
+        break  # only the first model is relevant; standalone/multi-model
+        # structures are already reduced to a single conformation by
+        # _structure_to_local_cif before p2rank ever sees them.
+
+    return coords_by_serial
 
 
 def _radius_of_gyration(
@@ -169,43 +164,89 @@ def _radius_of_gyration(
     ) ** 0.5
 
 
+def _pocket_row_to_binding_site(
+    row: dict[str, str],
+    conformational_state_id: str,
+    coords_by_serial: dict[int, tuple[float, float, float]],
+) -> BindingSite | None:
+    pocket_rank = row["rank"]
+    center = (
+        float(row["center_x"]),
+        float(row["center_y"]),
+        float(row["center_z"]),
+    )
+
+    surf_atom_ids = [int(_s) for _s in row["surf_atom_ids"].split()]
+    points = [
+        coords_by_serial[_serial]
+        for _serial in surf_atom_ids
+        if _serial in coords_by_serial
+    ]
+
+    missing_count = len(surf_atom_ids) - len(points)
+    if missing_count:
+        logger.warning(
+            "pocket rank %s (%s): %d/%d surf_atom_ids not found in structure; "
+            "radius computed from the %d resolved atoms only",
+            pocket_rank,
+            conformational_state_id,
+            missing_count,
+            len(surf_atom_ids),
+            len(points),
+        )
+
+    if not points:
+        logger.warning(
+            "pocket rank %s (%s): no surf_atom_ids resolved to structure "
+            "coordinates; skipping (cannot compute a radius)",
+            pocket_rank,
+            conformational_state_id,
+        )
+        return None
+
+    # Radius of gyration about p2rank's own reported pocket center (a centroid
+    # of SAS points, not of surf_atom_ids), for consistency with the fpocket
+    # path this replaces, which also derives radius from real pocket geometry
+    # rather than a fixed/configurable constant.
+    radius = _radius_of_gyration(points, center)
+
+    return BindingSite(
+        schema_version="1.0.0",
+        site_id=f"{conformational_state_id}:p2rank:{pocket_rank}",
+        conformational_state_id=conformational_state_id,
+        center=center,
+        extent=Sphere(center=center, radius=radius),
+        pocket_score=float(row["score"]),
+        provenance={
+            "tool": "p2rank",
+            "pocket_rank": int(pocket_rank),
+            "probability": float(row["probability"]),
+        },
+    )
+
+
 def _pockets_to_binding_sites(
-    out_dir: Path, conformational_state_id: str
+    predictions_csv: Path,
+    structure_path: Path,
+    conformational_state_id: str,
 ) -> list[BindingSite]:
-    info_files = list(out_dir.glob("*_info.txt"))
-    if not info_files:
-        logger.warning("no fpocket info file found in %s", out_dir)
+    rows = _parse_predictions_csv(predictions_csv)
+    if not rows:
+        logger.warning(
+            "p2rank produced no predicted pockets for conformational state: %s",
+            conformational_state_id,
+        )
         return []
 
-    scores = _parse_pocket_scores(info_files[0])
-    pocket_cifs = sorted((out_dir / "pockets").glob("pocket*_atm.cif"))
+    coords_by_serial = _resolve_atom_coords(structure_path)
 
     binding_sites: list[BindingSite] = []
-
-    for pocket_cif in pocket_cifs:
-        pocket_num_match = re.search(r"pocket(\d+)_atm\.cif", pocket_cif.name)
-        if not pocket_num_match:
-            continue
-        pocket_num = int(pocket_num_match.group(1))
-
-        points = _parse_atom_site_coords(pocket_cif)
-        if not points:
-            continue
-
-        center = _centroid(points)
-        radius = _radius_of_gyration(points, center)
-
-        binding_sites.append(
-            BindingSite(
-                schema_version="1.0.0",
-                site_id=f"{conformational_state_id}:fpocket:{pocket_num}",
-                conformational_state_id=conformational_state_id,
-                center=center,
-                extent=Sphere(center=center, radius=radius),
-                pocket_score=scores.get(pocket_num),
-                provenance={"tool": "fpocket", "pocket_index": pocket_num},
-            )
+    for row in rows:
+        binding_site = _pocket_row_to_binding_site(
+            row, conformational_state_id, coords_by_serial
         )
+        if binding_site is not None:
+            binding_sites.append(binding_site)
 
     return binding_sites
 
@@ -218,13 +259,15 @@ def _detect_putative_binding_sites(
         conformational_state.id,
     )
 
-    with tempfile.TemporaryDirectory(prefix="fpocket_") as _tmp:
+    with tempfile.TemporaryDirectory(prefix="p2rank_") as _tmp:
         workdir = Path(_tmp)
         local_input = _structure_to_local_cif(
             conformational_state.structure, ensemble_root, workdir
         )
-        out_dir = _run_fpocket(local_input)
-        return _pockets_to_binding_sites(out_dir, conformational_state.id)
+        predictions_csv = _run_p2rank(local_input, workdir)
+        return _pockets_to_binding_sites(
+            predictions_csv, local_input, conformational_state.id
+        )
 
 
 def _detect_putative_binding_sites_ensemble(
@@ -246,7 +289,7 @@ def _detect_putative_binding_sites_ensemble(
                 binding_sites.extend(future.result())
             except Exception:
                 logger.exception(
-                    "fpocket detection failed for conformational state: %s",
+                    "p2rank detection failed for conformational state: %s",
                     conformational_state.id,
                 )
                 raise
@@ -287,7 +330,7 @@ def _parse_args() -> argparse.Namespace:
         "--workers",
         type=_parse_num_workers,
         default="auto",
-        help="Number of parallel fpocket workers, or 'auto' for os.cpu_count()",
+        help="Number of parallel p2rank workers, or 'auto' for os.cpu_count()",
     )
     return p.parse_args()
 
