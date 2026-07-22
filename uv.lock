@@ -16,6 +16,7 @@ resolution-markers = [
 [manifest]
 members = [
     "detect-putative-binding-sites",
+    "docking-prep",
     "lynceus-chem",
     "lynceus-dev",
     "physiochemical-filter",
@@ -523,6 +524,11 @@ sdist = { url = "https://files.pythonhosted.org/packages/c9/02/bd72be9134d25ed78
 wheels = [
     { url = "https://files.pythonhosted.org/packages/02/08/9c41fb51ab5b43eb21674aff13df270e8ba6c4b29c8624e328dc7a9482af/distlib-0.4.3-py2.py3-none-any.whl", hash = "sha256:4b0ce306c966eb73bc3a7b6abad017c556dadd92c44701562cd528ac7fde4d5b", size = 470628, upload-time = "2026-06-12T08:04:50.506Z" },
 ]
+
+[[package]]
+name = "docking-prep"
+version = "0.1.0"
+source = { editable = "modules/local/docking_prep" }
 
 [[package]]
 name = "duckdb"

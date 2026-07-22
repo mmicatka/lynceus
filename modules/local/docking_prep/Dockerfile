@@ -10,15 +10,15 @@ COPY --from=ghcr.io/astral-sh/uv:0.11.28-python3.12-trixie /usr/local/bin/uv /us
 
 WORKDIR /app
 
-COPY pyproject.toml uv.lock* ./
+COPY pyproject.toml uv.lock ./
 
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv pip compile pyproject.toml -o /tmp/requirements.txt && \
-    uv pip install --system -r /tmp/requirements.txt && \
-    rm /tmp/requirements.txt
+COPY libs/protein-conformational-ensemble ./libs/protein-conformational-ensemble
+COPY libs/lynceus-chem ./libs/lynceus-chem
 
-COPY src ./src
+COPY modules/local/docking_prep ./modules/local/docking_prep
 
-RUN uv pip install --system --no-build-isolation --no-deps .
+WORKDIR /app/modules/local/docking_prep
+
+RUN uv pip install --system .
 
 ENTRYPOINT []
