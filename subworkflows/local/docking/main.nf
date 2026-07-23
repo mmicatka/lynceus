@@ -14,6 +14,8 @@ workflow DOCKING {
     DOCKING_PREP_TARGET(target_pce)
     DETECT_PUTATIVE_BINDING_SITES(target_pce)
 
+    DOCKING_PREP_CANDIDATE(candidates)
+
     emit:
     versions = ch_versions
 }

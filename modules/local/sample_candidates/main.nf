@@ -13,7 +13,7 @@ process SAMPLE_CANDIDATES {
 
     script:
     """
-    python3 -m sample_candidates.sample_candidates \\
+    sample-candidates \\
         --input-glob "candidates_*.parquet" \\
         --reservoir-size 20000 \\
         --seed 1000 \\

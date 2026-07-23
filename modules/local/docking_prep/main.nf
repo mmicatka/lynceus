@@ -6,6 +6,9 @@ process DOCKING_PREP_TARGET {
     input:
     tuple val(ensemble_id), path(ensemble_dir)
 
+    output:
+    path
+
     script:
     """
     docking-prep-ensemble \\
