@@ -4,13 +4,14 @@
 # so environment-specific parameters never need to be typed by hand or
 # forgotten on the command line.
 
-.PHONY: build build-lynceus-chem build-detect-putative-binding-sites build-protein-conformational-ensemble build-docking-prep run-test run-dev clean reset
+.PHONY: build build-lynceus-chem build-detect-putative-binding-sites build-protein-conformational-ensemble build-docking-prep build-sample-candidates run-test run-dev clean reset
 
 build:
 	$(MAKE) build-lynceus-chem
 	$(MAKE) build-protein-conformational-ensemble
 	$(MAKE) build-detect-putative-binding-sites
 	$(MAKE) build-docking-prep
+	$(MAKE) build-sample-candidates
 
 build-lynceus-chem:
 	docker build -t lynceus/lynceus-chem:0.1.0 libs/lynceus-chem
@@ -23,6 +24,9 @@ build-detect-putative-binding-sites:
 
 build-docking-prep:
 	docker build -f modules/local/docking_prep/Dockerfile -t lynceus/docking-prep:0.1.0 .
+
+build-sample-candidates:
+	docker build -t lynceus/sample-candidates:0.1.0 modules/local/sample_candidates
 
 # Dev environment: loads conf/examples/dev.yaml
 run-dev:
