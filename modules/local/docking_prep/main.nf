@@ -7,7 +7,7 @@ process DOCKING_PREP_TARGET {
     tuple val(ensemble_id), path(ensemble_dir)
 
     output:
-    path
+    path "${ensemble_id}_prepped"
 
     script:
     """
