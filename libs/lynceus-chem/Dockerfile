@@ -19,6 +19,6 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 COPY src ./src
 
-RUN uv pip install --system --no-build-isolation --no-deps .
+RUN uv pip install --system --no-deps .
 
 ENTRYPOINT []

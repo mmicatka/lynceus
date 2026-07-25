@@ -8,8 +8,8 @@ import subprocess
 import sys
 
 import gemmi
-from pce.ensemble import Ensemble, load_ensemble
-from pce.models import ConformationalState
+from protein_conformational_ensemble.ensemble import Ensemble, load_ensemble
+from protein_conformational_ensemble.models import ConformationalState
 
 from .models import (
     ReceptorPrepFailure,

@@ -6,14 +6,17 @@ import shutil
 from dataclasses import dataclass, replace
 from pathlib import Path
 
-from pce.canonical import canonical_serialize
-from pce.hashing import (
+from protein_conformational_ensemble.canonical import canonical_serialize
+from protein_conformational_ensemble.hashing import (
     StructureBytesResolver,
     compute_content_hash,
     default_structure_bytes,
 )
-from pce.manifest import SUPPORTED_SCHEMA_VERSIONS, validate_semantics
-from pce.models import (
+from protein_conformational_ensemble.manifest import (
+    SUPPORTED_SCHEMA_VERSIONS,
+    validate_semantics,
+)
+from protein_conformational_ensemble.models import (
     CAPABILITY_STANDALONE_CIF,
     Manifest,
     ConformationalState,
@@ -22,7 +25,7 @@ from pce.models import (
     Weight,
     WeightScheme,
 )
-from pce.ensemble import MANIFEST_FILENAME
+from protein_conformational_ensemble.ensemble import MANIFEST_FILENAME
 
 _PLACEHOLDER_HASH = "blake3:" + "0" * 64
 

@@ -9,7 +9,7 @@ from typing import Any
 
 import jsonschema
 
-from pce.errors import SchemaValidationError
+from protein_conformational_ensemble.errors import SchemaValidationError
 
 
 @functools.lru_cache(maxsize=1)
