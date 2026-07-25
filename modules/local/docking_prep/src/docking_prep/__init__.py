@@ -1,7 +1,7 @@
 # modules/local/docking_prep/src/docking_prep/__init__.py
 
-from .prepare_ensemble import prepare_ensemble
-from .models import (
+from .ensemble import prepare_ensemble
+from .ensemble.models import (
     ReceptorPrepResults,
     ReceptorPrepResult,
     ReceptorPrepParams,

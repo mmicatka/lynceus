@@ -1,8 +1,8 @@
 ---
 # conf/examples/dev.yaml
 
-uri_list: assets/candidate_uris.blackhole.txt
-# candidates_local_path: assets/.local/*
+# uri_list: assets/candidate_uris.blackhole.txt
+candidates_local_path: assets/.local/*
 
 outdir: results/dev
 
