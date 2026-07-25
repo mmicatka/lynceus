@@ -17,7 +17,7 @@ dependencies = [
 ]
 
 [project.scripts]
-docking-prepare-ensemble = "docking_prep.prepare_ensemble:prepare_ensemble"
+docking-prepare-ensemble = "docking_prepare.ensemble:prepare_ensemble"
 
 [build-system]
 requires = ["uv_build>=0.11.30,<0.12.0"]

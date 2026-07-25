@@ -9,13 +9,13 @@ workflow DOCKING {
     candidates // path: candidate parquet
 
     main:
-    ch_versions = channel.empty()
-
     DOCKING_PREP_TARGET(target_protein_conformational_ensemble)
+
     DETECT_PUTATIVE_BINDING_SITES(target_protein_conformational_ensemble)
 
     DOCKING_PREP_CANDIDATE(candidates)
 
     emit:
-    versions = ch_versions
+    prepped_target = DOCKING_PREP_TARGET.out.prepped
+    prepped_candidate = DOCKING_PREP_CANDIDATE.out.prepped
 }

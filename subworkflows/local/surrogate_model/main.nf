@@ -9,13 +9,12 @@ workflow SURROGATE_MODEL_TRAIN {
     candidates // path: filtered + repartitioned candidate parquets
 
     main:
-    ch_versions = channel.empty()
-
     SAMPLE_CANDIDATES(candidates)
-    ch_versions = ch_versions.mix(SAMPLE_CANDIDATES.out.versions)
 
     DOCKING(protein_conformational_ensemble, SAMPLE_CANDIDATES.out.candidates)
 
     emit:
-    versions = ch_versions
+    sampled_candidates = SAMPLE_CANDIDATES.out.candidates
+    prepped_target = DOCKING.out.prepped_target
+    prepped_candidate = DOCKING.out.prepped_candidate
 }
