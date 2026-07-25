@@ -11,7 +11,7 @@ process DOCKING_PREP_TARGET {
 
     script:
     """
-    docking-prep-ensemble \\
+    docking-prepare-ensemble \\
         --ensemble ${ensemble_dir} \\
         --output ${ensemble_id}_prepped
     """

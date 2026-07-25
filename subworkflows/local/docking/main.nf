@@ -5,14 +5,14 @@ include { DETECT_PUTATIVE_BINDING_SITES } from '../../../modules/local/detect_pu
 
 workflow DOCKING {
     take:
-    target_pce // protein conformational ensemble
+    target_protein_conformational_ensemble // protein conformational ensemble
     candidates // path: candidate parquet
 
     main:
     ch_versions = channel.empty()
 
-    DOCKING_PREP_TARGET(target_pce)
-    DETECT_PUTATIVE_BINDING_SITES(target_pce)
+    DOCKING_PREP_TARGET(target_protein_conformational_ensemble)
+    DETECT_PUTATIVE_BINDING_SITES(target_protein_conformational_ensemble)
 
     DOCKING_PREP_CANDIDATE(candidates)
 

@@ -1,4 +1,4 @@
-# libs/protein-conformational-ensemble/src/pce/schema.py
+# libs/protein-conformational-ensemble/src/protein_conformational_ensemble/schema.py
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from protein_conformational_ensemble.errors import SchemaValidationError
 @functools.lru_cache(maxsize=1)
 def load_manifest_schema() -> dict[str, Any]:
     schema_text = (
-        resources.files("pce.schemas")
+        resources.files("protein_conformational_ensemble.schemas")
         .joinpath("manifest.schema.json")
         .read_text(encoding="utf-8")
     )

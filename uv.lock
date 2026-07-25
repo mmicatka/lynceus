@@ -564,6 +564,9 @@ dependencies = [
     { name = "gemmi" },
     { name = "meeko" },
     { name = "prody" },
+    { name = "protein-conformational-ensemble" },
+    { name = "pydantic" },
+    { name = "rdkit" },
     { name = "scipy" },
 ]
 
@@ -572,6 +575,9 @@ requires-dist = [
     { name = "gemmi", specifier = ">=0.7.5" },
     { name = "meeko", specifier = ">=0.7.1" },
     { name = "prody", specifier = ">=2.6.1" },
+    { name = "protein-conformational-ensemble", editable = "libs/protein-conformational-ensemble" },
+    { name = "pydantic", specifier = ">=2.13.4" },
+    { name = "rdkit", specifier = ">=2026.3.3" },
     { name = "scipy", specifier = ">=1.18.0" },
 ]
 

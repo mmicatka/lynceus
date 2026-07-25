@@ -5,7 +5,7 @@ include { DOCKING } from '../docking'
 
 workflow SURROGATE_MODEL_TRAIN {
     take:
-    pce // protein conformational ensemble
+    protein_conformational_ensemble // protein conformational ensemble
     candidates // path: filtered + repartitioned candidate parquets
 
     main:
@@ -14,7 +14,7 @@ workflow SURROGATE_MODEL_TRAIN {
     SAMPLE_CANDIDATES(candidates)
     ch_versions = ch_versions.mix(SAMPLE_CANDIDATES.out.versions)
 
-    DOCKING(pce, SAMPLE_CANDIDATES.out.candidates)
+    DOCKING(protein_conformational_ensemble, SAMPLE_CANDIDATES.out.candidates)
 
     emit:
     versions = ch_versions

@@ -12,6 +12,9 @@ dependencies = [
   "rdkit>=2026.3.3",
 ]
 
+[project.scripts]
+sample-candidates = "sample_candidates.sample_candidates:sample_candidates"
+
 [build-system]
 requires = ["uv_build>=0.11.30,<0.12.0"]
 build-backend = "uv_build"

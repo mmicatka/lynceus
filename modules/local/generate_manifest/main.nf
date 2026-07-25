@@ -7,7 +7,7 @@ process GENERATE_MANIFEST {
     tuple val(ensemble_id), path(ensemble_dir)
 
     output:
-    tuple val(ensemble_id), path("${ensemble_id}"), emit: pce_package
+    tuple val(ensemble_id), path("${ensemble_id}"), emit: protein_conformational_ensemble
     path "versions.yml", emit: versions
 
     script:
@@ -19,7 +19,7 @@ process GENERATE_MANIFEST {
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
-        pce: \$(python -c "import pce; print(pce.__version__)" 2>/dev/null || echo "unknown")
+        protein_conformational_ensemble: \$(python -c "import protein_conformational_ensemble; print(protein_conformational_ensemble.__version__)" 2>/dev/null || echo "unknown")
     END_VERSIONS
     """
 
@@ -31,7 +31,7 @@ process GENERATE_MANIFEST {
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
         python: \$(python --version | sed 's/Python //')
-        pce: "stub"
+        protein_conformational_ensemble: "stub"
     END_VERSIONS
     """
 }

@@ -54,7 +54,7 @@ def _build_reservoir(input_glob: str, reservoir_size: int, seed: int) -> pl.Data
         return res_df
 
 
-def main():
+def sample_candidates():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--input-glob",
@@ -93,7 +93,3 @@ def main():
 
     out_df.write_parquet(args.output)
     logger.info("Wrote %d candidates -> %s", out_df.height, args.output)
-
-
-if __name__ == "__main__":
-    main()

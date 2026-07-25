@@ -1,4 +1,4 @@
-# libs/protein-conformational-ensemble/src/pce/package.py
+# libs/protein-conformational-ensemble/src/protein_conformational_ensemble/package.py
 
 
 from __future__ import annotations

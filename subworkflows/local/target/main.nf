@@ -20,8 +20,9 @@ workflow TARGET {
   ch_versions = ch_versions.mix(RETRIEVE_PDB.out.versions)
 
   GENERATE_MANIFEST(RETRIEVE_PDB.out.structure_dir)
+  ch_versions = ch_versions.mix(GENERATE_MANIFEST.out.versions)
 
   emit:
-  structure_dir = RETRIEVE_PDB.out.structure_dir
+  protein_conformational_ensemble = GENERATE_MANIFEST.out.protein_conformational_ensemble
   versions = ch_versions
 }
