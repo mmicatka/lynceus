@@ -2,8 +2,6 @@
 
 include { RETRIEVE_PDB } from '../../../modules/local/retrieve_pdb'
 include { GENERATE_MANIFEST } from '../../../modules/local/generate_manifest'
-include { DETECT_PUTATIVE_BINDING_SITES } from '../../../modules/local/detect_putative_binding_sites'
-
 
 workflow TARGET {
   take:
@@ -22,11 +20,9 @@ workflow TARGET {
   ch_versions = ch_versions.mix(RETRIEVE_PDB.out.versions)
 
   GENERATE_MANIFEST(RETRIEVE_PDB.out.structure_dir)
-
-  DETECT_PUTATIVE_BINDING_SITES(GENERATE_MANIFEST.out.pce_package)
+  ch_versions = ch_versions.mix(GENERATE_MANIFEST.out.versions)
 
   emit:
-  structure_dir = RETRIEVE_PDB.out.structure_dir
-  putative_binding_sites = DETECT_PUTATIVE_BINDING_SITES.out.sites
+  protein_conformational_ensemble = GENERATE_MANIFEST.out.protein_conformational_ensemble
   versions = ch_versions
 }

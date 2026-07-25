@@ -15,8 +15,8 @@ from pathlib import Path
 import gemmi
 
 from lynceus_chem.models.binding_site import BindingSite, Sphere
-from pce.ensemble import Ensemble, load_ensemble
-from pce.models import (
+from protein_conformational_ensemble.ensemble import Ensemble, load_ensemble
+from protein_conformational_ensemble.models import (
     ConformationalState,
     MultiModelStructure,
     StandaloneStructure,

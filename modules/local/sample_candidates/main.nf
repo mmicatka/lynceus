@@ -2,22 +2,22 @@
 
 process SAMPLE_CANDIDATES {
 
-    container "lynceus/sample:0.1.0"
+    container "lynceus/sample-candidates:0.1.0"
 
     input:
     path candidates_parquets, stageAs: 'candidates_*.parquet'
 
     output:
-    path ("training_candidates.parquet"), emit: training_candidates
+    path ("candidates.parquet"), emit: candidates
     path "versions.yml", emit: versions
 
     script:
     """
-    python3 -m sample_candidates.sample_candidates \\
+    sample-candidates \\
         --input-glob "candidates_*.parquet" \\
         --reservoir-size 20000 \\
         --seed 1000 \\
-        --output training_candidates.parquet
+        --output candidates.parquet
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

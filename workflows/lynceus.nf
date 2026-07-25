@@ -2,6 +2,7 @@
 
 include { CANDIDATE } from '../subworkflows/local/candidate'
 include { TARGET } from '../subworkflows/local/target'
+include { SURROGATE_MODEL_TRAIN } from '../subworkflows/local/surrogate_model'
 
 workflow LYNCEUS {
   ch_versions = channel.empty()
@@ -16,4 +17,6 @@ workflow LYNCEUS {
   ch_versions = ch_versions.mix(CANDIDATE.out.versions)
 
   TARGET(params.target.ensemble)
+
+  SURROGATE_MODEL_TRAIN(TARGET.out.protein_conformational_ensemble, CANDIDATE.out.filtered_parquets)
 }

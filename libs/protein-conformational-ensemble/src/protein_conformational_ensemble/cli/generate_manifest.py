@@ -4,8 +4,11 @@ import argparse
 from pathlib import Path
 from typing import Any
 
-from pce.generation import ConformationalStateSpec, generate_ensemble
-from pce.models import WeightScheme
+from protein_conformational_ensemble.generation import (
+    ConformationalStateSpec,
+    generate_ensemble,
+)
+from protein_conformational_ensemble.models import WeightScheme
 import yaml
 
 _STRUCTURE_SUFFIXES = {".cif", ".pdb", ".mmcif"}

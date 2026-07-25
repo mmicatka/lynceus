@@ -1,4 +1,4 @@
-# libs/protein-conformational-ensemble/src/pce/canonical.py
+# libs/protein-conformational-ensemble/src/protein_conformational_ensemble/canonical.py
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import re
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from pce.errors import CanonicalizationError
+from protein_conformational_ensemble.errors import CanonicalizationError
 
 _INDENT = "  "  # two-space indentation
 _SAFE_PLAIN_SCALAR = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.\-/:]*$")

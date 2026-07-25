@@ -92,7 +92,7 @@ def _write_partitions(
     return written
 
 
-def parse_args() -> argparse.Namespace:
+def _parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument(
         "--input",
@@ -130,8 +130,8 @@ def parse_args() -> argparse.Namespace:
     return p.parse_args()
 
 
-def main():
-    args = parse_args()
+def physiochemical_filter():
+    args = _parse_args()
 
     with open(args.config) as fh:
         config = yaml.safe_load(fh) or {}
@@ -173,8 +173,3 @@ def main():
         json.dump(report, fh, indent=2)
 
     logger.info("Wrote %d partition file(s) to %s", len(written), args.output_dir)
-
-
-if __name__ == "__main__":
-    logger.info("here")
-    main()

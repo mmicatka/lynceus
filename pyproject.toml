@@ -14,6 +14,7 @@ dependencies = [
     "detect-putative-binding-sites",
     "physiochemical-filter",
     "sample-candidates",
+    "docking-prep",
 ]
 
 [tool.uv.workspace]
@@ -25,15 +26,17 @@ members = [
     "modules/local/detect_putative_binding_sites",
     "modules/local/physiochemical_filter",
     "modules/local/sample_candidates",
+    "modules/local/docking_prep",
 ]
 
 [tool.uv.sources]
-lynceus-chem = { workspace = true }
-protein-conformational-ensemble = { workspace = true }
 
 physiochemical-filter = { workspace = true }
 sample-candidates = { workspace = true }
 detect-putative-binding-sites = { workspace = true }
+protein-conformational-ensemble = { workspace = true }
+lynceus-chem = { workspace = true }
+docking-prep = { workspace = true }
 
 [dependency-groups]
 dev = [

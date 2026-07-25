@@ -8,8 +8,12 @@ from typing import Protocol
 
 from blake3 import blake3
 
-from pce.canonical import canonical_serialize
-from pce.models import Manifest, ConformationalState, TrajectoryStructure
+from protein_conformational_ensemble.canonical import canonical_serialize
+from protein_conformational_ensemble.models import (
+    Manifest,
+    ConformationalState,
+    TrajectoryStructure,
+)
 
 ALGORITHM_PREFIX = "blake3"
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from pce.models import WeightSchemeType
+from protein_conformational_ensemble.models import WeightSchemeType
 
 
 @dataclass(frozen=True, slots=True)

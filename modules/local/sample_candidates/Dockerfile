@@ -10,9 +10,15 @@ COPY --from=ghcr.io/astral-sh/uv:0.11.28-python3.12-trixie /usr/local/bin/uv /us
 
 WORKDIR /app
 
-COPY pyproject.toml ./
+COPY pyproject.toml uv.lock* ./
+
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv pip compile pyproject.toml -o /tmp/requirements.txt && \
+    uv pip install --system -r /tmp/requirements.txt && \
+    rm /tmp/requirements.txt
+
 COPY src ./src
 
-RUN uv pip install --system .
+RUN uv pip install --system --no-deps .
 
 ENTRYPOINT []

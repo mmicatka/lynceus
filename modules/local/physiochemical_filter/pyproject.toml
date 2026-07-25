@@ -7,10 +7,9 @@ description = "Performs physiochemical-based filtering"
 requires-python = ">=3.12"
 dependencies = ["duckdb>=1.5.4", "pyyaml>=6.0.3"]
 
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+[project.scripts]
+physiochemical-filter = "physiochemical_filter.physiochemical_filter:physiochemical_filter"
 
-[tool.hatch.build.targets.wheel]
-sources = ["src"]
-packages = ["src/physiochemical_filter"]
+[build-system]
+requires = ["uv_build>=0.11.30,<0.12.0"]
+build-backend = "uv_build"

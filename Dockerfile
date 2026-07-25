@@ -75,7 +75,7 @@ RUN apt-get update \
     && apt-get install -y tree graphviz zsh \
     && rm -rf /var/lib/apt/lists/*
 
-RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
-
 WORKDIR /workspaces/lynceus
 USER appuser
+
+RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
