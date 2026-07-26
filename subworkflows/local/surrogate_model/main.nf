@@ -16,5 +16,4 @@ workflow SURROGATE_MODEL_TRAIN {
     emit:
     sampled_candidates = SAMPLE_CANDIDATES.out.candidates
     prepped_target = DOCKING.out.prepped_target
-    prepped_candidate = DOCKING.out.prepped_candidate
 }

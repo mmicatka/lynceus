@@ -34,7 +34,6 @@ workflow CANDIDATE {
 
   PREPROCESS_CANDIDATES(ch_smi_gz)
   ch_versions = ch_versions.mix(PREPROCESS_CANDIDATES.out.versions)
-
   ch_all_parquet = PREPROCESS_CANDIDATES.out.parquet.collect()
 
   PHYSIOCHEMICAL_FILTER(ch_all_parquet, config, batch_size)

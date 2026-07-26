@@ -21,10 +21,14 @@ process DOCKING_PREP_TARGET {
 }
 
 process DOCKING_PREP_CANDIDATE {
+    label 'process_single'
     container 'lynceus/docking-prep:0.1.0'
 
     input:
     path candidates
+
+    output:
+    tuple val("${task.process}"), val('docking_prep'), eval("python3 -c 'import docking_prep; print(docking_prep.__version__)'"), emit: versions_docking_prep, topic: versions
 
     script:
     """
