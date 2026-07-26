@@ -2,16 +2,21 @@
 
 from .ensemble import prepare_ensemble
 from .ensemble.models import (
-    ReceptorPrepResults,
-    ReceptorPrepResult,
-    ReceptorPrepParams,
-    ReceptorPrepFailure,
+    EnsembleMemberPrepResult,
+    EnsemblePrepParams,
+    EnsemblePrepResults,
 )
 
 __all__ = [
     "prepare_ensemble",
-    "ReceptorPrepResults",
-    "ReceptorPrepParams",
-    "ReceptorPrepResult",
-    "ReceptorPrepFailure",
+    "EnsemblePrepParams",
+    "EnsembleMemberPrepResult",
+    "EnsemblePrepResults",
 ]
+
+from importlib.metadata import version, PackageNotFoundError
+
+try:
+    __version__ = version("docking-prep")
+except PackageNotFoundError:
+    __version__ = "unknown"
