@@ -7,16 +7,14 @@ from pathlib import Path
 import subprocess
 import sys
 
+from docking_prep.ensemble.models import (
+    EnsemblePrepParams,
+    EnsembleMemberPrepResult,
+    EnsemblePrepResults,
+)
 import gemmi
 from protein_conformational_ensemble.ensemble import Ensemble, load_ensemble
 from protein_conformational_ensemble.models import ConformationalState
-
-from .models import (
-    ReceptorPrepFailure,
-    ReceptorPrepParams,
-    ReceptorPrepResult,
-    ReceptorPrepResults,
-)
 
 
 logging.basicConfig(
@@ -97,98 +95,113 @@ def _prepare_structure(
     root_path: Path,
     conformational_state: ConformationalState,
     output: Path,
-    params: ReceptorPrepParams,
-) -> ReceptorPrepResult:
-    output_stem = output / conformational_state.id
+    params: EnsemblePrepParams,
+) -> EnsembleMemberPrepResult:
+    member_id = conformational_state.id
+    output_stem = output / member_id
     expected_pdbqt = output_stem.with_suffix(".pdbqt")
     structure_path = root_path / conformational_state.structure.uri
 
     logger.info(
         "conformational_state: %s path: %s",
-        conformational_state.id,
+        member_id,
         structure_path,
     )
 
-    prepped_pdb_path = output_stem.with_suffix(".prepped.pdb")
-    prep_cif_with_gemmi(
-        input_cif_path=str(structure_path),
-        output_pdb_path=str(prepped_pdb_path),
-    )
+    try:
+        prepped_pdb_path = output_stem.with_suffix(".prepped.pdb")
+        prep_cif_with_gemmi(
+            input_cif_path=str(structure_path),
+            output_pdb_path=str(prepped_pdb_path),
+        )
 
-    command = [
-        sys.executable,
-        "-m",
-        "meeko.cli.mk_prepare_receptor",
-        "-i",
-        str(prepped_pdb_path),
-        "-o",
-        str(output_stem),
-        "-p",  # rigid-only PDBQT output
-        "--default_altloc",
-        params.default_altloc,
-    ]
-    if params.allow_bad_residues:
-        command += ["--allow_bad_res"]
+        command = [
+            sys.executable,
+            "-m",
+            "meeko.cli.mk_prepare_receptor",
+            "-i",
+            str(prepped_pdb_path),
+            "-o",
+            str(output_stem),
+            "-p",  # rigid-only PDBQT output
+            "--default_altloc",
+            params.default_altloc,
+        ]
+        if params.allow_bad_residues:
+            command += ["--allow_bad_res"]
 
-    completed = subprocess.run(command, capture_output=True, text=True)
+        completed = subprocess.run(command, capture_output=True, text=True)
 
-    dropped_residues = _parse_dropped_residues(
-        completed.stderr
-    ) or _parse_dropped_residues(completed.stdout)
+        dropped_residues = _parse_dropped_residues(
+            completed.stderr
+        ) or _parse_dropped_residues(completed.stdout)
 
-    if completed.returncode != 0:
-        if dropped_residues and not params.allow_bad_residues:
-            raise ResidueTemplateError(
-                member_id=conformational_state.id,
-                failed_residues=dropped_residues,
+        if completed.returncode != 0:
+            if dropped_residues and not params.allow_bad_residues:
+                raise ResidueTemplateError(
+                    member_id=member_id,
+                    failed_residues=dropped_residues,
+                )
+            raise ReceptorPrepError(
+                member_id=member_id,
+                returncode=completed.returncode,
+                stderr=completed.stderr or completed.stdout,
             )
-        raise ReceptorPrepError(
-            member_id=conformational_state.id,
-            returncode=completed.returncode,
-            stderr=completed.stderr or completed.stdout,
+
+        if not expected_pdbqt.is_file():
+            raise ReceptorPrepError(
+                member_id=member_id,
+                returncode=completed.returncode,
+                stderr=(
+                    f"mk_prepare_receptor.py exited 0 but expected output file "
+                    f"{expected_pdbqt} was not created."
+                ),
+            )
+
+        return EnsembleMemberPrepResult(
+            member_id=member_id,
+            success=True,
+            receptor_pdbqt_path=expected_pdbqt,
+            params=params,
+            dropped_residues=dropped_residues,
         )
 
-    if not expected_pdbqt.is_file():
-        raise ReceptorPrepError(
-            member_id=conformational_state.id,
-            returncode=completed.returncode,
-            stderr=(
-                f"mk_prepare_receptor.py exited 0 but expected output file "
-                f"{expected_pdbqt} was not created."
-            ),
+    except (ResidueTemplateError, ReceptorPrepError, Exception) as exc:
+        return EnsembleMemberPrepResult(
+            member_id=member_id,
+            success=False,
+            error_type=exc.__class__.__name__,
+            error_message=str(exc),
         )
-
-    return ReceptorPrepResult(
-        member_id=conformational_state.id,
-        receptor_pdbqt_path=expected_pdbqt,
-        params=params,
-        dropped_residues=dropped_residues,
-    )
 
 
 def _prepare_ensemble_batch(
     ensemble_path: Path | str,
     output: Path | str,
-    params: ReceptorPrepParams,
+    params: EnsemblePrepParams,
     n_workers: int | None = None,
-) -> ReceptorPrepResults:
+) -> EnsemblePrepResults:
     n_workers = n_workers or os.cpu_count()
+    ensemble_path = Path(ensemble_path)
     output = Path(output)
     output.mkdir(parents=True, exist_ok=True)
 
     ensemble: Ensemble = load_ensemble(ensemble_path)
-
-    successes: list[ReceptorPrepResult] = []
-    failures: list[ReceptorPrepFailure] = []
+    results: list[EnsembleMemberPrepResult] = []
 
     for _cs in ensemble.manifest.conformational_states:
-        _prepare_structure(ensemble_path, _cs, output, params)
+        result = _prepare_structure(
+            root_path=ensemble_path,
+            conformational_state=_cs,
+            output=output,
+            params=params,
+        )
+        results.append(result)
 
-    return ReceptorPrepResults(
+    return EnsemblePrepResults(
         ensemble_id=ensemble.manifest.id,
         ensemble_content_hash=ensemble.manifest.content_hash,
-        successes=successes,
-        failures=failures,
+        results=results,
     )
 
 
@@ -226,5 +239,5 @@ def _parse_args() -> argparse.Namespace:
 def prepare_ensemble():
     args = _parse_args()
     _prepare_ensemble_batch(
-        args.ensemble_path, args.output, ReceptorPrepParams(), args.workers
+        args.ensemble_path, args.output, EnsemblePrepParams(), args.workers
     )

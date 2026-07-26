@@ -1,17 +1,22 @@
 # modules/local/docking_prep/src/docking_prep/__init__.py
 
-from .prepare_ensemble import prepare_ensemble
-from .models import (
-    ReceptorPrepResults,
-    ReceptorPrepResult,
-    ReceptorPrepParams,
-    ReceptorPrepFailure,
+from .ensemble import prepare_ensemble
+from .ensemble.models import (
+    EnsembleMemberPrepResult,
+    EnsemblePrepParams,
+    EnsemblePrepResults,
 )
 
 __all__ = [
     "prepare_ensemble",
-    "ReceptorPrepResults",
-    "ReceptorPrepParams",
-    "ReceptorPrepResult",
-    "ReceptorPrepFailure",
+    "EnsemblePrepParams",
+    "EnsembleMemberPrepResult",
+    "EnsemblePrepResults",
 ]
+
+from importlib.metadata import version, PackageNotFoundError
+
+try:
+    __version__ = version("docking-prep")
+except PackageNotFoundError:
+    __version__ = "unknown"

@@ -9,7 +9,7 @@ from pathlib import Path
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class ReceptorPrepParams(BaseModel):
+class EnsemblePrepParams(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     strip_waters: bool = Field(
@@ -33,23 +33,27 @@ class ReceptorPrepParams(BaseModel):
             "If False (default), any residue that fails Meeko's template "
             "matching raises ResidueTemplateError and no receptor is "
             "produced. If True, such residues are dropped and recorded as "
-            "warnings on the ReceptorPrepResult instead of raising."
+            "warnings on the EnsembleMemberPrepResult instead of raising."
         ),
     )
 
 
-class ReceptorPrepResult(BaseModel):
+class EnsembleMemberPrepResult(BaseModel):
     model_config = ConfigDict(frozen=True)
+
     member_id: str
-
-    receptor_pdbqt_path: Path = Field(
-        ..., description="Path to the prepared rigid receptor PDBQT file."
+    success: bool = Field(
+        ..., description="True if preparation succeeded, False if an error occurred."
     )
 
-    params: ReceptorPrepParams = Field(
-        ..., description="The parameters actually used to produce this receptor."
+    receptor_pdbqt_path: Path | None = Field(
+        default=None,
+        description="Path to the prepared rigid receptor PDBQT file. Set on success.",
     )
-
+    params: EnsemblePrepParams | None = Field(
+        default=None,
+        description="The parameters actually used to produce this receptor. Set on success.",
+    )
     dropped_residues: list[str] = Field(
         default_factory=list,
         description=(
@@ -60,23 +64,33 @@ class ReceptorPrepResult(BaseModel):
         ),
     )
 
-
-class ReceptorPrepFailure(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    ensemble_id: str
-    member_id: str
-    error_type: str = Field(
-        ...,
-        description="Class name of the exception raised, e.g. 'ResidueTemplateError'.",
+    # Failure fields
+    error_type: str | None = Field(
+        default=None,
+        description="Class name of the exception raised (e.g., 'ResidueTemplateError'). Populated on failure.",
     )
-    message: str
+    error_message: str | None = Field(
+        default=None,
+        description="Detailed exception or failure message. Populated on failure.",
+    )
 
 
-class ReceptorPrepResults(BaseModel):
+class EnsemblePrepResults(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     ensemble_id: str
     ensemble_content_hash: str
-    successes: list[ReceptorPrepResult]
-    failures: list[ReceptorPrepFailure]
+    results: list[EnsembleMemberPrepResult] = Field(
+        default_factory=list,
+        description="Combined list of member preparation outcomes (both successes and failures).",
+    )
+
+    @property
+    def successes(self) -> list[EnsembleMemberPrepResult]:
+        """Convenience helper to retrieve successful results."""
+        return [r for r in self.results if r.success]
+
+    @property
+    def failures(self) -> list[EnsembleMemberPrepResult]:
+        """Convenience helper to retrieve failed results."""
+        return [r for r in self.results if not r.success]
