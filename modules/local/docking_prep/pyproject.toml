@@ -7,6 +7,7 @@ description = "Add your description here"
 authors = [{ name = "Mike", email = "mike.micatka@gmail.com" }]
 requires-python = ">=3.12"
 dependencies = [
+  "dimorphite-dl",
   "gemmi>=0.7.5",
   "meeko>=0.7.1",
   "prody>=2.6.1",
@@ -25,3 +26,4 @@ build-backend = "uv_build"
 
 [tool.uv.sources]
 protein-conformational-ensemble = { workspace = true }
+dimorphite-dl = { git = "https://github.com/mmicatka/dimorphite_dl.git" }
