@@ -17,6 +17,7 @@ from docking_prep.ligand.models import (
     ConformerRecord,
     EmbeddedConformer,
 )
+from meeko import MoleculePreparation, PDBQTWriterLegacy
 import pandas as pd
 import yaml
 from rdkit import Chem
@@ -33,7 +34,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def select_protonation_state(
+def _select_protonation_state(
     smiles: str,
     ph_min: float = 6.4,
     ph_max: float = 8.4,
@@ -57,7 +58,7 @@ def select_protonation_state(
     return min(variants, key=sort_key)
 
 
-def embed_and_rank_conformers(
+def _embed_and_rank_conformers(
     smiles: str,
     n_confs: int,
     random_seed: int = 1000,
@@ -127,7 +128,7 @@ def _unaligned_rmsd(
     return math.sqrt(sum(sq_diffs) / len(sq_diffs))
 
 
-def prune_and_select_top_n(
+def _prune_and_select_top_n(
     mol: Mol,
     embedded: list[EmbeddedConformer],
     keep_top_n: int,
@@ -147,8 +148,6 @@ def prune_and_select_top_n(
 
 
 def conformer_to_pdbqt(mol: Mol, conf_id: int, name: str) -> str:
-    from meeko import MoleculePreparation, PDBQTWriterLegacy
-
     mol.SetProp("_Name", name)
     preparator = MoleculePreparation()
     setups = preparator.prepare(mol, conformer_id=conf_id)
@@ -170,7 +169,7 @@ def content_hash(data: bytes) -> str:
     return f"blake3:{blake3.blake3(data).hexdigest()}"
 
 
-def process_candidate(
+def _process_ligand(
     candidate_id: str,
     smiles: str,
     ph_min: float,
@@ -181,13 +180,13 @@ def process_candidate(
     random_seed: int,
 ) -> CandidateResult:
     try:
-        protonated_smiles = select_protonation_state(
+        protonated_smiles = _select_protonation_state(
             smiles, ph_min=ph_min, ph_max=ph_max
         )
-        mol, embedded = embed_and_rank_conformers(
+        mol, embedded = _embed_and_rank_conformers(
             protonated_smiles, n_confs=n_confs, random_seed=random_seed
         )
-        kept = prune_and_select_top_n(mol, embedded, keep_top_n, rmsd_prune_threshold)
+        kept = _prune_and_select_top_n(mol, embedded, keep_top_n, rmsd_prune_threshold)
 
         conformers: list[ConformerRecord] = []
         for rank, e in enumerate(kept):
@@ -225,14 +224,11 @@ def process_candidate(
         )
 
 
-def _process_candidate_star(args: tuple) -> CandidateResult:
-    """Module-level, picklable wrapper for multiprocessing.Pool.imap, which
-    only maps over a single iterable argument.
-    """
-    return process_candidate(*args)
+def _process_ligand_star(args: tuple) -> CandidateResult:
+    return _process_ligand(*args)
 
 
-def _prepare_ligands_batch(
+def _prepare_and_write_ligands(
     rows: list[tuple[str, str]],
     ph_min: float,
     ph_max: float,
@@ -241,7 +237,9 @@ def _prepare_ligands_batch(
     rmsd_prune_threshold: float,
     random_seed: int,
     n_workers: int,
-) -> list[CandidateResult]:
+    out_root: Path,
+    source_tool: str,
+) -> tuple[int, int]:
     tasks = [
         (
             cid,
@@ -255,11 +253,35 @@ def _prepare_ligands_batch(
         )
         for cid, smi in rows
     ]
-    if n_workers <= 1:
-        return [process_candidate(*t) for t in tasks]
 
-    with multiprocessing.Pool(processes=n_workers) as pool:
-        return list(pool.imap(_process_candidate_star, tasks))
+    n_success = 0
+    n_failed = 0
+
+    def _handle(result: CandidateResult) -> None:
+        nonlocal n_success, n_failed
+        if not result.ok:
+            n_failed += 1
+            logger.error("Failed candidate %r: %s", result.candidate_id, result.error)
+            return
+        if not result.conformers:
+            n_failed += 1
+            logger.error(
+                "Candidate %r produced zero usable conformers after embedding/pruning.",
+                result.candidate_id,
+            )
+            return
+        write_candidate_directory(result, out_root, source_tool=source_tool)
+        n_success += 1
+
+    if n_workers <= 1:
+        for t in tasks:
+            _handle(_process_ligand(*t))
+    else:
+        with multiprocessing.Pool(processes=n_workers) as pool:
+            for result in pool.imap(_process_ligand_star, tasks):
+                _handle(result)
+
+    return n_success, n_failed
 
 
 def build_manifest(result: CandidateResult, source_tool: str) -> dict:
@@ -315,12 +337,12 @@ def write_candidate_directory(
         yaml.safe_dump(manifest, f, sort_keys=False, default_flow_style=False)
 
 
-def make_tarball(source_dir: Path, output_path: Path) -> None:
+def _make_tarball(source_dir: Path, output_path: Path) -> None:
     with tarfile.open(output_path, "w:gz") as tar:
         tar.add(source_dir, arcname=source_dir.name)
 
 
-def load_candidates(
+def _load_ligands(
     parquet_path: Path, id_column: str, smiles_column: str
 ) -> pd.DataFrame:
     df = pd.read_parquet(parquet_path, columns=[id_column, smiles_column])
@@ -352,7 +374,7 @@ def load_candidates(
     return df.reset_index(drop=True)
 
 
-def _parse_args() -> argparse.ArgumentParser:
+def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
             "Generate ranked, deduplicated multi-conformer PDBQT sets per "
@@ -426,7 +448,7 @@ def _parse_args() -> argparse.ArgumentParser:
     parser.add_argument(
         "-v", "--verbose", action="store_true", help="Enable debug logging."
     )
-    return parser
+    return parser.parse_args()
 
 
 def ligand_prepare() -> int:
@@ -454,7 +476,7 @@ def ligand_prepare() -> int:
         )
 
     try:
-        df = load_candidates(args.input, args.id_column, args.smiles_column)
+        df = _load_ligands(args.input, args.id_column, args.smiles_column)
     except ValueError as exc:
         logger.error("%s", exc)
         return 1
@@ -465,50 +487,40 @@ def ligand_prepare() -> int:
     logger.info(
         "Processing %d candidate(s) with %d worker(s)...", len(rows), args.n_workers
     )
-    results = _prepare_ligands_batch(
-        rows,
-        ph_min=args.ph_min,
-        ph_max=args.ph_max,
-        n_confs=args.n_confs,
-        keep_top_n=args.keep_top_n,
-        rmsd_prune_threshold=args.rmsd_prune_threshold,
-        random_seed=args.random_seed,
-        n_workers=args.n_workers,
-    )
 
-    n_success = 0
-    n_failed = 0
     with TemporaryDirectory(prefix="conformers_") as tmp:
         out_root = Path(tmp) / args.output.name.removesuffix(".tar.gz").removesuffix(
             ".tgz"
         )
         out_root.mkdir(parents=True, exist_ok=True)
 
-        for result in results:
-            if not result.ok:
-                n_failed += 1
-                logger.error(
-                    "Failed candidate %r: %s", result.candidate_id, result.error
-                )
-                continue
-            if not result.conformers:
-                n_failed += 1
-                logger.error(
-                    "Candidate %r produced zero usable conformers after embedding/pruning.",
-                    result.candidate_id,
-                )
-                continue
-            write_candidate_directory(
-                result, out_root, source_tool="lynceus_dimorphite_dl"
-            )
-            n_success += 1
+        n_success, n_failed = _prepare_and_write_ligands(
+            rows,
+            ph_min=args.ph_min,
+            ph_max=args.ph_max,
+            n_confs=args.n_confs,
+            keep_top_n=args.keep_top_n,
+            rmsd_prune_threshold=args.rmsd_prune_threshold,
+            random_seed=args.random_seed,
+            n_workers=args.n_workers,
+            out_root=out_root,
+            source_tool="lynceus_dimorphite_dl",
+        )
 
         if n_success == 0:
             logger.error("All %d candidate(s) failed; no output written.", n_failed)
             return 1
 
+        if n_failed and not args.skip_errors:
+            logger.error(
+                "%d candidate(s) failed and --skip-errors was not set; "
+                "no output written.",
+                n_failed,
+            )
+            return 1
+
         args.output.parent.mkdir(parents=True, exist_ok=True)
-        make_tarball(out_root, args.output)
+        _make_tarball(out_root, args.output)
 
     logger.info(
         "Done: %d succeeded, %d failed. Archive written to %s",
@@ -516,12 +528,5 @@ def ligand_prepare() -> int:
         n_failed,
         args.output,
     )
-
-    if n_failed and not args.skip_errors:
-        logger.error(
-            "%d candidate(s) failed and --skip-errors was not set; exiting non-zero.",
-            n_failed,
-        )
-        return 1
 
     return 0
