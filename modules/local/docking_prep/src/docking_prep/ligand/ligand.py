@@ -25,7 +25,12 @@ from rdkit.Chem.rdchem import Mol
 import dimorphite_dl
 
 
-logger = logging.getLogger("generate_conformers")
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(message)s",
+    stream=sys.stderr,
+)
+logger = logging.getLogger(__name__)
 
 
 def select_protonation_state(
@@ -108,26 +113,6 @@ def embed_and_rank_conformers(
 def _unaligned_rmsd(
     mol: Mol, conf_id_1: int, conf_id_2: int, heavy_atom_only: bool = True
 ) -> float:
-    """Plain coordinate-wise RMSD between two conformers of the SAME
-    molecule object, with NO alignment step.
-
-    This is only valid because both conformers share identical atom
-    ordering (they come from repeated EmbedMultipleConfs calls on one Mol),
-    so index i always refers to the same atom in both conformers. It is a
-    fast near-duplicate filter, not a rigorous shape-similarity metric —
-    two conformers that are true rigid-body rotations/translations of each
-    other but happen to have been embedded in different orientations will
-    NOT be recognized as duplicates by this check. That's an accepted
-    simplification for pruning near-identical embeddings from the same
-    ETKDG run, not a general conformer-clustering method.
-
-    Deliberately does not use RDKit's AllChem.GetConformerRMS: empirically,
-    that function's `prealigned` flag does not actually disable its
-    internal alignment step (verified: RMSD was identical whether
-    prealigned=True or False, even after manually translating one
-    conformer by 50 Angstroms), so it cannot produce a genuinely unaligned
-    RMSD regardless of which value is passed.
-    """
     c1 = mol.GetConformer(conf_id_1)
     c2 = mol.GetConformer(conf_id_2)
     sq_diffs = []
@@ -148,11 +133,6 @@ def prune_and_select_top_n(
     keep_top_n: int,
     rmsd_prune_threshold: float,
 ) -> list[EmbeddedConformer]:
-    """Greedily walk `embedded` in ascending-energy order, keeping a
-    conformer only if it's not within `rmsd_prune_threshold` Angstroms
-    (unaligned heavy-atom RMSD) of any already-kept conformer. Stops once
-    keep_top_n conformers are retained.
-    """
     kept: list[EmbeddedConformer] = []
     for candidate in embedded:
         if len(kept) >= keep_top_n:
@@ -252,7 +232,7 @@ def _process_candidate_star(args: tuple) -> CandidateResult:
     return process_candidate(*args)
 
 
-def process_candidates_parallel(
+def _prepare_ligands_batch(
     rows: list[tuple[str, str]],
     ph_min: float,
     ph_max: float,
@@ -372,7 +352,7 @@ def load_candidates(
     return df.reset_index(drop=True)
 
 
-def build_arg_parser() -> argparse.ArgumentParser:
+def _parse_args() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
             "Generate ranked, deduplicated multi-conformer PDBQT sets per "
@@ -449,13 +429,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: list[str] | None = None) -> int:
-    args = build_arg_parser().parse_args(argv)
-
-    logging.basicConfig(
-        level=logging.DEBUG if args.verbose else logging.INFO,
-        format="%(asctime)s %(levelname)-8s %(message)s",
-    )
+def ligand_prepare() -> int:
+    args = _parse_args()
 
     if not args.input.exists():
         logger.error("Input file does not exist: %s", args.input)
@@ -490,7 +465,7 @@ def main(argv: list[str] | None = None) -> int:
     logger.info(
         "Processing %d candidate(s) with %d worker(s)...", len(rows), args.n_workers
     )
-    results = process_candidates_parallel(
+    results = _prepare_ligands_batch(
         rows,
         ph_min=args.ph_min,
         ph_max=args.ph_max,
