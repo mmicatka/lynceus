@@ -451,7 +451,7 @@ def _parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def ligand_prepare() -> int:
+def prepare_ligand() -> int:
     args = _parse_args()
 
     if not args.input.exists():

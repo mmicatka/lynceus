@@ -32,5 +32,9 @@ process DOCKING_PREP_CANDIDATE {
 
     script:
     """
+    docking-prepare-ligands \\
+    --input ${candidates} \\
+    --output ${candidates}_prepped \\
+    --id-column catalog_id
     """
 }

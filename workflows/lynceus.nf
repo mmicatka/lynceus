@@ -17,6 +17,7 @@ workflow LYNCEUS {
   ch_versions = ch_versions.mix(CANDIDATE.out.versions)
 
   TARGET(params.target.ensemble)
+  ch_versions = ch_versions.mix(TARGET.out.versions)
 
   SURROGATE_MODEL_TRAIN(TARGET.out.protein_conformational_ensemble, CANDIDATE.out.filtered_parquets)
 }

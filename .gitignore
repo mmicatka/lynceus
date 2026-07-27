@@ -5,3 +5,5 @@ results/
 work/
 
 assets/.local
+
+__pycache__/
