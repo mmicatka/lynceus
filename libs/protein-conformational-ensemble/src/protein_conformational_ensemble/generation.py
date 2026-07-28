@@ -7,6 +7,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 
 from protein_conformational_ensemble.canonical import canonical_serialize
+from protein_conformational_ensemble.ensemble import MANIFEST_FILENAME
 from protein_conformational_ensemble.hashing import (
     StructureBytesResolver,
     compute_content_hash,
@@ -18,14 +19,13 @@ from protein_conformational_ensemble.manifest import (
 )
 from protein_conformational_ensemble.models import (
     CAPABILITY_STANDALONE_CIF,
-    Manifest,
     ConformationalState,
+    Manifest,
     StandaloneStructure,
     TopologyReference,
     Weight,
     WeightScheme,
 )
-from protein_conformational_ensemble.ensemble import MANIFEST_FILENAME
 
 _PLACEHOLDER_HASH = "blake3:" + "0" * 64
 

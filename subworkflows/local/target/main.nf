@@ -8,8 +8,6 @@ workflow TARGET {
   config
 
   main:
-  ch_versions = channel.empty()
-
   def pdb_ids = config.components.collect { component -> component.pdb_id }
 
   ch_retrieve_input = channel.of(
@@ -17,12 +15,8 @@ workflow TARGET {
   )
 
   RETRIEVE_PDB(ch_retrieve_input)
-  ch_versions = ch_versions.mix(RETRIEVE_PDB.out.versions)
-
   GENERATE_MANIFEST(RETRIEVE_PDB.out.structure_dir)
-  ch_versions = ch_versions.mix(GENERATE_MANIFEST.out.versions)
 
   emit:
   protein_conformational_ensemble = GENERATE_MANIFEST.out.protein_conformational_ensemble
-  versions = ch_versions
 }

@@ -3,19 +3,19 @@
 import argparse
 import logging
 import os
-from pathlib import Path
 import subprocess
 import sys
+from pathlib import Path
 
-from docking_prep.ensemble.models import (
-    EnsemblePrepParams,
-    EnsembleMemberPrepResult,
-    EnsemblePrepResults,
-)
 import gemmi
 from protein_conformational_ensemble.ensemble import Ensemble, load_ensemble
 from protein_conformational_ensemble.models import ConformationalState
 
+from docking_prep.ensemble.models import (
+    EnsembleMemberPrepResult,
+    EnsemblePrepParams,
+    EnsemblePrepResults,
+)
 
 logging.basicConfig(
     level=logging.INFO,

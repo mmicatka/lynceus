@@ -10,10 +10,8 @@ workflow SURROGATE_MODEL_TRAIN {
 
     main:
     SAMPLE_CANDIDATES(candidates)
-
     DOCKING(protein_conformational_ensemble, SAMPLE_CANDIDATES.out.candidates)
 
     emit:
     sampled_candidates = SAMPLE_CANDIDATES.out.candidates
-    prepped_target = DOCKING.out.prepped_target
 }

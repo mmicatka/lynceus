@@ -25,12 +25,18 @@ process DOCKING_PREP_CANDIDATE {
     container 'lynceus/docking-prep:0.1.0'
 
     input:
-    path candidates
+    path input_parquet
 
     output:
-    tuple val("${task.process}"), val('docking_prep'), eval("python3 -c 'import docking_prep; print(docking_prep.__version__)'"), emit: versions_docking_prep, topic: versions
+    path "${input_parquet.baseName}_prepped", emit: lmdb
+    path "${input_parquet.simpleName}_index.parquet", emit: index
 
     script:
     """
+    docking-prepare-ligands \\
+    --input ${input_parquet} \\
+    --output ${input_parquet.baseName}_prepped \\
+    --output-parquet ${input_parquet.simpleName}_index.parquet \\
+    --skip-errors
     """
 }

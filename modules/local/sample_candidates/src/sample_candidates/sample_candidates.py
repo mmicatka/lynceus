@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import argparse
 import logging
-from pathlib import Path
 import time
+from pathlib import Path
 
 import duckdb
 import polars as pl

@@ -5,3 +5,7 @@ results/
 work/
 
 assets/.local
+
+__pycache__/
+
+*.mdb
