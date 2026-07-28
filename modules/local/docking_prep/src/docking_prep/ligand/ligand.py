@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Iterator
 
 import lmdb
+import pyarrow as pa
 import pyarrow.parquet as pq
 from rdkit import RDLogger
 
@@ -43,11 +44,10 @@ def _parse_num_workers(value: str) -> int:
 
 
 def _worker_process_candidate(
-    args: tuple[str, str, float, float, int, int, float, int],
-) -> tuple[str, bytes | None, str | None]:
+    args: tuple[dict, float, float, int, int, float, int],
+) -> tuple[str | None, bytes | None, str | None, dict]:
     (
-        candidate_id,
-        smiles,
+        row,
         ph_min,
         ph_max,
         n_confs,
@@ -55,9 +55,18 @@ def _worker_process_candidate(
         rmsd_prune_threshold,
         random_seed,
     ) = args
+
+    catalog_id = row.get("catalog_id")
+    smiles = row.get("smiles")
+
+    if not row.get("parse_ok"):
+        return catalog_id, None, "parse_ok is false or missing", row
+    if not catalog_id or not smiles:
+        return catalog_id, None, "missing catalog_id or smiles", row
+
     try:
         result = generate_conformers(
-            candidate_id=candidate_id,
+            candidate_id=catalog_id,
             smiles=smiles,
             ph_min=ph_min,
             ph_max=ph_max,
@@ -67,37 +76,23 @@ def _worker_process_candidate(
             random_seed=random_seed,
         )
     except Exception as exc:  # noqa: BLE001 - reported per-candidate, not raised
-        return candidate_id, None, str(exc)
+        return catalog_id, None, str(exc), row
 
     if not result.ok:
-        return candidate_id, None, result.error
+        return catalog_id, None, result.error, row
 
-    return candidate_id, result.to_record_bytes(), None
+    return catalog_id, result.to_record_bytes(), None, row
 
 
 def _iter_candidate_args(
     input_path: Path, args: argparse.Namespace
-) -> Iterator[tuple[str, str, float, float, int, int, float, int]]:
+) -> Iterator[tuple[dict, float, float, int, int, float, int]]:
     parquet_file = pq.ParquetFile(input_path)
-    columns = ["catalog_id", "smiles", "parse_ok"]
 
-    for batch in parquet_file.iter_batches(columns=columns):
-        catalog_ids = batch.column("catalog_id")
-        smiles_col = batch.column("smiles")
-        parse_ok_col = batch.column("parse_ok")
-
-        for i in range(batch.num_rows):
-            if not parse_ok_col[i].as_py():
-                continue
-
-            catalog_id = catalog_ids[i].as_py()
-            smiles = smiles_col[i].as_py()
-            if catalog_id is None or smiles is None:
-                continue
-
+    for batch in parquet_file.iter_batches():
+        for row in batch.to_pylist():
             yield (
-                catalog_id,
-                smiles,
+                row,
                 args.ph_min,
                 args.ph_max,
                 args.n_confs,
@@ -117,6 +112,12 @@ def _parse_args() -> argparse.Namespace:
     )
     p.add_argument("--input", required=True, type=Path, help="Input Parquet file.")
     p.add_argument("--output", required=True, type=Path, help="Output LMDB directory.")
+    p.add_argument(
+        "--output-parquet",
+        required=True,
+        type=Path,
+        help="Output Parquet file mirroring input plus LMDB dir and errors.",
+    )
     p.add_argument(
         "--map-size",
         type=int,
@@ -180,7 +181,28 @@ def _parse_args() -> argparse.Namespace:
     return p.parse_args()
 
 
-def prepare_ligands() -> int:
+def _flush(
+    env: lmdb.Environment,
+    pq_writer: pq.ParquetWriter,
+    pending: list[tuple[str | None, bytes | None, dict]],
+) -> None:
+    if not pending:
+        return
+
+    with env.begin(write=True) as txn:
+        for key, value, _ in pending:
+            if key is not None and value is not None:
+                txn.put(key.encode("utf-8"), value)
+
+    rows = [row for _, _, row in pending]
+    if rows:
+        table = pa.Table.from_pylist(rows, schema=pq_writer.schema)
+        pq_writer.write_table(table)
+
+    pending.clear()
+
+
+def prepare_ligands():
     args = _parse_args()
     if args.verbose:
         logger.setLevel(logging.DEBUG)
@@ -188,42 +210,54 @@ def prepare_ligands() -> int:
     args.output.mkdir(parents=True, exist_ok=True)
     env = lmdb.open(str(args.output), map_size=args.map_size)
 
+    args.output_parquet.parent.mkdir(parents=True, exist_ok=True)
+    input_pq = pq.ParquetFile(args.input)
+    schema = input_pq.schema.to_arrow_schema()
+
+    schema = schema.append(pa.field("output_lmdb_dir", pa.string()))
+    schema = schema.append(pa.field("error", pa.string()))
+
+    pq_writer = pq.ParquetWriter(args.output_parquet, schema)
+
     worker_args = _iter_candidate_args(args.input, args)
 
     n_ok = 0
     n_failed = 0
-    pending: list[tuple[str, bytes]] = []
-
-    def _flush(txn_pending: list[tuple[str, bytes]]) -> None:
-        if not txn_pending:
-            return
-        with env.begin(write=True) as txn:
-            for key, value in txn_pending:
-                txn.put(key.encode("utf-8"), value)
-        txn_pending.clear()
+    pending: list[tuple[str | None, bytes | None, dict]] = []
 
     try:
         with Pool(processes=args.num_workers) as pool:
-            for candidate_id, packed, error in pool.imap_unordered(
+            for candidate_id, packed, error, row in pool.imap_unordered(
                 _worker_process_candidate, worker_args
             ):
+                row["output_lmdb_dir"] = str(args.output)
+                row["error"] = error
+
                 if error is not None:
                     n_failed += 1
                     logger.warning("candidate %s failed: %s", candidate_id, error)
                     if not args.skip_errors:
                         raise RuntimeError(f"candidate {candidate_id} failed: {error}")
+
+                    pending.append((candidate_id, packed, row))
                     continue
 
-                pending.append((candidate_id, packed))
+                pending.append((candidate_id, packed, row))
                 n_ok += 1
 
                 if len(pending) >= _LMDB_BATCH_SIZE:
                     logger.info("processed: %d", n_ok)
-                    _flush(pending)
+                    _flush(env, pq_writer, pending)
 
-        _flush(pending)
+        _flush(env, pq_writer, pending)
     finally:
         env.close()
+        pq_writer.close()
 
-    logger.info("wrote %d candidates (%d failed) to %s", n_ok, n_failed, args.output)
-    return 0 if n_failed == 0 or args.skip_errors else 1
+    logger.info(
+        "wrote %d candidates (%d failed) to %s and %s",
+        n_ok,
+        n_failed,
+        args.output,
+        args.output_parquet,
+    )
