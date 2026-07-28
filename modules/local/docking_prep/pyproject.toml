@@ -7,9 +7,11 @@ description = "Add your description here"
 authors = [{ name = "Mike", email = "mike.micatka@gmail.com" }]
 requires-python = ">=3.12"
 dependencies = [
+  "blake3>=1.0.9",
   "dimorphite-dl",
   "gemmi>=0.7.5",
   "meeko>=0.7.1",
+  "pandas>=3.0.3",
   "prody>=2.6.1",
   "protein-conformational-ensemble",
   "pydantic>=2.13.4",
@@ -19,7 +21,7 @@ dependencies = [
 
 [project.scripts]
 docking-prepare-ensemble = "docking_prep.ensemble:prepare_ensemble"
-docking-prepare-ligand = "docking_prep.ligand:prepare_ligand"
+docking-prepare-ligands = "docking_prep.ligand:prepare_ligands"
 
 [build-system]
 requires = ["uv_build>=0.11.30,<0.12.0"]

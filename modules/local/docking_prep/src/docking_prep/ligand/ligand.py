@@ -6,6 +6,7 @@ import argparse
 import logging
 import math
 import multiprocessing
+import os
 import sys
 import tarfile
 from pathlib import Path
@@ -20,10 +21,14 @@ from docking_prep.ligand.models import (
 from meeko import MoleculePreparation, PDBQTWriterLegacy
 import pandas as pd
 import yaml
-from rdkit import Chem
+from rdkit import Chem, RDLogger
 from rdkit.Chem import AllChem
 from rdkit.Chem.rdchem import Mol
 import dimorphite_dl
+
+
+RDLogger.DisableLog("rdApp.error")
+RDLogger.DisableLog("rdApp.warning")
 
 
 logging.basicConfig(
@@ -236,7 +241,7 @@ def _prepare_and_write_ligands(
     keep_top_n: int,
     rmsd_prune_threshold: float,
     random_seed: int,
-    n_workers: int,
+    num_workers: int,
     out_root: Path,
     source_tool: str,
 ) -> tuple[int, int]:
@@ -273,11 +278,11 @@ def _prepare_and_write_ligands(
         write_candidate_directory(result, out_root, source_tool=source_tool)
         n_success += 1
 
-    if n_workers <= 1:
+    if num_workers <= 1:
         for t in tasks:
             _handle(_process_ligand(*t))
     else:
-        with multiprocessing.Pool(processes=n_workers) as pool:
+        with multiprocessing.Pool(processes=num_workers) as pool:
             for result in pool.imap(_process_ligand_star, tasks):
                 _handle(result)
 
@@ -374,39 +379,46 @@ def _load_ligands(
     return df.reset_index(drop=True)
 
 
+def _parse_num_workers(value: str) -> int:
+    if value == "auto":
+        return os.cpu_count() or 1
+    n = int(value)
+    if n < 1:
+        raise argparse.ArgumentTypeError("workers must be >= 1")
+    return n
+
+
 def _parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
+    p = argparse.ArgumentParser(
         description=(
             "Generate ranked, deduplicated multi-conformer PDBQT sets per "
             "candidate from a Parquet file of SMILES, packaged as a tar.gz "
             "of <candidate-id>/conformer-manifest.yaml + <conformer-id>.pdbqt."
         )
     )
-    parser.add_argument("--input", required=True, type=Path, help="Input Parquet file.")
-    parser.add_argument(
-        "--output", required=True, type=Path, help="Output tar.gz path."
-    )
-    parser.add_argument(
+    p.add_argument("--input", required=True, type=Path, help="Input Parquet file.")
+    p.add_argument("--output", required=True, type=Path, help="Output tar.gz path.")
+    p.add_argument(
         "--id-column", required=True, help="Column name containing candidate IDs."
     )
-    parser.add_argument(
+    p.add_argument(
         "--smiles-column",
         default="smiles",
         help="Column name containing SMILES (default: smiles).",
     )
-    parser.add_argument(
+    p.add_argument(
         "--n-confs",
         type=int,
         default=10,
         help="Number of conformers to embed per candidate before ranking/pruning (default: 10).",
     )
-    parser.add_argument(
+    p.add_argument(
         "--keep-top-n",
         type=int,
         default=3,
         help="Number of conformers to retain per candidate after energy ranking and RMSD pruning (default: 3).",
     )
-    parser.add_argument(
+    p.add_argument(
         "--rmsd-prune-threshold",
         type=float,
         default=0.5,
@@ -416,50 +428,41 @@ def _parse_args() -> argparse.Namespace:
             "and dropped (default: 0.5)."
         ),
     )
-    parser.add_argument(
+    p.add_argument(
         "--skip-errors",
         action="store_true",
         help="Continue processing remaining candidates if some fail, instead of exiting non-zero.",
     )
-    parser.add_argument(
+    p.add_argument(
         "--ph-min",
         type=float,
         default=6.4,
         help="Dimorphite-DL minimum pH (default: 6.4).",
     )
-    parser.add_argument(
+    p.add_argument(
         "--ph-max",
         type=float,
         default=8.4,
         help="Dimorphite-DL maximum pH (default: 8.4).",
     )
-    parser.add_argument(
+    p.add_argument(
         "--random-seed",
         type=int,
         default=0xF00D,
         help="ETKDG random seed (default: 0xF00D).",
     )
-    parser.add_argument(
-        "--n-workers",
-        type=int,
-        default=1,
-        help="Number of worker processes for parallel candidate processing (default: 1, sequential).",
+    p.add_argument(
+        "--num-workers", metavar="N|auto", default="auto", type=_parse_num_workers
     )
-    parser.add_argument(
-        "-v", "--verbose", action="store_true", help="Enable debug logging."
-    )
-    return parser.parse_args()
+    p.add_argument("-v", "--verbose", action="store_true", help="Enable debug logging.")
+    return p.parse_args()
 
 
-def prepare_ligand() -> int:
+def prepare_ligands() -> int:
     args = _parse_args()
 
     if not args.input.exists():
         logger.error("Input file does not exist: %s", args.input)
-        return 1
-
-    if args.n_workers < 1:
-        logger.error("--n-workers must be >= 1, got %d", args.n_workers)
         return 1
 
     if args.keep_top_n < 1:
@@ -485,7 +488,7 @@ def prepare_ligand() -> int:
 
     rows = list(zip(df[args.id_column], df[args.smiles_column]))
     logger.info(
-        "Processing %d candidate(s) with %d worker(s)...", len(rows), args.n_workers
+        "Processing %d candidate(s) with %d worker(s)...", len(rows), args.num_workers
     )
 
     with TemporaryDirectory(prefix="conformers_") as tmp:
@@ -502,7 +505,7 @@ def prepare_ligand() -> int:
             keep_top_n=args.keep_top_n,
             rmsd_prune_threshold=args.rmsd_prune_threshold,
             random_seed=args.random_seed,
-            n_workers=args.n_workers,
+            num_workers=args.num_workers,
             out_root=out_root,
             source_tool="lynceus_dimorphite_dl",
         )

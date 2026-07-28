@@ -570,9 +570,11 @@ name = "docking-prep"
 version = "0.1.0"
 source = { editable = "modules/local/docking_prep" }
 dependencies = [
+    { name = "blake3" },
     { name = "dimorphite-dl" },
     { name = "gemmi" },
     { name = "meeko" },
+    { name = "pandas" },
     { name = "prody" },
     { name = "protein-conformational-ensemble" },
     { name = "pydantic" },
@@ -582,9 +584,11 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "blake3", specifier = ">=1.0.9" },
     { name = "dimorphite-dl", git = "https://github.com/mmicatka/dimorphite_dl.git" },
     { name = "gemmi", specifier = ">=0.7.5" },
     { name = "meeko", specifier = ">=0.7.1" },
+    { name = "pandas", specifier = ">=3.0.3" },
     { name = "prody", specifier = ">=2.6.1" },
     { name = "protein-conformational-ensemble", editable = "libs/protein-conformational-ensemble" },
     { name = "pydantic", specifier = ">=2.13.4" },
