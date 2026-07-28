@@ -10,8 +10,8 @@ from blake3 import blake3
 
 from protein_conformational_ensemble.canonical import canonical_serialize
 from protein_conformational_ensemble.models import (
-    Manifest,
     ConformationalState,
+    Manifest,
     TrajectoryStructure,
 )
 

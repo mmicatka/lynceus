@@ -4,12 +4,13 @@ import argparse
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 from protein_conformational_ensemble.generation import (
     ConformationalStateSpec,
     generate_ensemble,
 )
 from protein_conformational_ensemble.models import WeightScheme
-import yaml
 
 _STRUCTURE_SUFFIXES = {".cif", ".pdb", ".mmcif"}
 _WEIGHTS_FILENAME = "weights.yaml"

@@ -13,7 +13,6 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
 import gemmi
-
 from lynceus_chem.models.binding_site import BindingSite, Sphere
 from protein_conformational_ensemble.ensemble import Ensemble, load_ensemble
 from protein_conformational_ensemble.models import (
