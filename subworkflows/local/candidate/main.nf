@@ -35,6 +35,12 @@ workflow CANDIDATE {
 
   PHYSIOCHEMICAL_FILTER(ch_all_parquet, config, batch_size)
 
+  candidates = PHYSIOCHEMICAL_FILTER.out.parquet
+    .flatten()
+    .filter { file -> file.name.endsWith('.parquet') }
+
+  DOCKING_PREP_CANDIDATE(candidates)
+
   emit:
   filtered_parquets = PHYSIOCHEMICAL_FILTER.out.parquet.collect() // path: filtered + repartitioned parquet
   filter_report = PHYSIOCHEMICAL_FILTER.out.report // path: filter_report.json

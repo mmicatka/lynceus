@@ -36,6 +36,6 @@ process DOCKING_PREP_CANDIDATE {
     docking-prepare-ligands \\
     --input ${candidates} \\
     --output ${candidates}_prepped \\
-    --id-column catalog_id
+    --output-parquet ${candidates}.parquet
     """
 }
