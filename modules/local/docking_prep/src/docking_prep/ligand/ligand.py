@@ -25,10 +25,12 @@ from rdkit import Chem, RDLogger
 from rdkit.Chem import AllChem
 from rdkit.Chem.rdchem import Mol
 import dimorphite_dl
-
+import warnings
 
 RDLogger.DisableLog("rdApp.error")
 RDLogger.DisableLog("rdApp.warning")
+
+warnings.filterwarnings("ignore", category=SyntaxWarning, module="prody")
 
 
 logging.basicConfig(

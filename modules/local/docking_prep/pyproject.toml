@@ -9,11 +9,13 @@ requires-python = ">=3.12"
 dependencies = [
   "blake3>=1.0.9",
   "dimorphite-dl",
+  "fastparquet>=2026.5.0",
   "gemmi>=0.7.5",
   "meeko>=0.7.1",
   "pandas>=3.0.3",
   "prody>=2.6.1",
   "protein-conformational-ensemble",
+  "pyarrow>=24.0.0",
   "pydantic>=2.13.4",
   "rdkit>=2026.3.3",
   "scipy>=1.18.0",
