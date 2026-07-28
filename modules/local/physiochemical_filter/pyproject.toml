@@ -13,3 +13,6 @@ physiochemical-filter = "physiochemical_filter.physiochemical_filter:physiochemi
 [build-system]
 requires = ["uv_build>=0.11.30,<0.12.0"]
 build-backend = "uv_build"
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]

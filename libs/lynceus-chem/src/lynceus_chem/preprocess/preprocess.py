@@ -4,10 +4,10 @@ import argparse
 import gzip
 import json
 import logging
-from multiprocessing import Pool
 import os
-from pathlib import Path
 import sys
+from multiprocessing import Pool
+from pathlib import Path
 from typing import Any, Iterator
 
 import numpy as np

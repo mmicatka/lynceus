@@ -4,34 +4,24 @@ from __future__ import annotations
 
 import argparse
 import logging
-import math
-import multiprocessing
 import os
 import sys
-import tarfile
-from pathlib import Path
-from tempfile import TemporaryDirectory
-
-import blake3
-from docking_prep.ligand.models import (
-    CandidateResult,
-    ConformerRecord,
-    EmbeddedConformer,
-)
-from meeko import MoleculePreparation, PDBQTWriterLegacy
-import pandas as pd
-import yaml
-from rdkit import Chem, RDLogger
-from rdkit.Chem import AllChem
-from rdkit.Chem.rdchem import Mol
-import dimorphite_dl
 import warnings
+from multiprocessing import Pool
+from pathlib import Path
+from typing import Iterator
 
-RDLogger.DisableLog("rdApp.error")
-RDLogger.DisableLog("rdApp.warning")
+import lmdb
+import pyarrow.parquet as pq
+from rdkit import RDLogger
+
+from docking_prep.ligand.conformer_generation import generate_conformers
+
+# RDKit prints a lot of low-level parsing warnings to stderr by default;
+# we handle/report parse failures ourselves, so silence RDKit's own logger.
+RDLogger.DisableLog("rdApp.*")
 
 warnings.filterwarnings("ignore", category=SyntaxWarning, module="prody")
-
 
 logging.basicConfig(
     level=logging.INFO,
@@ -40,345 +30,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-
-def _select_protonation_state(
-    smiles: str,
-    ph_min: float = 6.4,
-    ph_max: float = 8.4,
-) -> str:
-    variants = dimorphite_dl.protonate_smiles(
-        smiles, ph_min=ph_min, ph_max=ph_max, validate_output=True
-    )
-    if not variants:
-        raise ValueError(
-            f"Dimorphite-DL returned no protonation states for SMILES: {smiles!r}"
-        )
-
-    def sort_key(variant_smiles: str) -> tuple[int, str]:
-        mol = Chem.MolFromSmiles(variant_smiles)
-        if mol is None:
-            return (10**6, variant_smiles)
-        formal_charge = Chem.GetFormalCharge(mol)
-        canonical = Chem.MolToSmiles(mol)
-        return (abs(formal_charge), canonical)
-
-    return min(variants, key=sort_key)
-
-
-def _embed_and_rank_conformers(
-    smiles: str,
-    n_confs: int,
-    random_seed: int = 1000,
-    max_iters: int = 500,
-) -> tuple[Mol, list[EmbeddedConformer]]:
-    mol = Chem.MolFromSmiles(smiles)
-    if mol is None:
-        raise ValueError(f"RDKit could not parse SMILES: {smiles!r}")
-    mol = Chem.AddHs(mol)
-
-    params = AllChem.ETKDGv3()
-    params.randomSeed = random_seed
-    params.useRandomCoords = True
-    params.pruneRmsThresh = -1.0  # no built-in pruning; we prune explicitly later
-
-    conf_ids = list(AllChem.EmbedMultipleConfs(mol, numConfs=n_confs, params=params))
-    if not conf_ids:
-        raise ValueError(f"RDKit ETKDG embedding failed for SMILES: {smiles!r}")
-
-    mmff_props = AllChem.MMFFGetMoleculeProperties(mol)
-    if mmff_props is None:
-        raise ValueError(
-            f"MMFF94 parameters unavailable for SMILES: {smiles!r} "
-            "(unsupported atom types for MMFF)"
-        )
-
-    embedded: list[EmbeddedConformer] = []
-    for conf_id in conf_ids:
-        ff = AllChem.MMFFGetMoleculeForceField(mol, mmff_props, confId=conf_id)
-        if ff is None:
-            logger.warning(
-                "Could not construct MMFF94 force field for conformer %d of %r; dropping it.",
-                conf_id,
-                smiles,
-            )
-            continue
-        converged = ff.Minimize(maxIts=max_iters)
-        if converged != 0:
-            logger.warning(
-                "MMFF94 minimization did not fully converge within %d iterations "
-                "for conformer %d of %r; keeping best available geometry.",
-                max_iters,
-                conf_id,
-                smiles,
-            )
-        energy = ff.CalcEnergy()
-        embedded.append(EmbeddedConformer(conf_id=conf_id, mmff_energy=energy))
-
-    embedded.sort(key=lambda e: e.mmff_energy)
-    return mol, embedded
-
-
-def _unaligned_rmsd(
-    mol: Mol, conf_id_1: int, conf_id_2: int, heavy_atom_only: bool = True
-) -> float:
-    c1 = mol.GetConformer(conf_id_1)
-    c2 = mol.GetConformer(conf_id_2)
-    sq_diffs = []
-    for atom in mol.GetAtoms():
-        if heavy_atom_only and atom.GetAtomicNum() == 1:
-            continue
-        i = atom.GetIdx()
-        p1, p2 = c1.GetAtomPosition(i), c2.GetAtomPosition(i)
-        sq_diffs.append((p1.x - p2.x) ** 2 + (p1.y - p2.y) ** 2 + (p1.z - p2.z) ** 2)
-    if not sq_diffs:
-        return 0.0
-    return math.sqrt(sum(sq_diffs) / len(sq_diffs))
-
-
-def _prune_and_select_top_n(
-    mol: Mol,
-    embedded: list[EmbeddedConformer],
-    keep_top_n: int,
-    rmsd_prune_threshold: float,
-) -> list[EmbeddedConformer]:
-    kept: list[EmbeddedConformer] = []
-    for candidate in embedded:
-        if len(kept) >= keep_top_n:
-            break
-        is_duplicate = any(
-            _unaligned_rmsd(mol, candidate.conf_id, k.conf_id) < rmsd_prune_threshold
-            for k in kept
-        )
-        if not is_duplicate:
-            kept.append(candidate)
-    return kept
-
-
-def conformer_to_pdbqt(mol: Mol, conf_id: int, name: str) -> str:
-    mol.SetProp("_Name", name)
-    preparator = MoleculePreparation()
-    setups = preparator.prepare(mol, conformer_id=conf_id)
-    if not setups:
-        raise ValueError("Meeko produced no molecule setups for this conformer")
-
-    setup = setups[0]
-    pdbqt_string, is_ok, error_msg = PDBQTWriterLegacy.write_string(setup)
-    if not is_ok:
-        raise ValueError(f"Meeko PDBQT writing failed: {error_msg}")
-    return pdbqt_string
-
-
-def content_id(data: bytes, length: int = 16) -> str:
-    return blake3.blake3(data).hexdigest(length // 2)
-
-
-def content_hash(data: bytes) -> str:
-    return f"blake3:{blake3.blake3(data).hexdigest()}"
-
-
-def _process_ligand(
-    candidate_id: str,
-    smiles: str,
-    ph_min: float,
-    ph_max: float,
-    n_confs: int,
-    keep_top_n: int,
-    rmsd_prune_threshold: float,
-    random_seed: int,
-) -> CandidateResult:
-    try:
-        protonated_smiles = _select_protonation_state(
-            smiles, ph_min=ph_min, ph_max=ph_max
-        )
-        mol, embedded = _embed_and_rank_conformers(
-            protonated_smiles, n_confs=n_confs, random_seed=random_seed
-        )
-        kept = _prune_and_select_top_n(mol, embedded, keep_top_n, rmsd_prune_threshold)
-
-        conformers: list[ConformerRecord] = []
-        for rank, e in enumerate(kept):
-            pdbqt_text = conformer_to_pdbqt(
-                mol, e.conf_id, name=f"{candidate_id}_rank{rank}"
-            )
-            cid = content_id(pdbqt_text.encode("utf-8"))
-            conformers.append(
-                ConformerRecord(
-                    conformer_id=cid,
-                    pdbqt_text=pdbqt_text,
-                    mmff_energy=e.mmff_energy,
-                    rank=rank,
-                )
-            )
-
-        return CandidateResult(
-            candidate_id=candidate_id,
-            source_smiles=smiles,
-            protonated_smiles=protonated_smiles,
-            conformers=conformers,
-            n_confs_requested=n_confs,
-            n_confs_embedded=len(embedded),
-            random_seed=random_seed,
-            ph_min=ph_min,
-            ph_max=ph_max,
-            error=None,
-        )
-    except Exception as exc:  # noqa: BLE001 - intentionally broad: isolate per-candidate failures
-        return CandidateResult(
-            candidate_id=candidate_id,
-            source_smiles=smiles,
-            protonated_smiles=None,
-            error=str(exc),
-        )
-
-
-def _process_ligand_star(args: tuple) -> CandidateResult:
-    return _process_ligand(*args)
-
-
-def _prepare_and_write_ligands(
-    rows: list[tuple[str, str]],
-    ph_min: float,
-    ph_max: float,
-    n_confs: int,
-    keep_top_n: int,
-    rmsd_prune_threshold: float,
-    random_seed: int,
-    num_workers: int,
-    out_root: Path,
-    source_tool: str,
-) -> tuple[int, int]:
-    tasks = [
-        (
-            cid,
-            smi,
-            ph_min,
-            ph_max,
-            n_confs,
-            keep_top_n,
-            rmsd_prune_threshold,
-            random_seed,
-        )
-        for cid, smi in rows
-    ]
-
-    n_success = 0
-    n_failed = 0
-
-    def _handle(result: CandidateResult) -> None:
-        nonlocal n_success, n_failed
-        if not result.ok:
-            n_failed += 1
-            logger.error("Failed candidate %r: %s", result.candidate_id, result.error)
-            return
-        if not result.conformers:
-            n_failed += 1
-            logger.error(
-                "Candidate %r produced zero usable conformers after embedding/pruning.",
-                result.candidate_id,
-            )
-            return
-        write_candidate_directory(result, out_root, source_tool=source_tool)
-        n_success += 1
-
-    if num_workers <= 1:
-        for t in tasks:
-            _handle(_process_ligand(*t))
-    else:
-        with multiprocessing.Pool(processes=num_workers) as pool:
-            for result in pool.imap(_process_ligand_star, tasks):
-                _handle(result)
-
-    return n_success, n_failed
-
-
-def build_manifest(result: CandidateResult, source_tool: str) -> dict:
-    """Build the conformer-manifest.yaml contents for one candidate."""
-    conformer_files_bytes = b"".join(
-        c.pdbqt_text.encode("utf-8") for c in result.conformers
-    )
-    return {
-        "schema_version": "1.0.0",
-        "candidate_id": result.candidate_id,
-        "source_smiles": result.source_smiles,
-        "protonated_smiles": result.protonated_smiles,
-        "protonation": {
-            "tool": source_tool,
-            "ph_min": result.ph_min,
-            "ph_max": result.ph_max,
-        },
-        "generation": {
-            "n_confs_requested": result.n_confs_requested,
-            "n_confs_embedded": result.n_confs_embedded,
-            "n_confs_retained": len(result.conformers),
-            "random_seed": result.random_seed,
-        },
-        "conformers": [
-            {
-                "id": c.conformer_id,
-                "file": f"{c.conformer_id}.pdbqt",
-                "mmff_energy": round(c.mmff_energy, 4),
-                "rank": c.rank,
-            }
-            for c in result.conformers
-        ],
-        "content_hash": content_hash(conformer_files_bytes),
-    }
-
-
-def sanitize_dirname(candidate_id: str) -> str:
-    safe = "".join(c if (c.isalnum() or c in "._-") else "_" for c in candidate_id)
-    return safe or "unnamed_candidate"
-
-
-def write_candidate_directory(
-    result: CandidateResult, out_root: Path, source_tool: str
-) -> None:
-    candidate_dir = out_root / sanitize_dirname(result.candidate_id)
-    candidate_dir.mkdir(parents=True, exist_ok=True)
-
-    for c in result.conformers:
-        (candidate_dir / f"{c.conformer_id}.pdbqt").write_text(c.pdbqt_text)
-
-    manifest = build_manifest(result, source_tool=source_tool)
-    with open(candidate_dir / "conformer-manifest.yaml", "w") as f:
-        yaml.safe_dump(manifest, f, sort_keys=False, default_flow_style=False)
-
-
-def _make_tarball(source_dir: Path, output_path: Path) -> None:
-    with tarfile.open(output_path, "w:gz") as tar:
-        tar.add(source_dir, arcname=source_dir.name)
-
-
-def _load_ligands(
-    parquet_path: Path, id_column: str, smiles_column: str
-) -> pd.DataFrame:
-    df = pd.read_parquet(parquet_path, columns=[id_column, smiles_column])
-
-    missing_cols = {id_column, smiles_column} - set(df.columns)
-    if missing_cols:
-        raise ValueError(
-            f"Input parquet is missing required column(s): {sorted(missing_cols)}"
-        )
-
-    n_total = len(df)
-    df = df.dropna(subset=[id_column, smiles_column])
-    n_dropped_na = n_total - len(df)
-    if n_dropped_na:
-        logger.warning("Dropped %d row(s) with null id/SMILES.", n_dropped_na)
-
-    df[id_column] = df[id_column].astype(str)
-    duplicated = df[id_column].duplicated(keep=False)
-    if duplicated.any():
-        dup_ids = sorted(df.loc[duplicated, id_column].unique())
-        raise ValueError(
-            f"Duplicate candidate IDs found in column {id_column!r}: {dup_ids[:10]}"
-            + (" ... (truncated)" if len(dup_ids) > 10 else "")
-        )
-
-    if df.empty:
-        raise ValueError("No valid candidate rows remain after dropping nulls.")
-
-    return df.reset_index(drop=True)
+_LMDB_BATCH_SIZE = 2000
 
 
 def _parse_num_workers(value: str) -> int:
@@ -394,31 +46,34 @@ def _parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(
         description=(
             "Generate ranked, deduplicated multi-conformer PDBQT sets per "
-            "candidate from a Parquet file of SMILES, packaged as a tar.gz "
-            "of <candidate-id>/conformer-manifest.yaml + <conformer-id>.pdbqt."
+            "candidate from a Parquet file of SMILES, packaged as an LMDB "
+            "keyed by candidate id."
         )
     )
     p.add_argument("--input", required=True, type=Path, help="Input Parquet file.")
-    p.add_argument("--output", required=True, type=Path, help="Output tar.gz path.")
+    p.add_argument("--output", required=True, type=Path, help="Output LMDB directory.")
     p.add_argument(
-        "--id-column", required=True, help="Column name containing candidate IDs."
-    )
-    p.add_argument(
-        "--smiles-column",
-        default="smiles",
-        help="Column name containing SMILES (default: smiles).",
+        "--map-size",
+        type=int,
+        default=1 << 33,  # 8 GiB
+        help="LMDB map_size in bytes, i.e. the maximum size the environment "
+        "may grow to (default: 8 GiB). LMDB reserves this address space "
+        "up front but only uses what's written; oversize rather than "
+        "undersize, since growing it later requires reopening the env.",
     )
     p.add_argument(
         "--n-confs",
         type=int,
         default=10,
-        help="Number of conformers to embed per candidate before ranking/pruning (default: 10).",
+        help="Number of conformers to embed per candidate before ranking/pruning \
+              (default: 10).",
     )
     p.add_argument(
         "--keep-top-n",
         type=int,
         default=3,
-        help="Number of conformers to retain per candidate after energy ranking and RMSD pruning (default: 3).",
+        help="Number of conformers to retain per candidate after energy ranking and \
+              RMSD pruning (default: 3).",
     )
     p.add_argument(
         "--rmsd-prune-threshold",
@@ -433,7 +88,7 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument(
         "--skip-errors",
         action="store_true",
-        help="Continue processing remaining candidates if some fail, instead of exiting non-zero.",
+        help="Continue processing remaining candidates if some fail.",
     )
     p.add_argument(
         "--ph-min",
@@ -450,8 +105,8 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument(
         "--random-seed",
         type=int,
-        default=0xF00D,
-        help="ETKDG random seed (default: 0xF00D).",
+        default=1000,
+        help="ETKDG random seed (default: 1000).",
     )
     p.add_argument(
         "--num-workers", metavar="N|auto", default="auto", type=_parse_num_workers
@@ -460,78 +115,126 @@ def _parse_args() -> argparse.Namespace:
     return p.parse_args()
 
 
+def _worker_process_candidate(
+    args: tuple[str, str, float, float, int, int, float, int],
+) -> tuple[str, bytes | None, str | None]:
+    (
+        candidate_id,
+        smiles,
+        ph_min,
+        ph_max,
+        n_confs,
+        keep_top_n,
+        rmsd_prune_threshold,
+        random_seed,
+    ) = args
+    try:
+        result = generate_conformers(
+            candidate_id=candidate_id,
+            smiles=smiles,
+            ph_min=ph_min,
+            ph_max=ph_max,
+            n_confs=n_confs,
+            keep_top_n=keep_top_n,
+            rmsd_prune_threshold=rmsd_prune_threshold,
+            random_seed=random_seed,
+        )
+    except Exception as exc:  # noqa: BLE001 - reported per-candidate, not raised
+        return candidate_id, None, str(exc)
+
+    if not result.ok:
+        return candidate_id, None, result.error
+
+    return candidate_id, result.to_record_bytes(), None
+
+
+def _iter_candidate_args(
+    input_path: Path, args: argparse.Namespace
+) -> Iterator[tuple[str, str, float, float, int, int, float, int]]:
+    parquet_file = pq.ParquetFile(input_path)
+    columns = ["catalog_id", "smiles", "parse_ok"]
+
+    for batch in parquet_file.iter_batches(columns=columns):
+        catalog_ids = batch.column("catalog_id")
+        smiles_col = batch.column("smiles")
+        parse_ok_col = batch.column("parse_ok")
+
+        for i in range(batch.num_rows):
+            if not parse_ok_col[i].as_py():
+                continue
+
+            catalog_id = catalog_ids[i].as_py()
+            smiles = smiles_col[i].as_py()
+            if catalog_id is None or smiles is None:
+                continue
+
+            yield (
+                catalog_id,
+                smiles,
+                args.ph_min,
+                args.ph_max,
+                args.n_confs,
+                args.keep_top_n,
+                args.rmsd_prune_threshold,
+                args.random_seed,
+            )
+
+
 def prepare_ligands() -> int:
     args = _parse_args()
+    if args.verbose:
+        logger.setLevel(logging.DEBUG)
 
-    if not args.input.exists():
-        logger.error("Input file does not exist: %s", args.input)
-        return 1
+    args.output.mkdir(parents=True, exist_ok=True)
+    env = lmdb.open(str(args.output), map_size=args.map_size)
 
-    if args.keep_top_n < 1:
-        logger.error("--keep-top-n must be >= 1, got %d", args.keep_top_n)
-        return 1
-
-    if args.n_confs < args.keep_top_n:
-        logger.warning(
-            "--n-confs (%d) is less than --keep-top-n (%d); at most %d conformer(s) "
-            "will be retained per candidate.",
+    worker_args = (
+        (
+            candidate_id,
+            smiles,
+            args.ph_min,
+            args.ph_max,
             args.n_confs,
             args.keep_top_n,
-            args.n_confs,
+            args.rmsd_prune_threshold,
+            args.random_seed,
         )
+        for candidate_id, smiles in _iter_candidate_args(args.input, args)
+    )
+
+    n_ok = 0
+    n_failed = 0
+    pending: list[tuple[str, bytes]] = []
+
+    def _flush(txn_pending: list[tuple[str, bytes]]) -> None:
+        if not txn_pending:
+            return
+        with env.begin(write=True) as txn:
+            for key, value in txn_pending:
+                txn.put(key.encode("utf-8"), value)
+        txn_pending.clear()
 
     try:
-        df = _load_ligands(args.input, args.id_column, args.smiles_column)
-    except ValueError as exc:
-        logger.error("%s", exc)
-        return 1
+        with Pool(processes=args.num_workers) as pool:
+            for candidate_id, packed, error in pool.imap_unordered(
+                _worker_process_candidate, worker_args
+            ):
+                if error is not None:
+                    n_failed += 1
+                    logger.warning("candidate %s failed: %s", candidate_id, error)
+                    if not args.skip_errors:
+                        raise RuntimeError(f"candidate {candidate_id} failed: {error}")
+                    continue
 
-    logger.info("Loaded %d candidate(s) from %s", len(df), args.input)
+                pending.append((candidate_id, packed))
+                n_ok += 1
 
-    rows = list(zip(df[args.id_column], df[args.smiles_column]))
-    logger.info(
-        "Processing %d candidate(s) with %d worker(s)...", len(rows), args.num_workers
-    )
+                if len(pending) >= _LMDB_BATCH_SIZE:
+                    _flush(pending)
 
-    with TemporaryDirectory(prefix="conformers_") as tmp:
-        out_root = Path(tmp) / args.output.name.removesuffix(".tar.gz").removesuffix(
-            ".tgz"
-        )
-        out_root.mkdir(parents=True, exist_ok=True)
+        _flush(pending)
+    finally:
+        env.close()
 
-        n_success, n_failed = _prepare_and_write_ligands(
-            rows,
-            ph_min=args.ph_min,
-            ph_max=args.ph_max,
-            n_confs=args.n_confs,
-            keep_top_n=args.keep_top_n,
-            rmsd_prune_threshold=args.rmsd_prune_threshold,
-            random_seed=args.random_seed,
-            num_workers=args.num_workers,
-            out_root=out_root,
-            source_tool="lynceus_dimorphite_dl",
-        )
-
-        if n_success == 0:
-            logger.error("All %d candidate(s) failed; no output written.", n_failed)
-            return 1
-
-        if n_failed and not args.skip_errors:
-            logger.error(
-                "%d candidate(s) failed and --skip-errors was not set; "
-                "no output written.",
-                n_failed,
-            )
-            return 1
-
-        args.output.parent.mkdir(parents=True, exist_ok=True)
-        _make_tarball(out_root, args.output)
-
-    logger.info(
-        "Done: %d succeeded, %d failed. Archive written to %s",
-        n_success,
-        n_failed,
-        args.output,
-    )
-
-    return 0
+    logger.info("wrote %d candidates (%d failed) to %s", n_ok, n_failed, args.output)
+    return 0 if n_failed == 0 or args.skip_errors else 1
