@@ -34,7 +34,6 @@ workflow CANDIDATE {
   ch_all_parquet = PREPROCESS_CANDIDATES.out.parquet.collect()
 
   PHYSIOCHEMICAL_FILTER(ch_all_parquet, config, batch_size)
-  DOCKING_PREP_CANDIDATE(ch_all_parquet)
 
   emit:
   filtered_parquets = PHYSIOCHEMICAL_FILTER.out.parquet.collect() // path: filtered + repartitioned parquet

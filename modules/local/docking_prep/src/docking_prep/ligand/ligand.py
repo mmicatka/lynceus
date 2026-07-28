@@ -30,7 +30,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-_LMDB_BATCH_SIZE = 2000
+_LMDB_BATCH_SIZE = 1000
 
 
 def _parse_num_workers(value: str) -> int:
@@ -40,6 +40,71 @@ def _parse_num_workers(value: str) -> int:
     if n < 1:
         raise argparse.ArgumentTypeError("workers must be >= 1")
     return n
+
+
+def _worker_process_candidate(
+    args: tuple[str, str, float, float, int, int, float, int],
+) -> tuple[str, bytes | None, str | None]:
+    (
+        candidate_id,
+        smiles,
+        ph_min,
+        ph_max,
+        n_confs,
+        keep_top_n,
+        rmsd_prune_threshold,
+        random_seed,
+    ) = args
+    try:
+        result = generate_conformers(
+            candidate_id=candidate_id,
+            smiles=smiles,
+            ph_min=ph_min,
+            ph_max=ph_max,
+            n_confs=n_confs,
+            keep_top_n=keep_top_n,
+            rmsd_prune_threshold=rmsd_prune_threshold,
+            random_seed=random_seed,
+        )
+    except Exception as exc:  # noqa: BLE001 - reported per-candidate, not raised
+        return candidate_id, None, str(exc)
+
+    if not result.ok:
+        return candidate_id, None, result.error
+
+    return candidate_id, result.to_record_bytes(), None
+
+
+def _iter_candidate_args(
+    input_path: Path, args: argparse.Namespace
+) -> Iterator[tuple[str, str, float, float, int, int, float, int]]:
+    parquet_file = pq.ParquetFile(input_path)
+    columns = ["catalog_id", "smiles", "parse_ok"]
+
+    for batch in parquet_file.iter_batches(columns=columns):
+        catalog_ids = batch.column("catalog_id")
+        smiles_col = batch.column("smiles")
+        parse_ok_col = batch.column("parse_ok")
+
+        for i in range(batch.num_rows):
+            if not parse_ok_col[i].as_py():
+                continue
+
+            catalog_id = catalog_ids[i].as_py()
+            smiles = smiles_col[i].as_py()
+            if catalog_id is None or smiles is None:
+                continue
+
+            yield (
+                catalog_id,
+                smiles,
+                args.ph_min,
+                args.ph_max,
+                args.n_confs,
+                args.keep_top_n,
+                args.rmsd_prune_threshold,
+                args.random_seed,
+            )
 
 
 def _parse_args() -> argparse.Namespace:
@@ -115,71 +180,6 @@ def _parse_args() -> argparse.Namespace:
     return p.parse_args()
 
 
-def _worker_process_candidate(
-    args: tuple[str, str, float, float, int, int, float, int],
-) -> tuple[str, bytes | None, str | None]:
-    (
-        candidate_id,
-        smiles,
-        ph_min,
-        ph_max,
-        n_confs,
-        keep_top_n,
-        rmsd_prune_threshold,
-        random_seed,
-    ) = args
-    try:
-        result = generate_conformers(
-            candidate_id=candidate_id,
-            smiles=smiles,
-            ph_min=ph_min,
-            ph_max=ph_max,
-            n_confs=n_confs,
-            keep_top_n=keep_top_n,
-            rmsd_prune_threshold=rmsd_prune_threshold,
-            random_seed=random_seed,
-        )
-    except Exception as exc:  # noqa: BLE001 - reported per-candidate, not raised
-        return candidate_id, None, str(exc)
-
-    if not result.ok:
-        return candidate_id, None, result.error
-
-    return candidate_id, result.to_record_bytes(), None
-
-
-def _iter_candidate_args(
-    input_path: Path, args: argparse.Namespace
-) -> Iterator[tuple[str, str, float, float, int, int, float, int]]:
-    parquet_file = pq.ParquetFile(input_path)
-    columns = ["catalog_id", "smiles", "parse_ok"]
-
-    for batch in parquet_file.iter_batches(columns=columns):
-        catalog_ids = batch.column("catalog_id")
-        smiles_col = batch.column("smiles")
-        parse_ok_col = batch.column("parse_ok")
-
-        for i in range(batch.num_rows):
-            if not parse_ok_col[i].as_py():
-                continue
-
-            catalog_id = catalog_ids[i].as_py()
-            smiles = smiles_col[i].as_py()
-            if catalog_id is None or smiles is None:
-                continue
-
-            yield (
-                catalog_id,
-                smiles,
-                args.ph_min,
-                args.ph_max,
-                args.n_confs,
-                args.keep_top_n,
-                args.rmsd_prune_threshold,
-                args.random_seed,
-            )
-
-
 def prepare_ligands() -> int:
     args = _parse_args()
     if args.verbose:
@@ -188,19 +188,7 @@ def prepare_ligands() -> int:
     args.output.mkdir(parents=True, exist_ok=True)
     env = lmdb.open(str(args.output), map_size=args.map_size)
 
-    worker_args = (
-        (
-            candidate_id,
-            smiles,
-            args.ph_min,
-            args.ph_max,
-            args.n_confs,
-            args.keep_top_n,
-            args.rmsd_prune_threshold,
-            args.random_seed,
-        )
-        for candidate_id, smiles in _iter_candidate_args(args.input, args)
-    )
+    worker_args = _iter_candidate_args(args.input, args)
 
     n_ok = 0
     n_failed = 0
@@ -230,6 +218,7 @@ def prepare_ligands() -> int:
                 n_ok += 1
 
                 if len(pending) >= _LMDB_BATCH_SIZE:
+                    logger.info("processed: %d", n_ok)
                     _flush(pending)
 
         _flush(pending)
