@@ -34,10 +34,11 @@ def default_structure_bytes(
     structure = conformational_state.structure
     if isinstance(structure, TrajectoryStructure):
         msg = (
-            f"Member {conformational_state.id!r} is trajectory-backed; extracting the exact "
-            "frame_index byte range requires a trajectory-format-aware reader "
-            "(e.g. MDAnalysis/mdtraj), which is out of scope for this reference "
-            "implementation. Supply a custom StructureBytesResolver -- see "
+            f"Member {conformational_state.id!r} is trajectory-backed; "
+            "extracting the exact frame_index byte range requires a "
+            "trajectory-format-aware reader (e.g. MDAnalysis/mdtraj), "
+            "which is out of scope for this reference implementation. "
+            "Supply a custom StructureBytesResolver - see "
             "extract_trajectory_frame_bytes for the expected contract."
         )
         raise NotImplementedError(msg)
@@ -134,7 +135,7 @@ def verify_content_hash(
     if algorithm != ALGORITHM_PREFIX:
         msg = (
             f"Unsupported content_hash algorithm {algorithm!r}; this reference "
-            f"implementation only supports {ALGORITHM_PREFIX!r} (§2.3.1, §A.4)"
+            f"implementation only supports {ALGORITHM_PREFIX!r}"
         )
         raise NotImplementedError(msg)
 

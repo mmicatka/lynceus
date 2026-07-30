@@ -1,4 +1,4 @@
-# modules/local/surface_extract/src/detect_putative_binding_sites/detect_putative_binding_sites.py
+# modules/local/surface_extract/src/detect_putative_binding_sites/detect_putative_binding_sites.py # noqa: E501
 
 import argparse
 import csv
@@ -317,7 +317,7 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument(
         "--ensemble",
         type=Path,
-        help="Protein conformational ensemble package directory (contains manifest.yaml)",
+        help="Protein conformational ensemble package directory.",
     )
     p.add_argument(
         "--out",

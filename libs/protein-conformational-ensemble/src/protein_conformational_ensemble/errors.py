@@ -12,7 +12,8 @@ class SchemaValidationError(ProteinConformationalEnsembleError):
 
 
 class SemanticValidationError(ProteinConformationalEnsembleError):
-    """Raised when a manifest passes schema validation but violates a normative semantic rule.
+    """Raised when a manifest passes schema validation but violates a
+    normative semantic rule.
 
     This error is used for validation rules that are explicitly out of scope
     for the structural JSON Schema.
@@ -27,14 +28,17 @@ class UnsupportedSchemaVersionError(ProteinConformationalEnsembleError):
 
 
 class UnsupportedCapabilityError(ProteinConformationalEnsembleError):
-    """Raised when a consumer encounters a declared ``capabilities_required`` entry it does not support.
+    """Raised when a consumer encounters a declared ``capabilities_required``
+    entry it does not support.
 
-    A consumer MUST reject the package rather than silently ignoring the unsupported capability.
+    A consumer MUST reject the package rather than silently ignoring the
+    unsupported capability.
     """
 
 
 class ContentHashMismatchError(ProteinConformationalEnsembleError):
-    """Raised when a recomputed ``content_hash`` does not match the value declared in the manifest.
+    """Raised when a recomputed ``content_hash`` does not match the value
+    declared in the manifest.
 
     This indicates silent corruption or data drift.
     """

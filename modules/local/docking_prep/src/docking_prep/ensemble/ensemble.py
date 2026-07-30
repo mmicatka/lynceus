@@ -219,7 +219,7 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument(
         "--ensemble-path",
         type=Path,
-        help="Protein conformational ensemble package directory (contains manifest.yaml)",
+        help="Protein conformational ensemble package directory.",
     )
     p.add_argument(
         "--output",

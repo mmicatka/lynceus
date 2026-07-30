@@ -94,8 +94,8 @@ def generate_ensemble(
     if any_weighted and weight_scheme is None:
         msg = (
             "At least one conformational state has a weight but no weight_scheme "
-            "was provided. Per PCE_MANIFEST_CONTRACT.md, weight_scheme is required the moment "
-            "any conformational state declares a weight."
+            "was provided. Per PCE_MANIFEST_CONTRACT.md, weight_scheme is required"
+            " the moment any conformational state declares a weight."
         )
         raise ValueError(msg)
     if not any_weighted:

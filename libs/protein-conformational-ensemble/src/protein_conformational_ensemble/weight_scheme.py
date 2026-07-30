@@ -22,15 +22,17 @@ WEIGHT_SEMANTICS: dict[WeightSchemeType, WeightTypeSemantics] = {
         comparable_within_ensemble=True,
         comparable_across_ensembles=False,
         valid_operations=("weighted_averaging", "expectation_values"),
-        notes="Comparable across ensembles only if same generation method and comparable "
-        "simulation length.",
+        notes=(
+            "Comparable across ensembles only if same generation method and comparable "
+            "simulation length.",
+        ),
     ),
     "cluster_fraction": WeightTypeSemantics(
         sums_to_one=True,
         comparable_within_ensemble=True,
         comparable_across_ensembles=False,
         valid_operations=("ranking", "relative_importance_within_ensemble"),
-        notes="Not comparable across ensembles: depends on clustering algorithm/parameters.",
+        notes="Not comparable across ensembles: depends on clustering parameters.",
     ),
     "experimental_occupancy": WeightTypeSemantics(
         sums_to_one=False,

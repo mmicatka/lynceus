@@ -3,7 +3,6 @@
 import argparse
 import io
 import logging
-import os
 import sys
 import zlib
 from pathlib import Path

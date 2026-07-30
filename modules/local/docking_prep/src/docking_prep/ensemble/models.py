@@ -25,7 +25,10 @@ class EnsemblePrepParams(BaseModel):
     )
     default_altloc: str = Field(
         default="A",
-        description="Alternate location identifier to keep when a residue has multiple altlocs.",
+        description=(
+            "Alternate location identifier to keep when a residue "
+            "has multiple altlocs.",
+        ),
     )
     allow_bad_residues: bool = Field(
         default=False,
@@ -52,7 +55,7 @@ class EnsembleMemberPrepResult(BaseModel):
     )
     params: EnsemblePrepParams | None = Field(
         default=None,
-        description="The parameters actually used to produce this receptor. Set on success.",
+        description="The parameters actually used to produce this receptor.",
     )
     dropped_residues: list[str] = Field(
         default_factory=list,
@@ -67,7 +70,7 @@ class EnsembleMemberPrepResult(BaseModel):
     # Failure fields
     error_type: str | None = Field(
         default=None,
-        description="Class name of the exception raised (e.g., 'ResidueTemplateError'). Populated on failure.",
+        description="Class name of the error raised (e.g., 'ResidueTemplateError').",
     )
     error_message: str | None = Field(
         default=None,
@@ -82,7 +85,7 @@ class EnsemblePrepResults(BaseModel):
     ensemble_content_hash: str
     results: list[EnsembleMemberPrepResult] = Field(
         default_factory=list,
-        description="Combined list of member preparation outcomes (both successes and failures).",
+        description="Combined list of member preparation outcomes.",
     )
 
     @property
