@@ -30,7 +30,8 @@ def _discover_member_specs(
     )
     if not structure_files:
         raise ValueError(
-            f"No structure files ({sorted(_STRUCTURE_SUFFIXES)}) found under {members_dir}"
+            f"No structure files ({sorted(_STRUCTURE_SUFFIXES)}) found under "
+            f"{members_dir}"
         )
 
     weight_values: dict[str, float] = (weights_data or {}).get("values", {})
@@ -62,7 +63,10 @@ def _discover_member_specs(
 
 def _parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(
-        description="Generate a multi-member PCE manifest from a directory of member structures."
+        description=(
+            "Generate a multi-member PCE manifest from a directory "
+            "of member structures."
+        )
     )
     p.add_argument("--members-dir", type=Path, required=True)
     p.add_argument("--ensemble-id", type=str, required=True)
@@ -71,7 +75,7 @@ def _parse_args() -> argparse.Namespace:
         "--topology-member-id",
         type=str,
         default=None,
-        help="Defaults to the first member found (alphabetical by filename) if omitted.",
+        help="Defaults to the first member found if omitted.",
     )
     return p.parse_args()
 
@@ -89,5 +93,6 @@ def generate_manifest():
     )
 
     print(
-        f"Wrote PCE manifest: {args.outdir / 'manifest.yaml'} ({len(manifest.conformational_states)} members)"
+        f"Wrote PCE manifest: {args.outdir / 'manifest.yaml'} "
+        f"({len(manifest.conformational_states)} members)"
     )

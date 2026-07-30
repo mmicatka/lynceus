@@ -1,6 +1,6 @@
 # libs/protein-conformational-ensemble/src/protein_conformational_ensemble/__init__.py
 
-from importlib.metadata import version, PackageNotFoundError
+from importlib.metadata import PackageNotFoundError, version
 
 try:
     __version__ = version("protein-conformational-ensemble")

@@ -70,7 +70,7 @@ def download_structures(pdb_ids: list[str], outdir: Path) -> dict[str, Path]:
 
 def _parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(
-        description="Retrieve structure files for a list of PDB IDs, serially, via httpx."
+        description="Retrieve structure files for a list of PDB IDs"
     )
     p.add_argument(
         "--pdb-ids",

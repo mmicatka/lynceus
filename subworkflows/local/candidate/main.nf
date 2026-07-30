@@ -3,7 +3,6 @@
 include { RETRIEVE_CANDIDATES } from '../../../modules/local/retrieve_candidates'
 include { PREPROCESS_CANDIDATES } from '../../../modules/local/preprocess_candidates'
 include { PHYSIOCHEMICAL_FILTER } from '../../../modules/local/physiochemical_filter'
-include { DOCKING_PREP_CANDIDATE } from '../../../modules/local/docking_prep'
 
 workflow CANDIDATE {
   take:
@@ -34,12 +33,6 @@ workflow CANDIDATE {
   ch_all_parquet = PREPROCESS_CANDIDATES.out.parquet.collect()
 
   PHYSIOCHEMICAL_FILTER(ch_all_parquet, config, batch_size)
-
-  candidates = PHYSIOCHEMICAL_FILTER.out.parquet
-    .flatten()
-    .filter { file -> file.name.endsWith('.parquet') }
-
-  DOCKING_PREP_CANDIDATE(candidates)
 
   emit:
   filtered_parquets = PHYSIOCHEMICAL_FILTER.out.parquet.collect() // path: filtered + repartitioned parquet

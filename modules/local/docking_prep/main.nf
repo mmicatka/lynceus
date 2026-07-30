@@ -20,7 +20,7 @@ process DOCKING_PREP_TARGET {
     """
 }
 
-process DOCKING_PREP_CANDIDATE {
+process DOCKING_PREP_CANDIDATE_CONFORMER_GENERATE {
     label 'process_single'
     container 'lynceus/docking-prep:0.1.0'
 
@@ -28,15 +28,30 @@ process DOCKING_PREP_CANDIDATE {
     path input_parquet
 
     output:
-    path "${input_parquet.baseName}_prepped", emit: lmdb
-    path "${input_parquet.simpleName}_index.parquet", emit: index
+    path "${input_parquet.simpleName}_conformers/output.parquet", emit: conformers
 
     script:
     """
-    docking-prepare-ligands \\
+    conformer-generate \\
     --input ${input_parquet} \\
-    --output ${input_parquet.baseName}_prepped \\
-    --output-parquet ${input_parquet.simpleName}_index.parquet \\
-    --skip-errors
+    --output ${input_parquet.baseName}_conformers
+    """
+}
+
+process DOCKING_PREP_CANDIDATE_CONVERT_PDBQT {
+    label 'process_single'
+    container 'lynceus/docking-prep:0.1.0'
+
+    input:
+    path input_parquet
+
+    output:
+    path "${input_parquet.simpleName}_converted/output.parquet", emit: candidates
+
+    script:
+    """
+    convert-pdbqt \\
+    --input ${input_parquet} \\
+    --output ${input_parquet.baseName}_converted
     """
 }
