@@ -237,7 +237,3 @@ def conformer_generate():
         batch_size=args.batch_size,
         num_shards=args.num_shards,
     )
-
-
-if __name__ == "__main__":
-    conformer_generate()

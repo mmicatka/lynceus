@@ -18,7 +18,7 @@ process SAMPLE_CANDIDATES {
     """
     sample-candidates \\
         --input-glob "candidates_*.parquet" \\
-        --reservoir-size 20000 \\
+        --reservoir-size 500 \\
         --seed 1000 \\
         --output candidates.parquet
     """
