@@ -43,3 +43,6 @@ clean:
 
 reset: clean
 	rm -rf results/*
+
+lint:
+	ruff check --fix .

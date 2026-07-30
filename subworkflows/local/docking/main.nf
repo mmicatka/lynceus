@@ -9,17 +9,8 @@ workflow DOCKING {
     candidates // path: candidate parquet
 
     main:
-    DOCKING_PREP_TARGET(target_protein_conformational_ensemble)
 
-    emit:
-    prepped_target = DOCKING_PREP_TARGET.out.prepped
-}
-
-workflow DOCKING_TARGET_PREP {
-    take:
-    target_protein_conformational_ensemble // protein conformational ensemble
-
-    main:
+    // Prep
     DOCKING_PREP_TARGET(target_protein_conformational_ensemble)
     DETECT_PUTATIVE_BINDING_SITES(target_protein_conformational_ensemble)
 

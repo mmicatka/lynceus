@@ -11,9 +11,7 @@ dependencies = [
   "dimorphite-dl",
   "fastparquet>=2026.5.0",
   "gemmi>=0.7.5",
-  "lmdb>=2.3.0",
   "meeko>=0.7.1",
-  "msgpack>=1.2.1",
   "pandas>=3.0.3",
   "prody>=2.6.1",
   "protein-conformational-ensemble",
@@ -25,7 +23,7 @@ dependencies = [
 
 [project.scripts]
 docking-prepare-ensemble = "docking_prep.ensemble:prepare_ensemble"
-docking-prepare-ligands = "docking_prep.ligand:prepare_ligands"
+conformer-generate = "docking_prep.ligand:conformer_generate"
 
 [build-system]
 requires = ["uv_build>=0.11.30,<0.12.0"]
