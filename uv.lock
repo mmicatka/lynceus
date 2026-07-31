@@ -17,6 +17,7 @@ resolution-markers = [
 members = [
     "detect-putative-binding-sites",
     "docking-prep",
+    "docking-run",
     "lynceus-chem",
     "lynceus-dev",
     "physiochemical-filter",
@@ -667,6 +668,11 @@ requires-dist = [
     { name = "rdkit", specifier = ">=2026.3.3" },
     { name = "scipy", specifier = ">=1.18.0" },
 ]
+
+[[package]]
+name = "docking-run"
+version = "0.1.0"
+source = { editable = "modules/local/docking_run" }
 
 [[package]]
 name = "duckdb"

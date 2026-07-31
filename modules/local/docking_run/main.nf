@@ -2,7 +2,7 @@
 
 process DOCKING_RUN {
     label 'process_single'
-    container 'lynceus/docking:0.1.0'
+    container 'lynceus/docking-run:0.1.0'
 
     input:
     path target

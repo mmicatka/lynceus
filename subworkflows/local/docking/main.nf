@@ -23,5 +23,5 @@ workflow DOCKING {
 
     emit:
     target = DOCKING_PREP_TARGET.out.prepped
-    candidates = DOCKING_PREP_CANDIDATE_CONVERT_PDBQT.out.candidates
+    sites = DETECT_PUTATIVE_BINDING_SITES.out.sites
 }

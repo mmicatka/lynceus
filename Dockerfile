@@ -68,6 +68,17 @@ ENV LD_LIBRARY_PATH="/usr/local/cuda/lib64:/usr/lib/wsl/lib"
 ENV GPU_INCLUDE_PATH=/usr/local/cuda/include
 ENV GPU_LIBRARY_PATH=/usr/local/cuda/lib64
 
+RUN mkdir -p /opt/boost \
+    && wget https://archives.boost.io/release/1.84.0/source/boost_1_84_0.tar.gz \
+    && tar -xzf boost_1_84_0.tar.gz \
+    && cd boost_1_84_0 \
+    && ./bootstrap.sh --with-libraries=filesystem,program_options,system \
+    && ./b2 install \
+    && ldconfig
+
+RUN mkdir -p /opt/vina \
+    && git clone https://github.com/DeltaGroupNJUPT/Vina-GPU-2.1.git /opt/vina
+
 # GPU Dev
 FROM base-gpu AS dev-gpu
 
