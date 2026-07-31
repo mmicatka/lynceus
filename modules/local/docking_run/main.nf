@@ -5,10 +5,12 @@ process DOCKING_RUN {
     container 'lynceus/docking:0.1.0'
 
     input:
-    path sites
+    path target
+    path binding_sites
+    path candidates
 
     script:
     """
-    docking-run 
+    docking-run
     """
 }
