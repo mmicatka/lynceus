@@ -27,6 +27,7 @@ members = [
     "modules/local/physiochemical_filter",
     "modules/local/sample_candidates",
     "modules/local/docking_prep",
+    "modules/local/docking_run",
 ]
 
 [tool.uv.sources]

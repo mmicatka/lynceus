@@ -46,7 +46,7 @@ process DOCKING_PREP_CANDIDATE_CONVERT_PDBQT {
     path input_parquet
 
     output:
-    path "${input_parquet.simpleName}_converted/output.parquet", emit: candidates
+    path "${input_parquet.simpleName}_converted/output.parquet", emit: converted
 
     script:
     """
