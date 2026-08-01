@@ -2,7 +2,7 @@
 
 include { DOCKING_PREP_TARGET ; DOCKING_PREP_CANDIDATE_CONFORMER_GENERATE ; DOCKING_PREP_CANDIDATE_CONVERT_PDBQT } from '../../../modules/local/docking_prep'
 include { DETECT_PUTATIVE_BINDING_SITES } from '../../../modules/local/detect_putative_binding_sites'
-include { DOCKING_RUN } from '../../../modules/local/docking_run'
+include { DOCKING_RUN_CPU } from '../../../modules/local/docking_run'
 
 workflow DOCKING {
     take:
@@ -19,9 +19,22 @@ workflow DOCKING {
     DOCKING_PREP_CANDIDATE_CONVERT_PDBQT(DOCKING_PREP_CANDIDATE_CONFORMER_GENERATE.out.conformers)
 
     // Run docking
-    DOCKING_RUN(DOCKING_PREP_TARGET.out.prepped, DETECT_PUTATIVE_BINDING_SITES.out.sites, DOCKING_PREP_CANDIDATE_CONVERT_PDBQT.out.converted)
+    states_ch = DOCKING_PREP_TARGET.out.prepped
+    sites_ch = DETECT_PUTATIVE_BINDING_SITES.out.sites
+        .splitJson()
+        .map { site ->
+            tuple(
+                site.conformational_state_id,
+                site.site_id,
+                site.center,
+                [site.extent.radius * 2] * 3,
+            )
+        }
+    docking_jobs_ch = states_ch.combine(sites_ch, by: 0)
+    DOCKING_RUN_CPU(docking_jobs_ch, DOCKING_PREP_CANDIDATE_CONVERT_PDBQT.out.converted)
 
     emit:
     target = DOCKING_PREP_TARGET.out.prepped
     sites = DETECT_PUTATIVE_BINDING_SITES.out.sites
+    results = DOCKING_RUN_CPU.out.results
 }
