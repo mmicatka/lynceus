@@ -1,11 +1,14 @@
 # modules/local/docking_run/src/docking_run/docking_run.py
 
 import argparse
+import json
 import logging
 import sys
 from pathlib import Path
 
-from .providers import available_providers
+from .providers import ProviderNotAvailableError, available_providers, get_provider
+from .types import DockingError, SearchBox
+from .types.docking_result import DockingResult
 
 logging.basicConfig(
     level=logging.INFO,
@@ -13,6 +16,43 @@ logging.basicConfig(
     stream=sys.stderr,
 )
 logger = logging.getLogger(__name__)
+
+
+def _build_provider_kwargs(args: argparse.Namespace) -> dict:
+    common = {"out_dir": args.out_dir} if args.out_dir else {}
+    if args.provider == "cpu":
+        return {
+            **common,
+            "exhaustiveness": args.exhaustiveness,
+            "n_poses": args.n_poses,
+            "n_workers": args.n_workers,
+        }
+    if args.provider == "gpu":
+        return {
+            **common,
+            "binary_path": args.vina_gpu_binary,
+            "search_depth": args.search_depth,
+            "thread": args.thread,
+        }
+    # Should be unreachable: argparse `choices=` already restricts this.
+    raise ValueError(f"Unhandled provider: {args.provider}")
+
+
+def _results_to_json(results_by_ligand: dict[str, list[DockingResult]]) -> str:
+    serializable = {
+        ligand_id: [
+            {
+                "mode": r.mode,
+                "affinity_kcal_mol": r.affinity_kcal_mol,
+                "rmsd_lb": r.rmsd_lb,
+                "rmsd_ub": r.rmsd_ub,
+                "pose_pdbqt": str(r.pose_pdbqt),
+            }
+            for r in results
+        ]
+        for ligand_id, results in results_by_ligand.items()
+    }
+    return json.dumps(serializable, indent=2)
 
 
 def _parse_args() -> argparse.Namespace:
@@ -131,3 +171,30 @@ def _parse_args() -> argparse.Namespace:
 
 def docking_run():
     args = _parse_args()
+
+    provider_kwargs = _build_provider_kwargs(args)
+    provider = get_provider(args.provider, **provider_kwargs)
+
+    try:
+        provider.validate_environment()
+    except ProviderNotAvailableError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+
+    box = SearchBox(center=tuple(args.center), size=tuple(args.size))
+
+    try:
+        results_by_ligand = provider.dock_batch(
+            receptor_pdbqt=args.receptor,
+            ligand_pdbqts=list(args.ligands),
+            box=box,
+            batch_size=args.batch_size,
+        )
+    except DockingError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+
+    output = _results_to_json(results_by_ligand)
+    print(output)
+    if args.out_json:
+        args.out_json.write_text(output)
