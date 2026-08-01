@@ -38,6 +38,40 @@ ENV LD_LIBRARY_PATH="/usr/local/cuda/lib64:/usr/lib/wsl/lib"
 ENV GPU_INCLUDE_PATH=/usr/local/cuda/include
 ENV GPU_LIBRARY_PATH=/usr/local/cuda/lib64
 
+# NVIDIA Container Toolkit: required for the INNER Docker-in-Docker daemon
+# to discover and pass GPUs through to containers it spawns (e.g. via
+# `docker run --gpus all`). This is separate from and in addition to the
+# CUDA userspace libraries installed above — those let code *inside this
+# image* use the GPU directly; this lets the Docker daemon *running
+# inside this image* expose the GPU to containers it launches. Missing
+# this is exactly why `docker run --gpus all` previously failed here with
+# "failed to discover GPU vendor from CDI: no known GPU vendor found",
+# even though `nvidia-smi` worked fine directly in the devcontainer shell.
+RUN curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey \
+    | gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg \
+    && curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list \
+    | sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' \
+    | tee /etc/apt/sources.list.d/nvidia-container-toolkit.list \
+    && apt-get update \
+    && apt-get install -y nvidia-container-toolkit \
+    && rm -rf /var/lib/apt/lists/*
+
+# `nvidia-ctk runtime configure` writes /etc/docker/daemon.json, which the
+# inner dockerd reads at STARTUP — not at build time, since no daemon is
+# running during `docker build`. This must run once the inner daemon is
+# actually up (e.g. as part of the devcontainer's postCreateCommand /
+# entrypoint / DinD startup script), not here as a RUN step. Documenting
+# the required command here since it belongs conceptually with this
+# install, even though it can't execute in this layer:
+#
+#   nvidia-ctk runtime configure --runtime=docker
+#   systemctl restart docker   # or the equivalent dockerd restart for
+#                               # however this image's DinD is supervised
+#
+# FIXME: wire the above into whatever starts dockerd in this devcontainer
+# (entrypoint script / postCreateCommand) — it cannot live in this
+# Dockerfile as a RUN instruction.
+
 FROM base AS dev-cpu
 ARG USERNAME=appuser
 ARG USER_UID=1000
