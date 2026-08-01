@@ -13,7 +13,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   wget \
   ocl-icd-opencl-dev \
   ocl-icd-libopencl1 \
-  clinfo \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /opt/boost-src
@@ -38,48 +37,43 @@ RUN mkdir -p /opt/vina-gpu-dist \
   && cp ./Vina-GPU /opt/vina-gpu-dist/ \
   && find . -maxdepth 1 -iname "*.txt" -exec cp {} /opt/vina-gpu-dist/ \;
 
-
-FROM python:3.12-slim-trixie AS base
+FROM python:3.12-slim-trixie AS cpu
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-  build-essential \
+  procps \
   && rm -rf /var/lib/apt/lists/*
 
 COPY --from=ghcr.io/astral-sh/uv:0.11.28-python3.12-trixie /usr/local/bin/uv /usr/local/bin/uvx /usr/local/bin/
 
-# Workspace root config + all member paths must be present for `uv sync
-# --package` to resolve the workspace correctly.
-WORKDIR /workspace
-COPY pyproject.toml uv.lock ./
-COPY libs/ libs/
-COPY modules/ modules/
+WORKDIR /app
 
-WORKDIR /workspace/modules/docking
+COPY pyproject.toml ./
+COPY src ./src
 
-FROM base AS cpu
+RUN uv pip install --system .
 
-RUN uv sync --frozen --package lynceus-docking --extra cpu
+ENTRYPOINT []
 
-ENTRYPOINT ["uv", "run", "--frozen", "--package", "lynceus-docking", "docking-run"]
+FROM python:3.12-slim-trixie AS gpu
 
-FROM base AS gpu
-
-# NVIDIA's OpenCL ICD loader + runtime libs, matching the builder stage's
-# CUDA/OpenCL version. Kept separate from `base` so the CPU target's image
-# never carries CUDA runtime weight.
 RUN apt-get update && apt-get install -y --no-install-recommends \
+  procps \
   ocl-icd-libopencl1 \
-  clinfo \
   && rm -rf /var/lib/apt/lists/*
+
+COPY --from=ghcr.io/astral-sh/uv:0.11.28-python3.12-trixie /usr/local/bin/uv /usr/local/bin/uvx /usr/local/bin/
+
+WORKDIR /app
+
+COPY pyproject.toml ./
+COPY src ./src
+
+RUN uv pip install --system .
 
 COPY --from=vina-gpu-builder /opt/vina-gpu-dist/ /opt/vina-gpu/
 ENV PATH="/opt/vina-gpu:${PATH}"
 ENV LYNCEUS_VINA_GPU_BIN=/opt/vina-gpu/Vina-GPU
-
-RUN uv sync --frozen --package lynceus-docking --extra gpu
-
-# nvidia-container-toolkit's runtime hook needs these to expose the device.
 ENV NVIDIA_VISIBLE_DEVICES=all
 ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
 
-ENTRYPOINT ["uv", "run", "--frozen", "--package", "lynceus-docking", "docking-run", "--backend", "vina-gpu"]
+ENTRYPOINT []

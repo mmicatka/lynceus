@@ -33,8 +33,8 @@ build-sample-candidates:
 build-physiochemical-filter:
 	docker build -t lynceus/physiochemical-filter:0.1.0 modules/local/physiochemical_filter
 
-build-docking-run:
-	docker build -t lynceus/docking-run:0.1.0 modules/local/docking_run
+build-docking-run-cpu:
+	docker build --target cpu -t lynceus/docking-run:cpu-0.1.0 modules/local/docking_run
 
 # Dev environment: loads conf/examples/dev.yaml
 run-dev:

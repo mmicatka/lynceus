@@ -15,6 +15,7 @@ dependencies = [
     "physiochemical-filter",
     "sample-candidates",
     "docking-prep",
+    "docking-run",
 ]
 
 [tool.uv.workspace]
@@ -38,6 +39,7 @@ detect-putative-binding-sites = { workspace = true }
 protein-conformational-ensemble = { workspace = true }
 lynceus-chem = { workspace = true }
 docking-prep = { workspace = true }
+docking-run = { workspace = true }
 
 [dependency-groups]
 dev = [
