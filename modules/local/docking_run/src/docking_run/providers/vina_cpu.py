@@ -1,10 +1,11 @@
-# modules/local/docking_run/src/docking_run/providers/vina_cpu.py
-
-
 from __future__ import annotations
 
-from concurrent.futures import ProcessPoolExecutor
+import os
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from contextlib import contextmanager
 from pathlib import Path
+
+from tqdm import tqdm
 
 from docking_run.types import (
     DockingError,
@@ -19,14 +20,23 @@ _DEFAULT_N_POSES = 9
 _DEFAULT_EXHAUSTIVENESS = 8
 
 
-class VinaCPUProvider(DockingProvider):
-    """Docking via AutoDock Vina's CPU implementation.
+@contextmanager
+def suppress_stderr():
+    """Context manager to redirect low-level C++ stderr to devnull."""
+    stderr_fd = 2
+    devnull_fd = os.open(os.devnull, os.O_WRONLY)
+    saved_stderr_fd = os.dup(stderr_fd)
+    try:
+        os.dup2(devnull_fd, stderr_fd)
+        yield
+    finally:
+        os.dup2(saved_stderr_fd, stderr_fd)
+        os.close(saved_stderr_fd)
+        os.close(devnull_fd)
 
-    FIXME: exhaustiveness is CPU Vina's actual search-thoroughness knob;
-    it is NOT ported to VinaGPUProvider, which uses a different parameter
-    (search_depth) with different semantics. Do not assume equivalent
-    values produce comparable search thoroughness across providers.
-    """
+
+class VinaCPUProvider(DockingProvider):
+    """Docking via AutoDock Vina's CPU implementation."""
 
     def __init__(
         self,
@@ -71,11 +81,6 @@ class VinaCPUProvider(DockingProvider):
         box: SearchBox,
         batch_size: int | None = None,
     ) -> dict[str, list[DockingResult]]:
-        # batch_size has no meaning for a non-batched backend: there's no
-        # underlying invocation to chunk. We accept the parameter (to
-        # satisfy the interface / keep CLI plumbing uniform) but ignore it,
-        # per the ABC docstring's "providers with no native batch
-        # primitive may ignore this" contract.
         del batch_size
 
         self.out_dir.mkdir(parents=True, exist_ok=True)
@@ -90,11 +95,16 @@ class VinaCPUProvider(DockingProvider):
                     n_poses=self.n_poses,
                     out_dir=self.out_dir,
                 )
-                for lig in ligand_pdbqts
+                for lig in tqdm(
+                    ligand_pdbqts,
+                    desc="Docking ligands",
+                    unit="ligand",
+                    dynamic_ncols=True,
+                )
             ]
         else:
             with ProcessPoolExecutor(max_workers=self.n_workers) as pool:
-                futures = [
+                future_to_lig = {
                     pool.submit(
                         _dock_one,
                         receptor_pdbqt=receptor_pdbqt,
@@ -103,10 +113,20 @@ class VinaCPUProvider(DockingProvider):
                         exhaustiveness=self.exhaustiveness,
                         n_poses=self.n_poses,
                         out_dir=self.out_dir,
-                    )
+                    ): lig
                     for lig in ligand_pdbqts
-                ]
-                results = [f.result() for f in futures]
+                }
+
+                results = []
+                with tqdm(
+                    total=len(future_to_lig),
+                    desc="Docking ligands (parallel)",
+                    unit="ligand",
+                    dynamic_ncols=True,
+                ) as pbar:
+                    for future in as_completed(future_to_lig):
+                        results.append(future.result())
+                        pbar.update(1)
 
         return {r[0].ligand_id: r for r in results if r}
 
@@ -120,22 +140,23 @@ def _dock_one(
     n_poses: int,
     out_dir: Path,
 ) -> list[DockingResult]:
-    """Module-level (not a method) so it's picklable for ProcessPoolExecutor."""
+    """Module-level worker function picklable for ProcessPoolExecutor."""
     import vina
 
     ligand_id = ligand_pdbqt.stem
     out_dir.mkdir(parents=True, exist_ok=True)
     output_pdbqt = out_dir / f"{ligand_id}_out.pdbqt"
 
-    v = vina.Vina(sf_name="vina")
-    v.set_receptor(str(receptor_pdbqt))
-    v.set_ligand_from_file(str(ligand_pdbqt))
-    v.compute_vina_maps(center=list(box.center), box_size=list(box.size))
-    v.dock(exhaustiveness=exhaustiveness, n_poses=n_poses)
+    with suppress_stderr():
+        v = vina.Vina(sf_name="vina", verbosity=0)
+        v.set_receptor(str(receptor_pdbqt))
+        v.set_ligand_from_file(str(ligand_pdbqt))
+        v.compute_vina_maps(center=list(box.center), box_size=list(box.size))
+        v.dock(exhaustiveness=exhaustiveness, n_poses=n_poses)
 
-    try:
-        v.write_poses(str(output_pdbqt), n_poses=n_poses, overwrite=True)
-    except Exception as exc:  # vina bindings raise plain Exception on failure
-        raise DockingError(f"Vina docking failed for {ligand_id}: {exc}") from exc
+        try:
+            v.write_poses(str(output_pdbqt), n_poses=n_poses, overwrite=True)
+        except Exception as exc:
+            raise DockingError(f"Vina docking failed for {ligand_id}: {exc}") from exc
 
     return parse_vina_output_pdbqt(output_pdbqt, ligand_id=ligand_id)

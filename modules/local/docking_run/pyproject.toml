@@ -4,7 +4,10 @@ version = "0.1.0"
 description = "Add your description here"
 authors = [{ name = "Mike", email = "mike.micatka@gmail.com" }]
 requires-python = ">=3.12"
-dependencies = ["vina>=1.2.7"]
+dependencies = [
+    "tqdm>=4.70.0",
+    "vina>=1.2.7",
+]
 
 [project.scripts]
 docking-run = "docking_run.cli:docking_run"
