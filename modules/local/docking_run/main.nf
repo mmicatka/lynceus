@@ -21,6 +21,9 @@ process DOCKING_RUN_CPU {
         --ligands ${candidates}/partitions/**/*.pdbqt \\
         --center ${cx} ${cy} ${cz} \\
         --size ${sx} ${sy} ${sz} \\
-        --n-workers 1
+        --n-workers 2 \\
+        --out-parquet output.parquet \\
+        --conformational-state-id ${conformational_state_id} \\
+        --site-id ${site_id}
     """
 }

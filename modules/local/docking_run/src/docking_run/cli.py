@@ -1,15 +1,13 @@
 # modules/local/docking_run/src/docking_run/docking_run.py
 
 import argparse
-import json
 import logging
-import os
 import sys
 from pathlib import Path
 
+from .output import write_docking_results_parquet
 from .providers import ProviderNotAvailableError, available_providers, get_provider
 from .types import DockingError, SearchBox
-from .types.docking_result import DockingResult
 
 logging.basicConfig(
     level=logging.INFO,
@@ -37,23 +35,6 @@ def _build_provider_kwargs(args: argparse.Namespace) -> dict:
         }
     # Should be unreachable: argparse `choices=` already restricts this.
     raise ValueError(f"Unhandled provider: {args.provider}")
-
-
-def _results_to_json(results_by_ligand: dict[str, list[DockingResult]]) -> str:
-    serializable = {
-        ligand_id: [
-            {
-                "mode": r.mode,
-                "affinity_kcal_mol": r.affinity_kcal_mol,
-                "rmsd_lb": r.rmsd_lb,
-                "rmsd_ub": r.rmsd_ub,
-                "pose_pdbqt": str(r.pose_pdbqt),
-            }
-            for r in results
-        ]
-        for ligand_id, results in results_by_ligand.items()
-    }
-    return json.dumps(serializable, indent=2)
 
 
 def _parse_args() -> argparse.Namespace:
@@ -100,13 +81,30 @@ def _parse_args() -> argparse.Namespace:
         help="Search box size, Angstroms.",
     )
     p.add_argument(
+        "--conformational-state-id",
+        type=str,
+        required=True,
+        help=(
+            "Identifier of the receptor conformational state (PCE member "
+            "id) being docked against. Recorded on every output row."
+        ),
+    )
+    p.add_argument(
+        "--site-id",
+        type=str,
+        required=True,
+        help=(
+            "Identifier of the binding site being targeted by "
+            "--center/--size. Recorded on every output row."
+        ),
+    )
+    p.add_argument(
         "--batch-size",
         type=int,
         default=None,
         help=(
-            "Max ligands per underlying provider invocation. CPU provider "
-            "ignores this (no native batch primitive; see VinaCPUProvider "
-            "docstring). GPU provider chunks --ligands into groups of at "
+            "Max ligands per underlying provider invocation. "
+            "GPU provider chunks --ligands into groups of at "
             "most this size per Vina-GPU+ invocation. Defaults to the "
             "selected provider's own default."
         ),
@@ -121,10 +119,14 @@ def _parse_args() -> argparse.Namespace:
         ),
     )
     p.add_argument(
-        "--out-json",
+        "--out-parquet",
         type=Path,
         default=None,
-        help="If set, write docking results as JSON.",
+        help=(
+            "If set, write docking results as a row-per-pose Parquet "
+            "file with catalog_id, conformational_state_id, and "
+            "site_id columns."
+        ),
     )
 
     cpu_group = p.add_argument_group("CPU provider options")
@@ -195,7 +197,11 @@ def docking_run():
         print(f"error: {exc}", file=sys.stderr)
         return 1
 
-    output = _results_to_json(results_by_ligand)
-    print(output)
-    if args.out_json:
-        args.out_json.write_text(output)
+    if args.out_parquet:
+        write_docking_results_parquet(
+            results_by_ligand,
+            args.out_parquet,
+            conformational_state_id=args.conformational_state_id,
+            site_id=args.site_id,
+        )
+        logger.info("Wrote docking results to %s", args.out_parquet)

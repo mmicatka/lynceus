@@ -674,12 +674,14 @@ name = "docking-run"
 version = "0.1.0"
 source = { editable = "modules/local/docking_run" }
 dependencies = [
+    { name = "pyarrow" },
     { name = "tqdm" },
     { name = "vina" },
 ]
 
 [package.metadata]
 requires-dist = [
+    { name = "pyarrow", specifier = ">=24.0.0" },
     { name = "tqdm", specifier = ">=4.70.0" },
     { name = "vina", specifier = ">=1.2.7" },
 ]
