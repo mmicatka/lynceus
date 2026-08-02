@@ -4,6 +4,7 @@ import os
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from contextlib import contextmanager
 from pathlib import Path
+from typing import Iterator
 
 from tqdm import tqdm
 
@@ -80,14 +81,19 @@ class VinaCPUProvider(DockingProvider):
         ligand_pdbqts: list[Path],
         box: SearchBox,
         batch_size: int | None = None,
-    ) -> dict[str, list[DockingResult]]:
+    ) -> Iterator[tuple[str, list[DockingResult]]]:
         del batch_size
 
         self.out_dir.mkdir(parents=True, exist_ok=True)
 
         if self.n_workers <= 1:
-            results = [
-                _dock_one(
+            for lig in tqdm(
+                ligand_pdbqts,
+                desc="Docking ligands",
+                unit="ligand",
+                dynamic_ncols=True,
+            ):
+                result = _dock_one(
                     receptor_pdbqt=receptor_pdbqt,
                     ligand_pdbqt=lig,
                     box=box,
@@ -95,13 +101,12 @@ class VinaCPUProvider(DockingProvider):
                     n_poses=self.n_poses,
                     out_dir=self.out_dir,
                 )
-                for lig in tqdm(
-                    ligand_pdbqts,
-                    desc="Docking ligands",
-                    unit="ligand",
-                    dynamic_ncols=True,
-                )
-            ]
+                # Same silent-drop-on-empty-result policy as the
+                # previous dict-returning implementation: a ligand that
+                # produced zero poses is omitted rather than yielded
+                # with an empty list.
+                if result:
+                    yield result[0].ligand_id, result
         else:
             with ProcessPoolExecutor(max_workers=self.n_workers) as pool:
                 future_to_lig = {
@@ -117,7 +122,6 @@ class VinaCPUProvider(DockingProvider):
                     for lig in ligand_pdbqts
                 }
 
-                results = []
                 with tqdm(
                     total=len(future_to_lig),
                     desc="Docking ligands (parallel)",
@@ -125,10 +129,10 @@ class VinaCPUProvider(DockingProvider):
                     dynamic_ncols=True,
                 ) as pbar:
                     for future in as_completed(future_to_lig):
-                        results.append(future.result())
+                        result = future.result()
                         pbar.update(1)
-
-        return {r[0].ligand_id: r for r in results if r}
+                        if result:
+                            yield result[0].ligand_id, result
 
 
 def _dock_one(

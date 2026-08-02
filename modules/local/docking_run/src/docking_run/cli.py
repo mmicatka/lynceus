@@ -1,11 +1,11 @@
-# modules/local/docking_run/src/docking_run/docking_run.py
+# modules/local/docking_run/src/docking_run/cli.py
 
 import argparse
 import logging
 import sys
 from pathlib import Path
 
-from .output import write_docking_results_parquet
+from .output import DEFAULT_STREAM_BATCH_ROWS, write_docking_results_parquet
 from .providers import ProviderNotAvailableError, available_providers, get_provider
 from .types import DockingError, SearchBox
 
@@ -128,6 +128,16 @@ def _parse_args() -> argparse.Namespace:
             "site_id columns."
         ),
     )
+    p.add_argument(
+        "--parquet-batch-rows",
+        type=int,
+        default=DEFAULT_STREAM_BATCH_ROWS,
+        help=(
+            "Max pose-rows buffered per RecordBatch before flushing to "
+            "the Parquet writer. Lower to bound peak memory in "
+            "memory-constrained containers."
+        ),
+    )
 
     cpu_group = p.add_argument_group("CPU provider options")
     cpu_group.add_argument(
@@ -186,22 +196,23 @@ def docking_run():
 
     box = SearchBox(center=tuple(args.center), size=tuple(args.size))
 
-    try:
-        results_by_ligand = provider.dock_batch(
-            receptor_pdbqt=args.receptor,
-            ligand_pdbqts=list(args.ligands),
-            box=box,
-            batch_size=args.batch_size,
-        )
-    except DockingError as exc:
-        print(f"error: {exc}", file=sys.stderr)
-        return 1
+    results_iter = provider.dock_batch(
+        receptor_pdbqt=args.receptor,
+        ligand_pdbqts=list(args.ligands),
+        box=box,
+        batch_size=args.batch_size,
+    )
 
     if args.out_parquet:
-        write_docking_results_parquet(
-            results_by_ligand,
-            args.out_parquet,
-            conformational_state_id=args.conformational_state_id,
-            site_id=args.site_id,
-        )
+        try:
+            write_docking_results_parquet(
+                results_iter,
+                args.out_parquet,
+                conformational_state_id=args.conformational_state_id,
+                site_id=args.site_id,
+                batch_rows=args.parquet_batch_rows,
+            )
+        except DockingError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 1
         logger.info("Wrote docking results to %s", args.out_parquet)
