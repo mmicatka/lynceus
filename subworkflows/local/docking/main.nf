@@ -19,7 +19,15 @@ workflow DOCKING {
     DOCKING_PREP_CANDIDATE_CONVERT_PDBQT(DOCKING_PREP_CANDIDATE_CONFORMER_GENERATE.out.conformers)
 
     // Run docking
-    states_ch = DOCKING_PREP_TARGET.out.prepped
+    states_ch = DOCKING_PREP_TARGET.out.prepped.flatMap { _ensemble_id, prepped_dir ->
+        prepped_dir
+            .listFiles()
+            .findAll { file -> file.name.endsWith('.pdbqt') }
+            .collect { pdbqt ->
+                def conformational_state_id = pdbqt.name.replaceAll(/\.pdbqt$/, '')
+                tuple(conformational_state_id, pdbqt)
+            }
+    }
     sites_ch = DETECT_PUTATIVE_BINDING_SITES.out.sites
         .splitJson()
         .map { site ->
@@ -34,7 +42,5 @@ workflow DOCKING {
     DOCKING_RUN_CPU(docking_jobs_ch, DOCKING_PREP_CANDIDATE_CONVERT_PDBQT.out.converted)
 
     emit:
-    target = DOCKING_PREP_TARGET.out.prepped
-    sites = DETECT_PUTATIVE_BINDING_SITES.out.sites
     results = DOCKING_RUN_CPU.out.results
 }
