@@ -14,4 +14,5 @@ workflow SURROGATE_MODEL_TRAIN {
 
     emit:
     sampled_candidates = SAMPLE_CANDIDATES.out.candidates
+    results = DOCKING.out.results
 }

@@ -9,7 +9,7 @@ process DOCKING_PREP_TARGET {
     tuple val(ensemble_id), path(ensemble_dir)
 
     output:
-    path "${ensemble_id}_prepped", emit: prepped
+    tuple val(ensemble_id), path("${ensemble_id}_prepped"), emit: prepped
     tuple val("${task.process}"), val('docking_prep'), eval("python3 -c 'import docking_prep; print(docking_prep.__version__)'"), emit: versions_docking_prep, topic: versions
 
     script:
@@ -28,7 +28,7 @@ process DOCKING_PREP_CANDIDATE_CONFORMER_GENERATE {
     path input_parquet
 
     output:
-    path "${input_parquet.simpleName}_conformers/output.parquet", emit: conformers
+    path "${input_parquet.simpleName}_conformers", emit: conformers
 
     script:
     """
@@ -43,15 +43,15 @@ process DOCKING_PREP_CANDIDATE_CONVERT_PDBQT {
     container 'lynceus/docking-prep:0.1.0'
 
     input:
-    path input_parquet
+    path input_dir
 
     output:
-    path "${input_parquet.simpleName}_converted/output.parquet", emit: candidates
+    path "${input_dir.simpleName}_converted", emit: converted
 
     script:
     """
     convert-pdbqt \\
-    --input ${input_parquet} \\
-    --output ${input_parquet.baseName}_converted
+    --input ${input_dir}/output.parquet \\
+    --output ${input_dir.simpleName}_converted
     """
 }

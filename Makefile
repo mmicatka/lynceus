@@ -4,7 +4,7 @@
 # so environment-specific parameters never need to be typed by hand or
 # forgotten on the command line.
 
-.PHONY: build build-lynceus-chem build-detect-putative-binding-sites build-protein-conformational-ensemble build-docking-prep build-sample-candidates build-physiochemical-filter run-dev clean reset
+.PHONY: build build-lynceus-chem build-detect-putative-binding-sites build-protein-conformational-ensemble build-docking-prep build-sample-candidates build-physiochemical-filter build-docking-run-cpu build-docking-run-gpu run-dev clean reset
 
 build:
 	$(MAKE) build-lynceus-chem
@@ -13,6 +13,8 @@ build:
 	$(MAKE) build-docking-prep
 	$(MAKE) build-sample-candidates
 	$(MAKE) build-physiochemical-filter
+	$(MAKE) build-docking-run
+	$(MAKE) build-docking-run-gpu
 
 build-lynceus-chem:
 	docker build -t lynceus/lynceus-chem:0.1.0 libs/lynceus-chem
@@ -31,6 +33,12 @@ build-sample-candidates:
 
 build-physiochemical-filter:
 	docker build -t lynceus/physiochemical-filter:0.1.0 modules/local/physiochemical_filter
+
+build-docking-run-cpu:
+	docker build --target cpu -t lynceus/docking-run:cpu-0.1.0 modules/local/docking_run
+
+build-docking-run-gpu:
+	docker build --target gpu -t lynceus/docking-run:gpu-0.1.0 modules/local/docking_run
 
 # Dev environment: loads conf/examples/dev.yaml
 run-dev:
