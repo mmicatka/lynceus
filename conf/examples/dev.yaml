@@ -14,10 +14,10 @@ filter:
 
 target:
   ensemble:
-    ensemble_id: "1STP_static_v1"
+    ensemble_id: "JAK2_static"
     type: "static"
     components:
-      - pdb_id: "1STP"
+      - pdb_id: "3FUP"
         weight: 1.0
 
     capabilities_required:
