@@ -16,6 +16,7 @@ dependencies = [
     "sample-candidates",
     "docking-prep",
     "docking-run",
+    "surrogate-model",
 ]
 
 [tool.uv.workspace]
@@ -41,6 +42,7 @@ protein-conformational-ensemble = { workspace = true }
 lynceus-chem = { workspace = true }
 docking-prep = { workspace = true }
 docking-run = { workspace = true }
+surrogate-model = { workspace = true }
 
 [dependency-groups]
 dev = [

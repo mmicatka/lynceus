@@ -10,7 +10,7 @@ workflow SURROGATE_MODEL_TRAIN {
     training_config // training configuration
 
     main:
-    SAMPLE_CANDIDATES(candidates, training_config.num_samples)
+    SAMPLE_CANDIDATES(candidates, training_config.num_samples, training_config.seed)
     DOCKING(protein_conformational_ensemble, SAMPLE_CANDIDATES.out.candidates)
 
     emit:
