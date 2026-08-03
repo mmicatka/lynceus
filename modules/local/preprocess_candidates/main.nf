@@ -12,7 +12,6 @@ process PREPROCESS_CANDIDATES {
 
     output:
     path "*.parquet", emit: parquet
-    path "versions.yml", emit: versions
 
     when:
     task.ext.when == null || task.ext.when
@@ -24,23 +23,5 @@ process PREPROCESS_CANDIDATES {
     lynceus-chem-preprocess \\
         --input ${smi_gz} \\
         --output ${prefix}.parquet
-
-    cat <<-END_VERSIONS > versions.yml
-    "${task.process}":
-        rdkit: \$(python3 -c "import rdkit; print(rdkit.__version__)")
-        polars: \$(python3 -c "import polars; print(polars.__version__)")
-    END_VERSIONS
-    """
-
-    stub:
-    def prefix = smi_gz.simpleName
-    """
-    touch ${prefix}.parquet
-
-    cat <<-END_VERSIONS > versions.yml
-    "${task.process}":
-        rdkit: stub
-        polars: stub
-    END_VERSIONS
     """
 }

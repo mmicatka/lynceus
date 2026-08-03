@@ -13,7 +13,7 @@ workflow LYNCEUS {
 
   CANDIDATE(ch_uri_list, ch_local_path, filter_config, params.filter.batch_size)
   TARGET(params.target.ensemble)
-  SURROGATE_MODEL_TRAIN(TARGET.out.protein_conformational_ensemble, CANDIDATE.out.filtered_parquets)
+  SURROGATE_MODEL_TRAIN(TARGET.out.protein_conformational_ensemble, CANDIDATE.out.filtered_parquets, params.surrogate_model.training)
 
   _ch_collated_versions = channel.topic('versions')
     .distinct()

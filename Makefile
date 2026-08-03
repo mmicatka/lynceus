@@ -13,7 +13,7 @@ build:
 	$(MAKE) build-docking-prep
 	$(MAKE) build-sample-candidates
 	$(MAKE) build-physiochemical-filter
-	$(MAKE) build-docking-run
+	$(MAKE) build-docking-run-cpu
 	$(MAKE) build-docking-run-gpu
 
 build-lynceus-chem:
