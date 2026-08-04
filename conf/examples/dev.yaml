@@ -17,11 +17,16 @@ surrogate_model:
 
 target:
   ensemble:
-    ensemble_id: "1STP_static_v1"
+    ensemble_id: "T4_lysozyme_L99_static"
     type: "static"
     components:
-      - pdb_id: "1STP"
+      - pdb_id: "1L83"
         weight: 1.0
+    # ensemble_id: "1STP_static_v1"
+    # type: "static"
+    # components:
+    #   - pdb_id: "1STP"
+    #     weight: 1.0
 
     capabilities_required:
       - "standalone_cif"
