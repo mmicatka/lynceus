@@ -20,6 +20,8 @@ from .provider import DockingProvider, ProviderNotAvailableError
 _DEFAULT_N_POSES = 9
 _DEFAULT_EXHAUSTIVENESS = 8
 
+_LOG_UPDATES = 100
+
 
 @contextmanager
 def suppress_stderr():
@@ -92,6 +94,8 @@ class VinaCPUProvider(DockingProvider):
                 desc="Docking ligands",
                 unit="ligand",
                 dynamic_ncols=True,
+                miniters=_LOG_UPDATES,
+                mininterval=0,
             ):
                 result = _dock_one(
                     receptor_pdbqt=receptor_pdbqt,
@@ -101,10 +105,6 @@ class VinaCPUProvider(DockingProvider):
                     n_poses=self.n_poses,
                     out_dir=self.out_dir,
                 )
-                # Same silent-drop-on-empty-result policy as the
-                # previous dict-returning implementation: a ligand that
-                # produced zero poses is omitted rather than yielded
-                # with an empty list.
                 if result:
                     yield result[0].ligand_id, result
         else:
@@ -127,6 +127,8 @@ class VinaCPUProvider(DockingProvider):
                     desc="Docking ligands (parallel)",
                     unit="ligand",
                     dynamic_ncols=True,
+                    miniters=_LOG_UPDATES,
+                    mininterval=0,
                 ) as pbar:
                     for future in as_completed(future_to_lig):
                         result = future.result()

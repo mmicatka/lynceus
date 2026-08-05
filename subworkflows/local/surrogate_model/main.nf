@@ -7,9 +7,10 @@ workflow SURROGATE_MODEL_TRAIN {
     take:
     protein_conformational_ensemble // protein conformational ensemble
     candidates // path: filtered + repartitioned candidate parquets
+    training_config // training configuration
 
     main:
-    SAMPLE_CANDIDATES(candidates)
+    SAMPLE_CANDIDATES(candidates, training_config.num_samples, training_config.seed)
     DOCKING(protein_conformational_ensemble, SAMPLE_CANDIDATES.out.candidates)
 
     emit:

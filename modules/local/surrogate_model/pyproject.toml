@@ -1,0 +1,21 @@
+[project]
+name = "surrogate-model"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Mike Micatka", email = "mike.micatka@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "click>=8.4.2",
+    "lightgbm>=4.7.0",
+    "numpy>=2.5.1",
+    "optuna>=4.9.0",
+    "polars>=1.42.1",
+    "scikit-learn>=1.9.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.12.1,<0.13.0"]
+build-backend = "uv_build"

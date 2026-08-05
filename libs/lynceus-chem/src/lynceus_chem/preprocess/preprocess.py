@@ -38,20 +38,23 @@ _CHUNK_SIZE = 500
 
 _pains_catalog: FilterCatalog | None = None
 _mfp_gen: Any = None
+_morgan_n_bits: int = 0
 
-arrow_schema = pa.schema(
-    [
-        ("catalog_id", pa.string()),
-        ("smiles", pa.string()),
-        ("parse_ok", pa.bool_()),
-        ("heavy_atom_count", pa.int16()),
-        ("molecular_weight", pa.float32()),
-        ("morgan_fp", pa.binary()),
-        ("cns_mpo", pa.float32()),
-        ("cns_mpo_components", pa.string()),
-        ("pains_flags", pa.list_(pa.string())),
-    ]
-)
+
+def _build_arrow_schema(morgan_n_bits: int) -> pa.Schema:
+    return pa.schema(
+        [
+            ("catalog_id", pa.string()),
+            ("smiles", pa.string()),
+            ("parse_ok", pa.bool_()),
+            ("heavy_atom_count", pa.int16()),
+            ("molecular_weight", pa.float32()),
+            ("morgan_fp", pa.list_(pa.uint8(), morgan_n_bits)),
+            ("cns_mpo", pa.float32()),
+            ("cns_mpo_components", pa.string()),
+            ("pains_flags", pa.list_(pa.string())),
+        ]
+    )
 
 
 def _build_pains_catalog():
@@ -79,15 +82,11 @@ def _build_fingerprint_gen(
     )
 
 
-def _preprocess_record(
-    record: tuple[str, str],
-) -> dict:
-
+def _preprocess_record(record: tuple[str, str]) -> dict:
     if not _pains_catalog:
         return {}
 
     smiles, catalog_id = record
-
     mol = Chem.MolFromSmiles(smiles)
 
     if mol is None:
@@ -97,13 +96,13 @@ def _preprocess_record(
             "parse_ok": False,
             "heavy_atom_count": None,
             "molecular_weight": None,
-            "morgan_fp": None,
+            "morgan_fp": np.zeros(_morgan_n_bits, dtype=np.uint8),
             "cns_mpo": None,
             "cns_mpo_components": {},
             "pains_flags": [],
         }
 
-    morgan_fp = bytes(np.packbits(np.array(_mfp_gen.GetFingerprint(mol))))
+    morgan_fp = _mfp_gen.GetFingerprintAsNumPy(mol)
     pains_flags = sorted(
         {match.GetDescription().split()[0] for match in _pains_catalog.GetMatches(mol)}
     )
@@ -161,7 +160,11 @@ def _batch(iterator: Iterator, size: int) -> Iterator[list]:
         yield batch
 
 
-def _results_to_frame(results: list[dict]) -> pl.DataFrame:
+def _results_to_frame(results: list[dict], morgan_n_bits: int) -> pl.DataFrame:
+    morgan_stack = np.stack(
+        [r["morgan_fp"] for r in results]
+    )  # (n, morgan_n_bits) uint8
+
     return pl.DataFrame(
         {
             "catalog_id": [r["catalog_id"] for r in results],
@@ -169,7 +172,7 @@ def _results_to_frame(results: list[dict]) -> pl.DataFrame:
             "parse_ok": [r["parse_ok"] for r in results],
             "heavy_atom_count": [r["heavy_atom_count"] for r in results],
             "molecular_weight": [r["molecular_weight"] for r in results],
-            "morgan_fp": [r["morgan_fp"] for r in results],
+            "morgan_fp": morgan_stack,
             "cns_mpo": [r["cns_mpo"] for r in results],
             "cns_mpo_components": [
                 json.dumps(r["cns_mpo_components"]) for r in results
@@ -182,7 +185,7 @@ def _results_to_frame(results: list[dict]) -> pl.DataFrame:
             "parse_ok": pl.Boolean,
             "heavy_atom_count": pl.Int16,
             "molecular_weight": pl.Float32,
-            "morgan_fp": pl.Binary,
+            "morgan_fp": pl.Array(pl.UInt8, morgan_n_bits),
             "cns_mpo": pl.Float32,
             "cns_mpo_components": pl.String,
             "pains_flags": pl.List(pl.String),
@@ -192,6 +195,8 @@ def _results_to_frame(results: list[dict]) -> pl.DataFrame:
 
 def _init_worker(morgan_radius: int, morgan_n_bits: int) -> None:
     """Initializes global variables inside each pool worker process."""
+    global _morgan_n_bits
+    _morgan_n_bits = morgan_n_bits
     _build_pains_catalog()
     _build_fingerprint_gen(morgan_radius, morgan_n_bits)
 
@@ -206,6 +211,8 @@ def _preprocess(
     logger.info("starting preprocessing with %d workers", num_workers)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    schema = _build_arrow_schema(morgan_n_bits)
 
     n_written = 0
     n_failed = 0
@@ -228,13 +235,11 @@ def _preprocess(
                 _CHUNK_SIZE,
             ):
                 n_failed += sum(1 for r in chunk_results if not r["parse_ok"])
-                frame = _results_to_frame(chunk_results)
+                frame = _results_to_frame(chunk_results, morgan_n_bits)
                 arrow_table = frame.to_arrow()
                 if writer is None:
-                    writer = pq.ParquetWriter(
-                        output_path, arrow_table.schema, compression="zstd"
-                    )
-                writer.write_table(arrow_table)
+                    writer = pq.ParquetWriter(output_path, schema, compression="zstd")
+                writer.write_table(arrow_table.cast(schema))
                 n_written += len(chunk_results)
 
                 if n_written >= next_log_threshold:

@@ -7,6 +7,8 @@ process SAMPLE_CANDIDATES {
 
     input:
     path candidates_parquets, stageAs: 'candidates_*.parquet'
+    val num_samples
+    val seed
 
     output:
     path "candidates.parquet", emit: candidates
@@ -18,8 +20,8 @@ process SAMPLE_CANDIDATES {
     """
     sample-candidates \\
         --input-glob "candidates_*.parquet" \\
-        --reservoir-size 500 \\
-        --seed 1000 \\
+        --reservoir-size ${num_samples} \\
+        --seed ${seed} \\
         --output candidates.parquet
     """
 
