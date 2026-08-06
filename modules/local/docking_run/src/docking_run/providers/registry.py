@@ -3,22 +3,16 @@
 from typing import Any
 
 from .provider import DockingProvider
+from .unidock_gpu import UnidockGPUProvider
 from .vina_cpu import VinaCPUProvider
-from .vina_gpu import VinaGPUProvider
 
 _PROVIDERS: dict[str, type[DockingProvider]] = {
     "cpu": VinaCPUProvider,
-    "gpu": VinaGPUProvider,
+    "gpu": UnidockGPUProvider,
 }
 
 
 def get_provider(name: str, **kwargs: Any) -> DockingProvider:
-    """Construct a DockingProvider by name ('cpu' or 'gpu').
-
-    kwargs are forwarded to the provider's constructor; unknown kwargs
-    will raise TypeError from the constructor itself, which is preferable
-    to silently swallowing typos in provider-specific options.
-    """
     try:
         provider_cls = _PROVIDERS[name]
     except KeyError:

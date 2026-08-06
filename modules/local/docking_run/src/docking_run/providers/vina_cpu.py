@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from contextlib import contextmanager
 from pathlib import Path
@@ -13,7 +14,6 @@ from docking_run.types import (
     DockingResult,
     SearchBox,
 )
-from docking_run.utils import parse_vina_output_pdbqt
 
 from .provider import DockingProvider, ProviderNotAvailableError
 
@@ -137,6 +137,45 @@ class VinaCPUProvider(DockingProvider):
                             yield result[0].ligand_id, result
 
 
+_RESULT_LINE = re.compile(
+    r"^REMARK VINA RESULT:\s*"
+    r"(?P<affinity>-?\d+\.?\d*)\s+"
+    r"(?P<rmsd_lb>-?\d+\.?\d*)\s+"
+    r"(?P<rmsd_ub>-?\d+\.?\d*)",
+)
+
+
+def _parse_vina_output_pdbqt(output_pdbqt: Path, ligand_id: str) -> list[DockingResult]:
+    if not output_pdbqt.is_file():
+        raise DockingError(f"Expected output PDBQT not found: {output_pdbqt}")
+
+    text = output_pdbqt.read_text()
+    results: list[DockingResult] = []
+    mode = 0
+    for line in text.splitlines():
+        if line.startswith("MODEL"):
+            mode += 1
+        match = _RESULT_LINE.match(line)
+        if match:
+            results.append(
+                DockingResult(
+                    ligand_id=ligand_id,
+                    pose_pdbqt=output_pdbqt,
+                    affinity_kcal_mol=float(match["affinity"]),
+                    mode=mode if mode > 0 else 1,
+                    rmsd_lb=float(match["rmsd_lb"]),
+                    rmsd_ub=float(match["rmsd_ub"]),
+                )
+            )
+
+    if not results:
+        raise DockingError(
+            f"No REMARK VINA RESULT lines found in {output_pdbqt}; "
+            "docking may have failed silently."
+        )
+    return results
+
+
 def _dock_one(
     *,
     receptor_pdbqt: Path,
@@ -165,4 +204,4 @@ def _dock_one(
         except Exception as exc:
             raise DockingError(f"Vina docking failed for {ligand_id}: {exc}") from exc
 
-    return parse_vina_output_pdbqt(output_pdbqt, ligand_id=ligand_id)
+    return _parse_vina_output_pdbqt(output_pdbqt, ligand_id=ligand_id)
