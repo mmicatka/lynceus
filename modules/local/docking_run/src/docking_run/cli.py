@@ -17,6 +17,13 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+PDBQT_GLOB = "*.pdbqt"
+
+
+def get_ligands_from_path(ligands_path: Path) -> list[Path]:
+    return sorted(p for p in ligands_path.rglob(PDBQT_GLOB) if p.is_file())
+
+
 def _build_provider_kwargs(args: argparse.Namespace) -> dict:
     common = {"out_dir": args.out_dir} if args.out_dir else {}
     if args.provider == "cpu":
@@ -57,9 +64,8 @@ def _parse_args() -> argparse.Namespace:
         help="Receptor structure in PDBQT format.",
     )
     p.add_argument(
-        "--ligands",
+        "--ligands-path",
         type=Path,
-        nargs="+",
         required=True,
         help="One or more ligand PDBQT files to dock against the receptor.",
     )
@@ -199,9 +205,11 @@ def docking_run():
 
     box = SearchBox(center=tuple(args.center), size=tuple(args.size))
 
+    ligand_paths = get_ligands_from_path(args.ligands_path)
+
     results_iter = provider.dock_batch(
-        receptor_pdbqt=args.receptor,
-        ligand_pdbqts=list(args.ligands),
+        receptor_path=args.receptor,
+        ligand_paths=ligand_paths,
         box=box,
         batch_size=args.batch_size,
     )

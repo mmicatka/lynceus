@@ -18,7 +18,7 @@ process DOCKING_RUN_CPU {
     """
     docking-run --provider cpu \\
         --receptor ${receptor} \\
-        --ligands ${candidates}/partitions/**/*.pdbqt \\
+        --ligands-path ${candidates} \\
         --center ${cx} ${cy} ${cz} \\
         --size ${sx} ${sy} ${sz} \\
         --n-workers 2 \\
@@ -47,7 +47,7 @@ process DOCKING_RUN_GPU {
     """
     docking-run --provider gpu \\
         --receptor ${receptor} \\
-        --ligands ${candidates}/partitions/**/*.pdbqt \\
+        --ligands-path ${candidates} \\
         --center ${cx} ${cy} ${cz} \\
         --size ${sx} ${sy} ${sz} \\
         --out-parquet output.parquet \\

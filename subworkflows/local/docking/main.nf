@@ -39,6 +39,7 @@ workflow DOCKING {
             )
         }
     docking_jobs_ch = states_ch.combine(sites_ch, by: 0)
+
     // DOCKING_RUN_CPU(docking_jobs_ch, DOCKING_PREP_CANDIDATE_CONVERT_PDBQT.out.converted)
     DOCKING_RUN_GPU(docking_jobs_ch, DOCKING_PREP_CANDIDATE_CONVERT_PDBQT.out.converted)
 

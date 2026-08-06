@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -12,22 +11,16 @@ from typing import Iterator
 from docking_run.types import DockingError, DockingResult, SearchBox
 
 from .provider import DockingProvider, ProviderNotAvailableError
+from .utils import parse_vina_output_pdbqt
 
 logger = logging.getLogger(__name__)
 
 _DEFAULT_BATCH_SIZE = 1000
-"""Per Uni-Dock's README FAQ ("Uni-Dock computes slowly for few (<10)
-ligands"): throughput is best in the "order of 1000" ligands per batch,
-since fixed per-invocation overhead dominates below that and GPU memory
-constraints cap how far above it's useful. This is a starting point, not
-a tuned value — profile against actual GPU memory / ligand size before
-trusting it at scale.
-"""
-
 _DEFAULT_SEARCH_MODE = "balance"
 _DEFAULT_NUM_MODES = 9
 
 _UNIDOCK_BINARY = "unidock"
+_SCORING_MODE_VINA = "vina"
 
 
 class UnidockGPUProvider(DockingProvider):
@@ -53,32 +46,38 @@ class UnidockGPUProvider(DockingProvider):
 
     def dock(
         self,
-        receptor_pdbqt: Path,
-        ligand_pdbqt: Path,
+        receptor_path: Path,
+        ligand_path: Path,
         box: SearchBox,
+        scoring_mode: str = _SCORING_MODE_VINA,
     ) -> list[DockingResult]:
-        results_by_id = dict(self._run_gpu_batch(receptor_pdbqt, [ligand_pdbqt], box))
-        return results_by_id.get(ligand_pdbqt.stem, [])
+        results_by_id = dict(
+            self._run_gpu_batch(receptor_path, [ligand_path], box, scoring_mode)
+        )
+        return results_by_id.get(ligand_path.stem, [])
 
     def dock_batch(
         self,
-        receptor_pdbqt: Path,
-        ligand_pdbqts: list[Path],
+        receptor_path: Path,
+        ligand_paths: list[Path],
         box: SearchBox,
         batch_size: int | None = None,
+        scoring_mode: str = _SCORING_MODE_VINA,
     ) -> Iterator[tuple[str, list[DockingResult]]]:
         chunk_size = batch_size or _DEFAULT_BATCH_SIZE
-        n_chunks = -(-len(ligand_pdbqts) // chunk_size)  # ceil div
+        n_chunks = -(-len(ligand_paths) // chunk_size)  # ceil div
 
         n_ligands_seen = 0
         n_ligands_failed = 0
 
-        for chunk_idx, start in enumerate(range(0, len(ligand_pdbqts), chunk_size), 1):
-            chunk = ligand_pdbqts[start : start + chunk_size]
+        for chunk_idx, start in enumerate(range(0, len(ligand_paths), chunk_size), 1):
+            chunk = ligand_paths[start : start + chunk_size]
             n_ligands_seen += len(chunk)
             n_yielded_this_chunk = 0
 
-            for ligand_id, results in self._run_gpu_batch(receptor_pdbqt, chunk, box):
+            for ligand_id, results in self._run_gpu_batch(
+                receptor_path, chunk, box, scoring_mode
+            ):
                 n_yielded_this_chunk += 1
                 yield ligand_id, results
 
@@ -105,23 +104,27 @@ class UnidockGPUProvider(DockingProvider):
 
     def _run_gpu_batch(
         self,
-        receptor_pdbqt: Path,
-        ligand_pdbqts: list[Path],
+        receptor_path: Path,
+        ligand_paths: list[Path],
         box: SearchBox,
+        scoring_mode: str = _SCORING_MODE_VINA,
     ) -> Iterator[tuple[str, list[DockingResult]]]:
-        chunk_out_dir = self._chunk_out_dir(ligand_pdbqts)
+        chunk_out_dir = self._chunk_out_dir(ligand_paths)
         chunk_out_dir.mkdir(parents=True, exist_ok=True)
+
+        ligand_index_path = chunk_out_dir / "ligand_index.txt"
+        ligand_index_path.write_text("\n".join(str(lig) for lig in ligand_paths))
 
         cmd = [
             _UNIDOCK_BINARY,
             "--receptor",
-            str(receptor_pdbqt),
-            "--gpu_batch",
-            *[str(lig) for lig in ligand_pdbqts],
+            str(receptor_path),
+            "--ligand_index",
+            str(ligand_index_path),
             "--search_mode",
             self.search_mode,
             "--scoring",
-            "vina",
+            scoring_mode,
             "--center_x",
             str(box.center[0]),
             "--center_y",
@@ -142,26 +145,16 @@ class UnidockGPUProvider(DockingProvider):
         if self.max_gpu_memory:
             cmd += ["--max_gpu_memory", str(self.max_gpu_memory)]
 
-        # A failed *invocation* (nonzero exit) still raises hard — that's
-        # a chunk-wide failure (bad receptor, CUDA error, etc.), not a
-        # per-ligand docking failure, and there's no partial output to
-        # salvage. Per-ligand failures (parsed below) are a different,
-        # expected-at-scale failure mode and are logged + skipped instead.
         proc = subprocess.run(cmd, capture_output=True, text=True)
         if proc.returncode != 0:
             raise DockingError(
-                f"unidock --gpu_batch failed for chunk of {len(ligand_pdbqts)} "
-                f"ligands (receptor={receptor_pdbqt.name}, "
+                f"unidock --gpu_batch failed for chunk of {len(ligand_paths)} "
+                f"ligands (receptor={receptor_path.name}, "
                 f"returncode={proc.returncode}): {proc.stderr.strip()}"
             )
 
-        for lig in ligand_pdbqts:
+        for lig in ligand_paths:
             ligand_id = lig.stem
-
-            # Exact match on the confirmed naming convention
-            # ("<ligand_id>_out.pdbqt"), not a wildcard glob — narrowed
-            # from the earlier unverified "*out*" pattern now that a
-            # real --gpu_batch run has confirmed the exact convention.
             candidates = list(chunk_out_dir.glob(f"{ligand_id}_out.pdbqt"))
 
             if not candidates:
@@ -175,12 +168,6 @@ class UnidockGPUProvider(DockingProvider):
                 continue
 
             if len(candidates) > 1:
-                # Ambiguity is a different, more suspicious failure mode
-                # than "no output" -- logged and skipped rather than
-                # silently guessing candidates[0], but not raised, per
-                # the log-and-skip policy requested here. Worth revisiting
-                # if this actually fires: it would mean the naming
-                # convention assumption above is wrong.
                 logger.error(
                     "Ambiguous output for ligand '%s' in %s: found %d "
                     "matching files (%s) -- skipping rather than "
@@ -193,9 +180,7 @@ class UnidockGPUProvider(DockingProvider):
                 continue
 
             try:
-                results = _parse_unidock_output_pdbqt(
-                    candidates[0], ligand_id=ligand_id
-                )
+                results = parse_vina_output_pdbqt(candidates[0], ligand_id=ligand_id)
             except DockingError as exc:
                 logger.warning(
                     "Failed to parse unidock output for ligand '%s' "
@@ -209,9 +194,6 @@ class UnidockGPUProvider(DockingProvider):
             if results:
                 yield ligand_id, results
             else:
-                # Shouldn't happen given _parse_unidock_output_pdbqt
-                # raises on empty results, but kept as a belt-and-braces
-                # explicit skip rather than yielding an empty list.
                 logger.warning(
                     "unidock output for ligand '%s' (%s) parsed to zero "
                     "poses -- skipping.",
@@ -226,44 +208,3 @@ class UnidockGPUProvider(DockingProvider):
         """
         first_id = ligand_pdbqts[0].stem if ligand_pdbqts else "empty"
         return self.out_dir / f"chunk_{first_id}"
-
-
-_RESULT_LINE = re.compile(
-    r"^REMARK VINA RESULT:\s*"
-    r"(?P<affinity>-?\d+\.?\d*)\s+"
-    r"(?P<rmsd_lb>-?\d+\.?\d*)\s+"
-    r"(?P<rmsd_ub>-?\d+\.?\d*)",
-)
-
-
-def _parse_unidock_output_pdbqt(
-    output_pdbqt: Path, ligand_id: str
-) -> list[DockingResult]:
-    if not output_pdbqt.is_file():
-        raise DockingError(f"Expected output PDBQT not found: {output_pdbqt}")
-
-    text = output_pdbqt.read_text()
-    results: list[DockingResult] = []
-    mode = 0
-    for line in text.splitlines():
-        if line.startswith("MODEL"):
-            mode += 1
-        match = _RESULT_LINE.match(line)
-        if match:
-            results.append(
-                DockingResult(
-                    ligand_id=ligand_id,
-                    pose_pdbqt=output_pdbqt,
-                    affinity_kcal_mol=float(match["affinity"]),
-                    mode=mode if mode > 0 else 1,
-                    rmsd_lb=float(match["rmsd_lb"]),
-                    rmsd_ub=float(match["rmsd_ub"]),
-                )
-            )
-
-    if not results:
-        raise DockingError(
-            f"No REMARK VINA RESULT lines found in {output_pdbqt}; "
-            "docking may have failed silently."
-        )
-    return results
