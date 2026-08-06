@@ -17,6 +17,13 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+PDBQT_GLOB = "*.pdbqt"
+
+
+def get_ligands_from_path(ligands_path: Path) -> list[Path]:
+    return sorted(p for p in ligands_path.rglob(PDBQT_GLOB) if p.is_file())
+
+
 def _build_provider_kwargs(args: argparse.Namespace) -> dict:
     common = {"out_dir": args.out_dir} if args.out_dir else {}
     if args.provider == "cpu":
@@ -29,11 +36,10 @@ def _build_provider_kwargs(args: argparse.Namespace) -> dict:
     if args.provider == "gpu":
         return {
             **common,
-            "binary_path": args.vina_gpu_binary,
-            "search_depth": args.search_depth,
-            "thread": args.thread,
+            "search_mode": args.search_mode,
+            "num_modes": args.num_modes,
+            "max_gpu_memory": args.max_gpu_memory,
         }
-    # Should be unreachable: argparse `choices=` already restricts this.
     raise ValueError(f"Unhandled provider: {args.provider}")
 
 
@@ -58,9 +64,8 @@ def _parse_args() -> argparse.Namespace:
         help="Receptor structure in PDBQT format.",
     )
     p.add_argument(
-        "--ligands",
+        "--ligands-path",
         type=Path,
-        nargs="+",
         required=True,
         help="One or more ligand PDBQT files to dock against the receptor.",
     )
@@ -104,9 +109,9 @@ def _parse_args() -> argparse.Namespace:
         default=None,
         help=(
             "Max ligands per underlying provider invocation. "
-            "GPU provider chunks --ligands into groups of at "
-            "most this size per Vina-GPU+ invocation. Defaults to the "
-            "selected provider's own default."
+            "unidock-gpu chunks --ligands into groups of at most this "
+            "size per `unidock --gpu_batch` invocation. Defaults to "
+            "the selected provider's own default."
         ),
     )
     p.add_argument(
@@ -159,24 +164,28 @@ def _parse_args() -> argparse.Namespace:
         help="[cpu] Number of worker processes for dock_batch (1 = sequential).",
     )
 
-    gpu_group = p.add_argument_group("GPU provider options")
+    gpu_group = p.add_argument_group("unidock-gpu provider options")
     gpu_group.add_argument(
-        "--vina-gpu-binary",
+        "--search-mode",
         type=str,
-        default=None,
-        help="[gpu] Path to the Vina-GPU+ binary. Defaults to 'Vina-GPU+'.",
+        default="balance",
+        help=("[gpu] Uni-Dock --search_mode (e.g. 'fast', 'balance', 'detail')."),
     )
     gpu_group.add_argument(
-        "--search-depth",
+        "--num-modes",
         type=int,
-        default=None,
-        help="[gpu] Vina-GPU+ search depth. Defaults to the binary's own heuristic.",
+        default=9,
+        help="[gpu] Number of output poses per ligand (--num_modes).",
     )
     gpu_group.add_argument(
-        "--thread",
+        "--max-gpu-memory",
         type=int,
-        default=1000,
-        help="[gpu] Vina-GPU+ docking-lane parallelism (--thread). Keep below 10000.",
+        default=0,
+        help=(
+            "[gpu] Cap on GPU memory (MiB) Uni-Dock may use for "
+            "batch sizing (--max_gpu_memory). 0 = let Uni-Dock estimate "
+            "based on available memory."
+        ),
     )
 
     return p.parse_args()
@@ -196,9 +205,11 @@ def docking_run():
 
     box = SearchBox(center=tuple(args.center), size=tuple(args.size))
 
+    ligand_paths = get_ligands_from_path(args.ligands_path)
+
     results_iter = provider.dock_batch(
-        receptor_pdbqt=args.receptor,
-        ligand_pdbqts=list(args.ligands),
+        receptor_path=args.receptor,
+        ligand_paths=ligand_paths,
         box=box,
         batch_size=args.batch_size,
     )

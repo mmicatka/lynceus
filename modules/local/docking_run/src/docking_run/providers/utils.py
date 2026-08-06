@@ -1,10 +1,11 @@
-# modules/local/docking_run/src/docking_run/utils/parsing.py
+# modules/local/docking_run/src/docking_run/providers/utils.py
 
 
 import re
 from pathlib import Path
 
-from docking_run.types import DockingError, DockingResult
+from docking_run.types.docking_result import DockingResult
+from docking_run.types.errors import DockingError
 
 _RESULT_LINE = re.compile(
     r"^REMARK VINA RESULT:\s*"
@@ -15,13 +16,6 @@ _RESULT_LINE = re.compile(
 
 
 def parse_vina_output_pdbqt(output_pdbqt: Path, ligand_id: str) -> list[DockingResult]:
-    """Parse a Vina-style multi-MODEL output PDBQT into DockingResults.
-
-    Each MODEL/ENDMDL block becomes one DockingResult with mode = the
-    1-indexed model number. Individual pose coordinates are left on disk
-    (referenced via pose_pdbqt) rather than materialized in memory, since
-    downstream consumers (e.g. complex generation) read them directly.
-    """
     if not output_pdbqt.is_file():
         raise DockingError(f"Expected output PDBQT not found: {output_pdbqt}")
 

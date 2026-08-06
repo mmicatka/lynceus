@@ -28,9 +28,10 @@ class DockingProvider(ABC):
     @abstractmethod
     def dock(
         self,
-        receptor_pdbqt: Path,
-        ligand_pdbqt: Path,
+        receptor_path: Path,
+        ligand_path: Path,
         box: SearchBox,
+        scoring_mode: str = "",
     ) -> list[DockingResult]:
         """Dock a single ligand against a single receptor. Returns one
         DockingResult per output pose/mode."""
@@ -39,10 +40,11 @@ class DockingProvider(ABC):
     @abstractmethod
     def dock_batch(
         self,
-        receptor_pdbqt: Path,
-        ligand_pdbqts: list[Path],
+        receptor_path: Path,
+        ligand_paths: list[Path],
         box: SearchBox,
         batch_size: int | None = None,
+        scoring_mode: str = "",
     ) -> Iterator[tuple[str, list[DockingResult]]]:
         """Dock each ligand in `ligand_pdbqts` independently against the
         same receptor + search box, yielding results incrementally.

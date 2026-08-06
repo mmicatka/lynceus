@@ -13,9 +13,9 @@ from docking_run.types import (
     DockingResult,
     SearchBox,
 )
-from docking_run.utils import parse_vina_output_pdbqt
 
 from .provider import DockingProvider, ProviderNotAvailableError
+from .utils import parse_vina_output_pdbqt
 
 _DEFAULT_N_POSES = 9
 _DEFAULT_EXHAUSTIVENESS = 8
@@ -64,13 +64,13 @@ class VinaCPUProvider(DockingProvider):
 
     def dock(
         self,
-        receptor_pdbqt: Path,
-        ligand_pdbqt: Path,
+        receptor_path: Path,
+        ligand_path: Path,
         box: SearchBox,
     ) -> list[DockingResult]:
         return _dock_one(
-            receptor_pdbqt=receptor_pdbqt,
-            ligand_pdbqt=ligand_pdbqt,
+            receptor_path=receptor_path,
+            ligand_path=ligand_path,
             box=box,
             exhaustiveness=self.exhaustiveness,
             n_poses=self.n_poses,
@@ -79,8 +79,8 @@ class VinaCPUProvider(DockingProvider):
 
     def dock_batch(
         self,
-        receptor_pdbqt: Path,
-        ligand_pdbqts: list[Path],
+        receptor_path: Path,
+        ligand_paths: list[Path],
         box: SearchBox,
         batch_size: int | None = None,
     ) -> Iterator[tuple[str, list[DockingResult]]]:
@@ -89,8 +89,8 @@ class VinaCPUProvider(DockingProvider):
         self.out_dir.mkdir(parents=True, exist_ok=True)
 
         if self.n_workers <= 1:
-            for lig in tqdm(
-                ligand_pdbqts,
+            for ligand_path in tqdm(
+                ligand_paths,
                 desc="Docking ligands",
                 unit="ligand",
                 dynamic_ncols=True,
@@ -98,8 +98,8 @@ class VinaCPUProvider(DockingProvider):
                 mininterval=0,
             ):
                 result = _dock_one(
-                    receptor_pdbqt=receptor_pdbqt,
-                    ligand_pdbqt=lig,
+                    receptor_path=receptor_path,
+                    ligand_path=ligand_path,
                     box=box,
                     exhaustiveness=self.exhaustiveness,
                     n_poses=self.n_poses,
@@ -112,14 +112,14 @@ class VinaCPUProvider(DockingProvider):
                 future_to_lig = {
                     pool.submit(
                         _dock_one,
-                        receptor_pdbqt=receptor_pdbqt,
-                        ligand_pdbqt=lig,
+                        receptor_path=receptor_path,
+                        ligand_path=ligand_path,
                         box=box,
                         exhaustiveness=self.exhaustiveness,
                         n_poses=self.n_poses,
                         out_dir=self.out_dir,
-                    ): lig
-                    for lig in ligand_pdbqts
+                    ): ligand_path
+                    for ligand_path in ligand_paths
                 }
 
                 with tqdm(
@@ -139,8 +139,8 @@ class VinaCPUProvider(DockingProvider):
 
 def _dock_one(
     *,
-    receptor_pdbqt: Path,
-    ligand_pdbqt: Path,
+    receptor_path: Path,
+    ligand_path: Path,
     box: SearchBox,
     exhaustiveness: int,
     n_poses: int,
@@ -149,14 +149,14 @@ def _dock_one(
     """Module-level worker function picklable for ProcessPoolExecutor."""
     import vina
 
-    ligand_id = ligand_pdbqt.stem
+    ligand_id = ligand_path.stem
     out_dir.mkdir(parents=True, exist_ok=True)
     output_pdbqt = out_dir / f"{ligand_id}_out.pdbqt"
 
     with suppress_stderr():
         v = vina.Vina(sf_name="vina", verbosity=0)
-        v.set_receptor(str(receptor_pdbqt))
-        v.set_ligand_from_file(str(ligand_pdbqt))
+        v.set_receptor(str(receptor_path))
+        v.set_ligand_from_file(str(ligand_path))
         v.compute_vina_maps(center=list(box.center), box_size=list(box.size))
         v.dock(exhaustiveness=exhaustiveness, n_poses=n_poses)
 
