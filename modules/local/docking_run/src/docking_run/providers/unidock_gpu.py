@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import re
 import shutil
 import subprocess
@@ -11,6 +12,8 @@ from typing import Iterator
 from docking_run.types import DockingError, DockingResult, SearchBox
 
 from .provider import DockingProvider, ProviderNotAvailableError
+
+logger = logging.getLogger(__name__)
 
 _DEFAULT_BATCH_SIZE = 1000
 """Per Uni-Dock's README FAQ ("Uni-Dock computes slowly for few (<10)
@@ -65,10 +68,40 @@ class UnidockGPUProvider(DockingProvider):
         batch_size: int | None = None,
     ) -> Iterator[tuple[str, list[DockingResult]]]:
         chunk_size = batch_size or _DEFAULT_BATCH_SIZE
+        n_chunks = -(-len(ligand_pdbqts) // chunk_size)  # ceil div
 
-        for start in range(0, len(ligand_pdbqts), chunk_size):
+        n_ligands_seen = 0
+        n_ligands_failed = 0
+
+        for chunk_idx, start in enumerate(range(0, len(ligand_pdbqts), chunk_size), 1):
             chunk = ligand_pdbqts[start : start + chunk_size]
-            yield from self._run_gpu_batch(receptor_pdbqt, chunk, box)
+            n_ligands_seen += len(chunk)
+            n_yielded_this_chunk = 0
+
+            for ligand_id, results in self._run_gpu_batch(receptor_pdbqt, chunk, box):
+                n_yielded_this_chunk += 1
+                yield ligand_id, results
+
+            n_failed_this_chunk = len(chunk) - n_yielded_this_chunk
+            n_ligands_failed += n_failed_this_chunk
+            logger.info(
+                "unidock chunk %d/%d: %d/%d ligands produced results (%d failed)",
+                chunk_idx,
+                n_chunks,
+                n_yielded_this_chunk,
+                len(chunk),
+                n_failed_this_chunk,
+            )
+
+        if n_ligands_failed:
+            logger.warning(
+                "unidock dock_batch complete: %d/%d ligands failed to produce "
+                "results across %d chunk(s). See preceding WARNING/ERROR log "
+                "lines for per-ligand detail.",
+                n_ligands_failed,
+                n_ligands_seen,
+                n_chunks,
+            )
 
     def _run_gpu_batch(
         self,
@@ -109,11 +142,11 @@ class UnidockGPUProvider(DockingProvider):
         if self.max_gpu_memory:
             cmd += ["--max_gpu_memory", str(self.max_gpu_memory)]
 
-        # Explicit over silent: a failed batch invocation raises rather
-        # than silently yielding nothing for every ligand in the chunk.
-        # This mirrors the CPU provider's per-ligand DockingError, just
-        # scoped to the whole chunk since that's the failure granularity
-        # unidock actually gives us.
+        # A failed *invocation* (nonzero exit) still raises hard — that's
+        # a chunk-wide failure (bad receptor, CUDA error, etc.), not a
+        # per-ligand docking failure, and there's no partial output to
+        # salvage. Per-ligand failures (parsed below) are a different,
+        # expected-at-scale failure mode and are logged + skipped instead.
         proc = subprocess.run(cmd, capture_output=True, text=True)
         if proc.returncode != 0:
             raise DockingError(
@@ -124,21 +157,67 @@ class UnidockGPUProvider(DockingProvider):
 
         for lig in ligand_pdbqts:
             ligand_id = lig.stem
-            # FIXME: output filename convention (e.g. whether unidock
-            # emits "<ligand_stem>_out.pdbqt" like Vina, or something
-            # else under --dir) is an unverified guess. Confirm against
-            # an actual --gpu_batch run's --dir contents before trusting
-            # this glob.
-            candidates = list(chunk_out_dir.glob(f"{ligand_id}*out*.pdbqt"))
+
+            # Exact match on the confirmed naming convention
+            # ("<ligand_id>_out.pdbqt"), not a wildcard glob — narrowed
+            # from the earlier unverified "*out*" pattern now that a
+            # real --gpu_batch run has confirmed the exact convention.
+            candidates = list(chunk_out_dir.glob(f"{ligand_id}_out.pdbqt"))
+
             if not candidates:
-                # Same silent-drop-on-missing-output policy as
-                # VinaCPUProvider: a ligand with no output pose is
-                # omitted, not yielded with an empty list.
+                logger.warning(
+                    "unidock produced no output file for ligand '%s' "
+                    "(expected %s) -- skipping. This ligand will be "
+                    "absent from results.",
+                    ligand_id,
+                    chunk_out_dir / f"{ligand_id}_out.pdbqt",
+                )
                 continue
 
-            results = _parse_unidock_output_pdbqt(candidates[0], ligand_id=ligand_id)
+            if len(candidates) > 1:
+                # Ambiguity is a different, more suspicious failure mode
+                # than "no output" -- logged and skipped rather than
+                # silently guessing candidates[0], but not raised, per
+                # the log-and-skip policy requested here. Worth revisiting
+                # if this actually fires: it would mean the naming
+                # convention assumption above is wrong.
+                logger.error(
+                    "Ambiguous output for ligand '%s' in %s: found %d "
+                    "matching files (%s) -- skipping rather than "
+                    "guessing which is correct.",
+                    ligand_id,
+                    chunk_out_dir,
+                    len(candidates),
+                    [c.name for c in candidates],
+                )
+                continue
+
+            try:
+                results = _parse_unidock_output_pdbqt(
+                    candidates[0], ligand_id=ligand_id
+                )
+            except DockingError as exc:
+                logger.warning(
+                    "Failed to parse unidock output for ligand '%s' "
+                    "(%s) -- skipping: %s",
+                    ligand_id,
+                    candidates[0],
+                    exc,
+                )
+                continue
+
             if results:
                 yield ligand_id, results
+            else:
+                # Shouldn't happen given _parse_unidock_output_pdbqt
+                # raises on empty results, but kept as a belt-and-braces
+                # explicit skip rather than yielding an empty list.
+                logger.warning(
+                    "unidock output for ligand '%s' (%s) parsed to zero "
+                    "poses -- skipping.",
+                    ligand_id,
+                    candidates[0],
+                )
 
     def _chunk_out_dir(self, ligand_pdbqts: list[Path]) -> Path:
         """Give each chunk its own subdirectory so output filenames
