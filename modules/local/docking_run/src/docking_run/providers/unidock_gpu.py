@@ -23,6 +23,25 @@ _UNIDOCK_BINARY = "unidock"
 _SCORING_MODE_VINA = "vina"
 
 
+_MAX_CRASH_RETRIES_PER_BATCH = 1
+_MIN_BISECT_SIZE = 1
+
+
+class UnidockCrashQuarantine:
+    def __init__(self) -> None:
+        self.entries: list[dict[str, str]] = []
+
+    def add(self, ligand_ids: list[str], reason: str) -> None:
+        for ligand_id in ligand_ids:
+            self.entries.append({"ligand_id": ligand_id, "reason": reason})
+
+    def __len__(self) -> int:
+        return len(self.entries)
+
+    def __bool__(self) -> bool:
+        return bool(self.entries)
+
+
 class UnidockGPUProvider(DockingProvider):
     def __init__(
         self,
@@ -35,6 +54,7 @@ class UnidockGPUProvider(DockingProvider):
         self.num_modes = num_modes
         self.max_gpu_memory = max_gpu_memory
         self.out_dir = out_dir or Path.cwd() / "unidock_gpu_out"
+        self.quarantine = UnidockCrashQuarantine()
 
     def validate_environment(self) -> None:
         if shutil.which(_UNIDOCK_BINARY) is None:
@@ -52,7 +72,9 @@ class UnidockGPUProvider(DockingProvider):
         scoring_mode: str = _SCORING_MODE_VINA,
     ) -> list[DockingResult]:
         results_by_id = dict(
-            self._run_gpu_batch(receptor_path, [ligand_path], box, scoring_mode)
+            self._run_gpu_batch_contained(
+                receptor_path, [ligand_path], box, scoring_mode
+            )
         )
         return results_by_id.get(ligand_path.stem, [])
 
@@ -69,27 +91,33 @@ class UnidockGPUProvider(DockingProvider):
 
         n_ligands_seen = 0
         n_ligands_failed = 0
+        n_ligands_quarantined = 0
 
         for chunk_idx, start in enumerate(range(0, len(ligand_paths), chunk_size), 1):
             chunk = ligand_paths[start : start + chunk_size]
             n_ligands_seen += len(chunk)
             n_yielded_this_chunk = 0
+            n_quarantined_before = len(self.quarantine)
 
-            for ligand_id, results in self._run_gpu_batch(
+            for ligand_id, results in self._run_gpu_batch_contained(
                 receptor_path, chunk, box, scoring_mode
             ):
                 n_yielded_this_chunk += 1
                 yield ligand_id, results
 
+            n_quarantined_this_chunk = len(self.quarantine) - n_quarantined_before
+            n_ligands_quarantined += n_quarantined_this_chunk
             n_failed_this_chunk = len(chunk) - n_yielded_this_chunk
             n_ligands_failed += n_failed_this_chunk
             logger.info(
-                "unidock chunk %d/%d: %d/%d ligands produced results (%d failed)",
+                "unidock chunk %d/%d: %d/%d ligands produced results "
+                "(%d failed, %d quarantined due to crashes)",
                 chunk_idx,
                 n_chunks,
                 n_yielded_this_chunk,
                 len(chunk),
                 n_failed_this_chunk,
+                n_quarantined_this_chunk,
             )
 
         if n_ligands_failed:
@@ -101,15 +129,130 @@ class UnidockGPUProvider(DockingProvider):
                 n_ligands_seen,
                 n_chunks,
             )
+        if self.quarantine:
+            logger.warning(
+                "unidock dock_batch complete: %d ligand(s) quarantined after "
+                "repeated subprocess crashes (isolated via bisection). See "
+                "provider.quarantine.entries for the full list.",
+                n_ligands_quarantined,
+            )
 
-    def _run_gpu_batch(
+    def _run_gpu_batch_contained(
         self,
         receptor_path: Path,
         ligand_paths: list[Path],
         box: SearchBox,
-        scoring_mode: str = _SCORING_MODE_VINA,
+        scoring_mode: str,
     ) -> Iterator[tuple[str, list[DockingResult]]]:
+        yield from self._run_with_bisection(
+            receptor_path, ligand_paths, box, scoring_mode, retries_used=0
+        )
+
+    def _run_with_bisection(
+        self,
+        receptor_path: Path,
+        ligand_paths: list[Path],
+        box: SearchBox,
+        scoring_mode: str,
+        retries_used: int,
+    ) -> Iterator[tuple[str, list[DockingResult]]]:
+        if not ligand_paths:
+            return
+
         chunk_out_dir = self._chunk_out_dir(ligand_paths)
+
+        try:
+            crashed = False
+            proc = self._invoke_unidock(
+                receptor_path, ligand_paths, box, scoring_mode, chunk_out_dir
+            )
+        except _UnidockCrash as exc:
+            crashed = True
+            proc = exc.proc
+
+        if crashed:
+            logger.error(
+                "unidock subprocess crashed (returncode=%d) on a batch of "
+                "%d ligand(s) in %s: %s",
+                proc.returncode,
+                len(ligand_paths),
+                chunk_out_dir,
+                proc.stderr.strip() if proc.stderr else "(no stderr)",
+            )
+
+            recovered, unresolved = self._partition_by_output_present(
+                ligand_paths, chunk_out_dir
+            )
+            for ligand_id, results in self._collect_chunk_results(
+                recovered, chunk_out_dir
+            ):
+                yield ligand_id, results
+
+            if not unresolved:
+                return
+
+            if retries_used < _MAX_CRASH_RETRIES_PER_BATCH:
+                logger.warning(
+                    "Retrying crashed sub-batch of %d ligand(s) once "
+                    "(retry %d/%d) before bisecting.",
+                    len(unresolved),
+                    retries_used + 1,
+                    _MAX_CRASH_RETRIES_PER_BATCH,
+                )
+                yield from self._run_with_bisection(
+                    receptor_path,
+                    unresolved,
+                    box,
+                    scoring_mode,
+                    retries_used=retries_used + 1,
+                )
+                return
+
+            if len(unresolved) <= _MIN_BISECT_SIZE:
+                ligand_ids = [lig.stem for lig in unresolved]
+                logger.error(
+                    "Quarantining %d ligand(s) after repeated unidock "
+                    "crashes at minimum bisection size: %s",
+                    len(unresolved),
+                    ligand_ids,
+                )
+                self.quarantine.add(
+                    ligand_ids,
+                    reason=(
+                        f"unidock subprocess crashed (returncode="
+                        f"{proc.returncode}) and could not be isolated "
+                        f"further below batch size {_MIN_BISECT_SIZE}"
+                    ),
+                )
+                return
+
+            midpoint = len(unresolved) // 2
+            left, right = unresolved[:midpoint], unresolved[midpoint:]
+            logger.warning(
+                "Bisecting crashed sub-batch of %d ligand(s) into halves "
+                "of %d and %d to isolate the failure.",
+                len(unresolved),
+                len(left),
+                len(right),
+            )
+            yield from self._run_with_bisection(
+                receptor_path, left, box, scoring_mode, retries_used=0
+            )
+            yield from self._run_with_bisection(
+                receptor_path, right, box, scoring_mode, retries_used=0
+            )
+            return
+
+        yield from self._collect_chunk_results(ligand_paths, chunk_out_dir)
+
+    def _invoke_unidock(
+        self,
+        receptor_path: Path,
+        ligand_paths: list[Path],
+        box: SearchBox,
+        scoring_mode: str,
+        chunk_out_dir: Path,
+    ) -> subprocess.CompletedProcess:
         chunk_out_dir.mkdir(parents=True, exist_ok=True)
 
         ligand_index_path = chunk_out_dir / "ligand_index.txt"
@@ -147,12 +290,22 @@ class UnidockGPUProvider(DockingProvider):
 
         proc = subprocess.run(cmd, capture_output=True, text=True)
         if proc.returncode != 0:
-            raise DockingError(
-                f"unidock --gpu_batch failed for chunk of {len(ligand_paths)} "
-                f"ligands (receptor={receptor_path.name}, "
-                f"returncode={proc.returncode}): {proc.stderr.strip()}"
-            )
+            raise _UnidockCrash(proc)
+        return proc
 
+    def _partition_by_output_present(
+        self, ligand_paths: list[Path], chunk_out_dir: Path
+    ) -> tuple[list[Path], list[Path]]:
+        present: list[Path] = []
+        absent: list[Path] = []
+        for lig in ligand_paths:
+            matches = list(chunk_out_dir.glob(f"{lig.stem}_out.pdbqt"))
+            (present if matches else absent).append(lig)
+        return present, absent
+
+    def _collect_chunk_results(
+        self, ligand_paths: list[Path], chunk_out_dir: Path
+    ) -> Iterator[tuple[str, list[DockingResult]]]:
         for lig in ligand_paths:
             ligand_id = lig.stem
             candidates = list(chunk_out_dir.glob(f"{ligand_id}_out.pdbqt"))
@@ -202,9 +355,19 @@ class UnidockGPUProvider(DockingProvider):
                 )
 
     def _chunk_out_dir(self, ligand_pdbqts: list[Path]) -> Path:
-        """Give each chunk its own subdirectory so output filenames
-        from different chunks can't collide, and so a chunk's outputs
-        are easy to isolate for debugging a specific failed invocation.
-        """
-        first_id = ligand_pdbqts[0].stem if ligand_pdbqts else "empty"
-        return self.out_dir / f"chunk_{first_id}"
+        if not ligand_pdbqts:
+            return self.out_dir / "chunk_empty"
+        first_id = ligand_pdbqts[0].stem
+        last_id = ligand_pdbqts[-1].stem
+        return self.out_dir / f"chunk_{first_id}_{last_id}_{len(ligand_pdbqts)}"
+
+
+class _UnidockCrash(Exception):
+    """Internal signal carrying the failed CompletedProcess so the
+    bisection logic can inspect returncode/stderr without re-parsing a
+    DockingError message string.
+    """
+
+    def __init__(self, proc: subprocess.CompletedProcess) -> None:
+        self.proc = proc
+        super().__init__(f"unidock crashed with returncode={proc.returncode}")
