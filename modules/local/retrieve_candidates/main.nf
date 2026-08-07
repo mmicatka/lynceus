@@ -2,7 +2,6 @@
 
 process RETRIEVE_CANDIDATES {
     tag "${uri_list}"
-    label 'process_single'
 
     container "quay.io/biocontainers/aria2:1.36.0"
     containerOptions '--entrypoint ""'

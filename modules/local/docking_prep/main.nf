@@ -2,7 +2,6 @@
 
 process DOCKING_PREP_TARGET {
     tag "${ensemble_id}"
-    label 'process_single'
     container 'lynceus/docking-prep:0.1.0'
 
     input:

@@ -38,7 +38,6 @@ def _build_provider_kwargs(args: argparse.Namespace) -> dict:
             **common,
             "search_mode": args.search_mode,
             "num_modes": args.num_modes,
-            "max_gpu_memory": args.max_gpu_memory,
         }
     raise ValueError(f"Unhandled provider: {args.provider}")
 
@@ -176,16 +175,6 @@ def _parse_args() -> argparse.Namespace:
         type=int,
         default=9,
         help="[gpu] Number of output poses per ligand (--num_modes).",
-    )
-    gpu_group.add_argument(
-        "--max-gpu-memory",
-        type=int,
-        default=0,
-        help=(
-            "[gpu] Cap on GPU memory (MiB) Uni-Dock may use for "
-            "batch sizing (--max_gpu_memory). 0 = let Uni-Dock estimate "
-            "based on available memory."
-        ),
     )
 
     return p.parse_args()
