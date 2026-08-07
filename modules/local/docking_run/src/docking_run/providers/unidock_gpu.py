@@ -47,12 +47,10 @@ class UnidockGPUProvider(DockingProvider):
         self,
         search_mode: str = _DEFAULT_SEARCH_MODE,
         num_modes: int = _DEFAULT_NUM_MODES,
-        max_gpu_memory: int = 0,
         out_dir: Path | None = None,
     ) -> None:
         self.search_mode = search_mode
         self.num_modes = num_modes
-        self.max_gpu_memory = max_gpu_memory
         self.out_dir = out_dir or Path.cwd() / "unidock_gpu_out"
         self.quarantine = UnidockCrashQuarantine()
 
@@ -285,8 +283,6 @@ class UnidockGPUProvider(DockingProvider):
             "--dir",
             str(chunk_out_dir),
         ]
-        if self.max_gpu_memory:
-            cmd += ["--max_gpu_memory", str(self.max_gpu_memory)]
 
         proc = subprocess.run(cmd, capture_output=True, text=True)
         if proc.returncode != 0:
