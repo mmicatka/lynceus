@@ -2,11 +2,7 @@
 
 
 process PHYSIOCHEMICAL_FILTER {
-    debug true
-
     container "lynceus/physiochemical-filter:0.1.0"
-
-    publishDir "${params.outdir}/candidate/physiochemical_filter", mode: 'copy'
 
     input:
     path parquet_files, stageAs: 'input??/*'
@@ -33,18 +29,6 @@ process PHYSIOCHEMICAL_FILTER {
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
         duckdb: \$(python3 -c "import duckdb; print(duckdb.__version__)")
-    END_VERSIONS
-    """
-
-    stub:
-    """
-    mkdir -p partitions
-    touch partitions/stub-00000.parquet
-    touch filter_report.json
-
-    cat <<-END_VERSIONS > versions.yml
-    "${task.process}":
-        duckdb: stub
     END_VERSIONS
     """
 }

@@ -2,7 +2,6 @@
 
 process SAMPLE_CANDIDATES {
     tag "sample_candidates"
-    label 'process_single'
     container "lynceus/sample-candidates:0.1.0"
 
     input:
@@ -23,10 +22,5 @@ process SAMPLE_CANDIDATES {
         --reservoir-size ${num_samples} \\
         --seed ${seed} \\
         --output candidates.parquet
-    """
-
-    stub:
-    """
-    touch candidates.parquet
     """
 }
