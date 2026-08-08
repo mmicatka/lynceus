@@ -8,7 +8,9 @@
     "--gpus=all"
   ],
   "features": {
-    "ghcr.io/devcontainers/features/docker-in-docker:4": {}
+    "ghcr.io/devcontainers/features/docker-in-docker:4": {},
+    "ghcr.io/devcontainers/features/kubectl-helm-minikube:1": {},
+    "ghcr.io/devcontainer-community/devcontainer-features/dotenv.org:1": {}
   },
   "customizations": {
     "vscode": {
@@ -39,7 +41,8 @@
     }
   },
   "mounts": [
-    "source=${localWorkspaceFolder}/results,target=/workspaces/lynceus/results,type=bind"
+    "source=${localWorkspaceFolder}/results,target=/workspaces/lynceus/results,type=bind",
+    "source=${localEnv:HOME}${localEnv:USERPROFILE}/.kube,target=/home/appuser/.kube,type=bind"
   ],
   "remoteUser": "appuser"
 }

@@ -17,6 +17,7 @@ dependencies = [
     "docking-prep",
     "docking-run",
     "surrogate-model",
+    
 ]
 
 [tool.uv.workspace]
@@ -52,6 +53,7 @@ dev = [
     "pyarrow>=24.0.0",
     "ruff>=0.15.21",
     "yamllint>=1.38.0",
+    "awscli>=1.46.0",
     "pre-commit>=4.6.0",
 ]
 
