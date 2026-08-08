@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import io
+import json
 import logging
 import os
 import sys
@@ -18,6 +19,8 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 from rdkit import Chem, RDLogger
 from rdkit.Chem import AllChem
+
+from .molecule_descriptors import MolDescriptorError, compute_mol_geometry_descriptors
 
 # RDKit prints a lot of low-level parsing warnings to stderr by default;
 # we handle/report parse failures ourselves, so silence RDKit's own logger.
@@ -57,29 +60,39 @@ def _select_protonation_state(
     return min(variants, key=sort_key)
 
 
-def _embed_and_minimize(smiles: str, random_seed: int = 42) -> tuple[bytes | None, str]:
+def _embed_and_minimize(
+    smiles: str, random_seed: int = 42
+) -> tuple[bytes | None, str, str | None]:
     mol = Chem.MolFromSmiles(smiles)
     if not mol:
-        return None, "SMILES_PARSE_FAILED"
+        return None, "SMILES_PARSE_FAILED", None
 
     mol = Chem.AddHs(mol)
     params = AllChem.ETKDGv3()
     params.randomSeed = random_seed
 
     if AllChem.EmbedMolecule(mol, params) != 0:
-        return None, "EMBEDDING_FAILED"
+        return None, "EMBEDDING_FAILED", None
 
     try:
         if AllChem.MMFFOptimizeMolecule(mol) == -1:
-            return None, "MINIMIZATION_FAILED"
+            return None, "MINIMIZATION_FAILED", None
     except Exception as exc:
-        return None, f"MINIMIZATION_EXCEPTION: {exc}"
+        return None, f"MINIMIZATION_EXCEPTION: {exc}", None
+
+    error = "SUCCESS"
+    descriptors_json = None
+    try:
+        descriptors = compute_mol_geometry_descriptors(mol)
+        descriptors_json = json.dumps(descriptors)
+    except MolDescriptorError as exc:
+        error = f"SUCCESS_DESCRIPTORS_FAILED: {exc}"
 
     buf = io.StringIO()
     writer = Chem.SDWriter(buf)
     writer.write(mol)
     writer.flush()
-    return buf.getvalue().encode(), "SUCCESS"
+    return buf.getvalue().encode(), error, descriptors_json
 
 
 def _process_ligand(
@@ -98,6 +111,7 @@ def _process_ligand(
 
     sdf_bytes = None
     error = "SUCCESS"
+    descriptors_json = None
 
     if not smiles:
         error = "NO_SMILES"
@@ -106,12 +120,15 @@ def _process_ligand(
             prot_smiles = _select_protonation_state(
                 smiles, ph_min=ph_min, ph_max=ph_max
             )
-            sdf_bytes, error = _embed_and_minimize(prot_smiles, random_seed=random_seed)
+            sdf_bytes, error, descriptors_json = _embed_and_minimize(
+                prot_smiles, random_seed=random_seed
+            )
         except Exception as exc:
             error = f"EXCEPTION: {exc}"
 
     # Update row dict for the new parquet file
     row["error"] = error
+    row["descriptors_json"] = descriptors_json
     return row, sdf_bytes, catalog_id
 
 
@@ -128,6 +145,7 @@ def _conformer_generate(
     input_pq = pq.ParquetFile(input)
     schema = input_pq.schema.to_arrow_schema()
     schema = schema.append(pa.field("error", pa.string()))
+    schema = schema.append(pa.field("descriptors_json", pa.string()))
 
     # Prepare output directories
     output_dir.mkdir(parents=True, exist_ok=True)

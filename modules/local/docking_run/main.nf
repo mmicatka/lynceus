@@ -49,7 +49,7 @@ process DOCKING_RUN_GPU {
         --ligands-path ${candidates} \\
         --center ${cx} ${cy} ${cz} \\
         --size ${sx} ${sy} ${sz} \\
-        --out-parquet output.parquet \\
+        --out-parquet ${conformational_state_id}.${site_id}.output.parquet \\
         --conformational-state-id ${conformational_state_id} \\
         --site-id ${site_id}
     """
