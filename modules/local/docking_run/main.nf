@@ -51,6 +51,7 @@ process DOCKING_RUN_GPU {
         --size ${sx} ${sy} ${sz} \\
         --out-parquet ${conformational_state_id}.${site_id}.output.parquet \\
         --conformational-state-id ${conformational_state_id} \\
+        --num-modes 1 \\
         --site-id ${site_id}
     """
 }
