@@ -2,7 +2,7 @@
 
 process DOCKING_RUN_CPU {
     tag "${conformational_state_id}:${site_id}"
-    container 'lynceus/docking-run:cpu-0.1.0'
+    container "${params.registry}/lynceus/docking-run:cpu-0.1.0"
 
     input:
     tuple val(conformational_state_id), path(receptor), val(site_id), val(center), val(size)
@@ -30,7 +30,7 @@ process DOCKING_RUN_CPU {
 process DOCKING_RUN_GPU {
     tag "${conformational_state_id}:${site_id}"
     label 'gpu'
-    container 'lynceus/docking-run:gpu-0.1.0'
+    container "${params.registry}/lynceus/docking-run:gpu-0.1.0"
     containerOptions '--gpus all'
 
     input:

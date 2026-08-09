@@ -5,7 +5,7 @@ process PREPROCESS_CANDIDATES {
 
     label 'process_medium'
 
-    container "lynceus/lynceus-chem:0.1.0"
+    container "${params.registry}/lynceus/lynceus-chem:0.1.0"
 
     input:
     path smi_gz

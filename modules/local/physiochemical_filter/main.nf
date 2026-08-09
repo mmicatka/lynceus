@@ -2,7 +2,7 @@
 
 
 process PHYSIOCHEMICAL_FILTER {
-    container "lynceus/physiochemical-filter:0.1.0"
+    container "${params.registry}/lynceus/physiochemical-filter:0.1.0"
 
     input:
     path parquet_files, stageAs: 'input??/*'

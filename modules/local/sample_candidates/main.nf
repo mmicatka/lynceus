@@ -2,7 +2,7 @@
 
 process SAMPLE_CANDIDATES {
     tag "sample_candidates"
-    container "lynceus/sample-candidates:0.1.0"
+    container "${params.registry}/lynceus/sample-candidates:0.1.0"
 
     input:
     path candidates_parquets, stageAs: 'candidates_*.parquet'

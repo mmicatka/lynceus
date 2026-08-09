@@ -1,7 +1,7 @@
 // modules/local/download_pdb/main.nf
 
 process RETRIEVE_PDB {
-    container "lynceus/lynceus-chem:0.1.0"
+    container "${params.registry}/lynceus/lynceus-chem:0.1.0"
     maxRetries 2
     errorStrategy 'retry'
 

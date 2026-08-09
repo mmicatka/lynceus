@@ -1,7 +1,7 @@
 // modules/local/generate_manifest/main.nf
 
 process GENERATE_MANIFEST {
-    container 'lynceus/protein-conformational-ensemble:0.1.0'
+    container "${params.registry}/lynceus/protein-conformational-ensemble:0.1.0"
 
     input:
     tuple val(ensemble_id), path(ensemble_dir)

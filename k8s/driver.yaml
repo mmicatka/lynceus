@@ -1,0 +1,31 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nf-driver
+  namespace: lynceus
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nf-driver
+  template:
+    metadata:
+      labels:
+        app: nf-driver
+    spec:
+      serviceAccountName: nextflow-sa
+      imagePullSecrets:
+        - name: zot-registry-creds
+      containers:
+        - name: nextflow
+          image: registry.nebula.lan:8080/lynceus/nf-driver:0.1.0
+          imagePullPolicy: Always
+          command: ["sleep", "infinity"]
+          volumeMounts:
+            - name: work
+              mountPath: /workspace
+      volumes:
+        - name: work
+          persistentVolumeClaim:
+            claimName: lynceus-work-pvc
