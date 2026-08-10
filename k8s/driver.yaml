@@ -22,6 +22,17 @@ spec:
           image: registry.nebula.lan:8080/lynceus/nf-driver:0.1.0
           imagePullPolicy: Always
           command: ["sleep", "infinity"]
+          env:
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: garage-s3-creds
+                  key: AWS_ACCESS_KEY_ID
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: garage-s3-creds
+                  key: AWS_SECRET_ACCESS_KEY
           volumeMounts:
             - name: work
               mountPath: /workspace

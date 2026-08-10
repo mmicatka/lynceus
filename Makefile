@@ -50,7 +50,7 @@ run-dev:
 # Usage: make run-k8s ARGS="-params-file conf/examples/dev.yaml -resume"
 run-k8s:
 	kubectl exec -it deploy/$(NF_DRIVER_DEPLOYMENT) -n $(K8S_NAMESPACE) -- \
-		bash -c "cd /workspace/lynceus && nextflow run main.nf -profile k8s-onprem $(ARGS)"
+		bash -c "cd /app/lynceus && nextflow run main.nf -profile k8s-onprem $(ARGS)"
 
 # Drop into a shell on the driver pod
 driver-exec:
