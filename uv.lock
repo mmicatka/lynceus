@@ -3002,6 +3002,7 @@ dependencies = [
     { name = "optuna" },
     { name = "polars" },
     { name = "scikit-learn" },
+    { name = "scipy" },
 ]
 
 [package.metadata]
@@ -3012,6 +3013,7 @@ requires-dist = [
     { name = "optuna", specifier = ">=4.9.0" },
     { name = "polars", specifier = ">=1.42.1" },
     { name = "scikit-learn", specifier = ">=1.9.0" },
+    { name = "scipy", specifier = ">=1.18.0" },
 ]
 
 [[package]]
