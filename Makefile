@@ -3,7 +3,7 @@
 # Each `run-<env>` target wraps `nextflow run main.nf -params-file conf/examples/<env>.yaml`
 
 # --- Configuration Variables ---
-REGISTRY ?= registry.nebula.lan:8080
+REGISTRY ?= registry.nebula.local:5000
 NAMESPACE ?= lynceus
 VERSION ?= 0.1.0
 IMAGE_PREFIX := $(REGISTRY)/$(NAMESPACE)
