@@ -44,6 +44,6 @@ def surrogate_metrics(
     }
     for frac in top_fracs:
         pct = int(frac * 100)
-        metrics[f"ef_top{pct}"] = enrichment_factor(y_true, y_pred, frac)
-        metrics[f"recall_top{pct}"] = top_k_recall(y_true, y_pred, frac)
+        metrics[f"ef_top_{pct}_percent"] = enrichment_factor(y_true, y_pred, frac)
+        metrics[f"recall_top_{pct}_percent"] = top_k_recall(y_true, y_pred, frac)
     return metrics

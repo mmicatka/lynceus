@@ -13,14 +13,14 @@ filter:
 surrogate_model:
   training:
     seed: 1000
-    num_samples: 10000
+    num_samples: 100000
 
 target:
   ensemble:
-    ensemble_id: "T4_lysozyme_L99_static"
+    ensemble_id: "BACE1_4B70_static"
     type: "static"
     components:
-      - pdb_id: "1L83"
+      - pdb_id: "4B70"
         weight: 1.0
     # ensemble_id: "1STP_static_v1"
     # type: "static"

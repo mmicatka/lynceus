@@ -7,14 +7,15 @@ from sklearn.model_selection import KFold
 
 from surrogate_model.metrics import surrogate_metrics
 
-RECALL_TOP_1 = "recall_top1"
+RECALL_TOP_5_PERCENT = "recall_top_5_percent"
+RECALL_TOP_1_PERCENT = "recall_top_1_percent"
 
 
 def make_objective(
     X: np.ndarray,
     y: np.ndarray,
     n_splits: int = 5,
-    primary_metric: str = RECALL_TOP_1,
+    primary_metric: str = RECALL_TOP_5_PERCENT,
     random_seed=1000,
 ):
     def objective(trial: optuna.Trial) -> float:
