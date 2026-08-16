@@ -8,7 +8,7 @@ work/
 
 assets/.local
 
-__pycache__/
+**__pycache__**
 
 *.mdb
 
