@@ -14,7 +14,6 @@ process PHYSIOCHEMICAL_FILTER {
     output:
     path "partitions/*.parquet", emit: parquet
     path "filter_report.json", emit: report
-    path "versions.yml", emit: versions
 
     when:
     task.ext.when == null || task.ext.when
@@ -27,10 +26,5 @@ process PHYSIOCHEMICAL_FILTER {
         --output-dir partitions \\
         --partition-size ${partition_size} \\
         --report filter_report.json
-
-    cat <<-END_VERSIONS > versions.yml
-    "${task.process}":
-        duckdb: \$(python3 -c "import duckdb; print(duckdb.__version__)")
-    END_VERSIONS
     """
 }

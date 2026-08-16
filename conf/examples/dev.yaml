@@ -7,7 +7,7 @@ candidates_local_path: "/app/lynceus/work/assets/candidates/*.smi.gz"
 outdir: results/dev
 
 filter:
-  config: conf/examples/physiochemical_filter.yaml
+  config: "/app/lynceus/work/conf/examples/physiochemical_filter.yaml"
   batch_size: 50000
 
 surrogate_model:
