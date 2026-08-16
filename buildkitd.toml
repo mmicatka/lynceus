@@ -1,2 +1,2 @@
-[registry."zot.nebula.local:5000"]
-ca = ["/etc/docker/certs.d/zot.nebula.local:5000/ca.crt"]
+[registry."registry.nebula.lan:5000"]
+ca = ["/etc/docker/certs.d/registry.nebula.lan:5000/ca.crt"]

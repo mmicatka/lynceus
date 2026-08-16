@@ -3,7 +3,7 @@
 # Each `run-<env>` target wraps `nextflow run main.nf -params-file conf/examples/<env>.yaml`
 
 # --- Configuration Variables ---
-REGISTRY ?= registry.nebula.local:5000
+REGISTRY ?= registry.nebula.lan:5000
 NAMESPACE ?= lynceus
 VERSION ?= 0.1.0
 IMAGE_PREFIX := $(REGISTRY)/$(NAMESPACE)
@@ -12,7 +12,7 @@ NF_DRIVER_DEPLOYMENT ?= nf-driver
 
 .PHONY: build push build-* push-* run-dev run-k8s driver-exec driver-restart clean reset lint
 
-build: build-lynceus-chem build-detect-putative-binding-sites build-protein-conformational-ensemble build-docking-prep build-sample-candidates build-physiochemical-filter build-docking-run-cpu build-docking-run-gpu build-nf-driver
+build: build-lynceus-chem build-detect-putative-binding-sites build-protein-conformational-ensemble build-docking-prep build-sample-candidates build-physiochemical-filter  build-docking-run-gpu build-nf-driver
 
 build-lynceus-chem:
 	docker buildx build --platform linux/amd64,linux/arm64 --push -t $(IMAGE_PREFIX)/lynceus-chem:$(VERSION) libs/lynceus-chem
@@ -31,9 +31,6 @@ build-sample-candidates:
 
 build-physiochemical-filter:
 	docker buildx build --platform linux/amd64,linux/arm64 --push -t $(IMAGE_PREFIX)/physiochemical-filter:$(VERSION) modules/local/physiochemical_filter
-
-build-docking-run-cpu:
-	docker buildx build --platform linux/amd64,linux/arm64 --push --target cpu -t $(IMAGE_PREFIX)/docking-run:cpu-$(VERSION) modules/local/docking_run
 
 build-docking-run-gpu:
 	docker buildx build --platform linux/amd64 --push --target gpu -t $(IMAGE_PREFIX)/docking-run:gpu-$(VERSION) modules/local/docking_run
