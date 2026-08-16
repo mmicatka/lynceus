@@ -22,7 +22,7 @@ spec:
           command: ["sleep", "infinity"]
           volumeMounts:
             - name: work
-              mountPath: /workspace
+              mountPath: /app/lynceus/work
       volumes:
         - name: work
           persistentVolumeClaim:

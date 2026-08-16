@@ -1,8 +1,8 @@
 ---
 # conf/examples/dev.yaml
 
-uri_list: assets/candidate_uris.blackhole.txt
-# candidates_local_path: assets/.local/*
+# uri_list: assets/candidate_uris.blackhole.txt
+candidates_local_path: assets/.local/*
 
 outdir: results/dev
 
@@ -22,11 +22,6 @@ target:
     components:
       - pdb_id: "1L83"
         weight: 1.0
-    # ensemble_id: "1STP_static_v1"
-    # type: "static"
-    # components:
-    #   - pdb_id: "1STP"
-    #     weight: 1.0
 
     capabilities_required:
       - "standalone_cif"
