@@ -3,7 +3,7 @@
 process PREPROCESS_CANDIDATES {
     debug true
 
-    label 'process_medium'
+    label 'pvc_io_retry'
 
     container "${params.registry}/lynceus/lynceus-chem:0.1.0"
 

@@ -4,6 +4,8 @@
 process PHYSIOCHEMICAL_FILTER {
     container "${params.registry}/lynceus/physiochemical-filter:0.1.0"
 
+    label 'pvc_io_retry'
+
     input:
     path parquet_files, stageAs: 'input??/*'
     path filter_config

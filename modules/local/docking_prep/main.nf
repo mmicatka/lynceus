@@ -4,6 +4,8 @@ process DOCKING_PREP_TARGET {
     tag "${ensemble_id}"
     container "${params.registry}/lynceus/docking-prep:0.1.0"
 
+    label 'pvc_io_retry'
+
     input:
     tuple val(ensemble_id), path(ensemble_dir)
 

@@ -3,6 +3,8 @@
 process GENERATE_MANIFEST {
     container "${params.registry}/lynceus/protein-conformational-ensemble:0.1.0"
 
+    label 'pvc_io_retry'
+
     input:
     tuple val(ensemble_id), path(ensemble_dir)
 

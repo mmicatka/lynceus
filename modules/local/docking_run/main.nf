@@ -4,6 +4,8 @@ process DOCKING_RUN_CPU {
     tag "${conformational_state_id}:${site_id}"
     container "${params.registry}/lynceus/docking-run:cpu-0.1.0"
 
+    label 'pvc_io_retry'
+
     input:
     tuple val(conformational_state_id), path(receptor), val(site_id), val(center), val(size)
     path candidates
@@ -29,7 +31,10 @@ process DOCKING_RUN_CPU {
 
 process DOCKING_RUN_GPU {
     tag "${conformational_state_id}:${site_id}"
+
     label 'gpu'
+    label 'pvc_io_retry'
+
     container "${params.registry}/lynceus/docking-run:gpu-0.1.0"
     containerOptions '--gpus all'
 
