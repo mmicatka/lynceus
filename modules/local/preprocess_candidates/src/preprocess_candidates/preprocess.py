@@ -9,10 +9,11 @@ from multiprocessing import Pool
 from pathlib import Path
 from typing import Any, Iterator
 
-from preprocess_candidates.steps.descriptors import BasicDescriptorsStep
 import pyarrow as pa
 import pyarrow.parquet as pq
 from rdkit import Chem, RDLogger
+
+from preprocess_candidates.steps.descriptors import BasicDescriptorsStep
 
 from .steps.step import Step, StepContext
 

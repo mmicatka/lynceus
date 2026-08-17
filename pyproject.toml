@@ -32,7 +32,7 @@ members = [
     "modules/local/docking_prep",
     "modules/local/docking_run",
     "modules/local/surrogate_model",
-    "modules/local/preprocess_candidates",
+    "modules/local/preprocess_candidates"
 ]
 
 [tool.uv.sources]
@@ -55,7 +55,7 @@ dev = [
     "pyarrow>=24.0.0",
     "ruff>=0.15.21",
     "yamllint>=1.38.0",
-    "pre-commit>=4.6.0",
+    "pre-commit>=4.6.0"
 ]
 
 [tool.ruff.lint]
