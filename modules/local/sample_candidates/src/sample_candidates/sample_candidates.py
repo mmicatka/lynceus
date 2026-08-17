@@ -16,7 +16,8 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
 )
-logger = logging.getLogger("sample_candidates")
+
+logger = logging.getLogger(__name__)
 
 # RDKit's C++ logger is noisy on malformed SMILES
 RDLogger.DisableLog("rdApp.*")

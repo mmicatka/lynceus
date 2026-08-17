@@ -17,7 +17,7 @@ dependencies = [
     "docking-prep",
     "docking-run",
     "surrogate-model",
-    
+    "preprocess-candidates"
 ]
 
 [tool.uv.workspace]
@@ -32,6 +32,7 @@ members = [
     "modules/local/docking_prep",
     "modules/local/docking_run",
     "modules/local/surrogate_model",
+    "modules/local/preprocess_candidates",
 ]
 
 [tool.uv.sources]
@@ -44,6 +45,7 @@ lynceus-chem = { workspace = true }
 docking-prep = { workspace = true }
 docking-run = { workspace = true }
 surrogate-model = { workspace = true }
+preprocess-candidates = {workspace = true}
 
 [dependency-groups]
 dev = [
