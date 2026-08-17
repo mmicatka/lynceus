@@ -7,6 +7,7 @@ authors = [
 ]
 requires-python = ">=3.12"
 dependencies = [
+    "click>=8.4.2",
     "numpy>=2.5.1",
     "polars>=1.42.1",
     "pyarrow>=24.0.0",
@@ -14,7 +15,7 @@ dependencies = [
 ]
 
 [project.scripts]
-preprocess-candidates = "preprocess_candidates.preprocess_candidates:preprocess"
+preprocess-candidates = "preprocess_candidates.cli:preprocess"
 
 [build-system]
 requires = ["uv_build>=0.12.3,<0.13.0"]

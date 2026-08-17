@@ -2163,6 +2163,7 @@ name = "preprocess-candidates"
 version = "0.1.0"
 source = { editable = "modules/local/preprocess_candidates" }
 dependencies = [
+    { name = "click" },
     { name = "numpy" },
     { name = "polars" },
     { name = "pyarrow" },
@@ -2171,6 +2172,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "click", specifier = ">=8.4.2" },
     { name = "numpy", specifier = ">=2.5.1" },
     { name = "polars", specifier = ">=1.42.1" },
     { name = "pyarrow", specifier = ">=24.0.0" },
@@ -3018,7 +3020,6 @@ name = "surrogate-model"
 version = "0.1.0"
 source = { editable = "modules/local/surrogate_model" }
 dependencies = [
-    { name = "click" },
     { name = "lightgbm" },
     { name = "numpy" },
     { name = "optuna" },
@@ -3028,7 +3029,6 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "click", specifier = ">=8.4.2" },
     { name = "lightgbm", specifier = ">=4.7.0" },
     { name = "numpy", specifier = ">=2.5.1" },
     { name = "optuna", specifier = ">=4.9.0" },
