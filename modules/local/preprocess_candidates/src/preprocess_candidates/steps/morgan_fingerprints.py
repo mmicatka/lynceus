@@ -3,12 +3,12 @@
 from typing import Any
 
 import numpy as np
-import polars as pl
+import pyarrow as pa
 from rdkit.Chem import Mol, rdFingerprintGenerator
 
 
 class MorganFingerprintStep:
-    name = "basic_descriptors"
+    name = "morgan_fingerprint"
 
     def __init__(self, morgan_radius: int, morgan_n_bits: int) -> None:
         self._mfp_gen: Any = None
@@ -31,7 +31,7 @@ class MorganFingerprintStep:
         return {"morgan_fingerprint": morgan_fingerprint}
 
     def failure_result(self) -> dict[str, Any]:
-        return {"morgan_fingerprint": None}
+        return {"morgan_fingerprint": []}
 
     def output_fields(self) -> list[tuple[str, Any]]:
-        return [("morgan_fp", pl.Array(pl.UInt8, self._morgan_radius))]
+        return [("morgan_fingerprint", pa.list_(pa.uint8(), self._morgan_n_bits))]
