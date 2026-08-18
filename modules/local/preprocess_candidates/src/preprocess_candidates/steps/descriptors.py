@@ -1,4 +1,4 @@
-# modules/local/preprocess_candidates/src/preprocess_candidates/steps/__init__.py
+# modules/local/preprocess_candidates/src/preprocess_candidates/steps/descriptors.py
 
 from __future__ import annotations
 
@@ -8,6 +8,78 @@ from typing import Any, Optional
 
 import pyarrow as pa
 from rdkit.Chem import Descriptors, Mol, MolFromSmarts, rdMolDescriptors
+
+
+class DescriptorsStep:
+    name = "basic_descriptors"
+
+    def __init__(self) -> None:
+        self._compiled_pka_rules: list[tuple[Mol, float]] = []
+
+    def init_worker(self) -> None:
+        for rule in _PKA_RULES:
+            pattern = MolFromSmarts(rule.smarts)
+            if pattern is None:
+                raise ValueError(
+                    f"Invalid SMARTS for pKa rule '{rule.label}': {rule.smarts}"
+                )
+            self._compiled_pka_rules.append((pattern, rule.pka))
+
+    def compute(self, mol: Mol) -> dict[str, Any]:
+        if self._compiled_pka_rules is None:
+            raise RuntimeError(
+                f"{self.name}: init_worker() must be called before compute()"
+            )
+
+        molecular_weight = Descriptors.MolWt(mol)
+
+        clogp = Descriptors.MolLogP(mol)
+        pka = _most_basic_pka(mol, self._compiled_pka_rules)
+        has_basic_center = pka is not None and pka > 0
+        tpsa = rdMolDescriptors.CalcTPSA(mol)
+        clogd = (
+            clogp - math.log10(1.0 + 10.0 ** (pka - 7.4)) if has_basic_center else clogp
+        )
+        hydrogen_bond_donors = rdMolDescriptors.CalcNumHBD(mol)
+        return {
+            "heavy_atom_count": mol.GetNumHeavyAtoms(),
+            "molecular_weight": molecular_weight,
+            "calculated_partition_coefficient": clogp,
+            "calculated_distribution_coefficient": clogd,
+            "has_basic_center": has_basic_center,
+            "topological_polar_surface_area": tpsa,
+            "hydrogen_bond_donors": hydrogen_bond_donors,
+            "pka": pka,
+            "cns_mpo": cns_mpo(
+                clogp, clogd, molecular_weight, tpsa, hydrogen_bond_donors, pka
+            ),
+        }
+
+    def failure_result(self) -> dict[str, Any]:
+        return {
+            "heavy_atom_count": None,
+            "molecular_weight": None,
+            "calculated_partition_coefficient": None,
+            "calculated_distribution_coefficient": None,
+            "has_basic_center": None,
+            "topological_polar_surface_area": None,
+            "hydrogen_bond_donors": None,
+            "pka": None,
+            "cns_mpo": None,
+        }
+
+    def output_fields(self) -> list[tuple[str, Any]]:
+        return [
+            ("heavy_atom_count", pa.int16()),
+            ("molecular_weight", pa.float32()),
+            ("calculated_partition_coefficient", pa.float32()),
+            ("calculated_distribution_coefficient", pa.float32()),
+            ("has_basic_center", pa.bool_()),
+            ("topological_polar_surface_area", pa.float32()),
+            ("hydrogen_bond_donors", pa.int16()),
+            ("pka", pa.float32()),
+            ("cns_mpo", pa.float32()),
+        ]
 
 
 @dataclass(frozen=True)
@@ -51,18 +123,6 @@ _PKA_RULES: tuple[PkaRule, ...] = (
 )
 
 
-def _compile_pka_rules(rules: tuple[PkaRule, ...]) -> list[tuple[Mol, float]]:
-    compiled: list[tuple[Mol, float]] = []
-    for rule in rules:
-        pattern = MolFromSmarts(rule.smarts)
-        if pattern is None:
-            raise ValueError(
-                f"Invalid SMARTS for pKa rule '{rule.label}': {rule.smarts}"
-            )
-        compiled.append((pattern, rule.pka))
-    return compiled
-
-
 def _most_basic_pka(
     mol: Mol, compiled_rules: list[tuple[Mol, float]]
 ) -> Optional[float]:
@@ -73,60 +133,74 @@ def _most_basic_pka(
     return best
 
 
-class DescriptorsStep:
-    name = "basic_descriptors"
+def _lerp(v: float, lo: float, hi: float, s_lo: float, s_hi: float) -> float:
+    t = max(0.0, min(1.0, (v - lo) / (hi - lo)))
+    return s_lo + (s_hi - s_lo) * t
 
-    def __init__(self) -> None:
-        self._compiled_pka_rules: list[tuple[Mol, float]] | None = None
 
-    def init_worker(self) -> None:
-        self._compiled_pka_rules = _compile_pka_rules(_PKA_RULES)
+def _d_clogp(v: float) -> float:
+    if v <= 3.0:
+        return 1.0
+    if v >= 5.0:
+        return 0.0
+    return _lerp(v, 3.0, 5.0, 1.0, 0.0)
 
-    def compute(self, mol: Mol) -> dict[str, Any]:
-        if self._compiled_pka_rules is None:
-            raise RuntimeError(
-                f"{self.name}: init_worker() must be called before compute()"
-            )
 
-        clogp = Descriptors.MolLogP(mol)
-        pka = _most_basic_pka(mol, self._compiled_pka_rules)
-        has_basic_center = pka is not None and pka > 0
+def _d_clogd(v: float) -> float:
+    if v <= 2.0:
+        return 1.0
+    if v >= 4.0:
+        return 0.0
+    return _lerp(v, 2.0, 4.0, 1.0, 0.0)
 
-        return {
-            "heavy_atom_count": mol.GetNumHeavyAtoms(),
-            "molecular_weight": Descriptors.MolWt(mol),
-            "calculated_partition_coefficient": clogp,
-            "calculated_distribution_coefficient": (
-                clogp - math.log10(1.0 + 10.0 ** (pka - 7.4))
-                if has_basic_center
-                else clogp
-            ),
-            "has_basic_center": has_basic_center,
-            "topological_polar_surface_area": rdMolDescriptors.CalcTPSA(mol),
-            "hydrogen_bond_donors": rdMolDescriptors.CalcNumHBD(mol),
-            "pka": pka,
-        }
 
-    def failure_result(self) -> dict[str, Any]:
-        return {
-            "heavy_atom_count": None,
-            "molecular_weight": None,
-            "calculated_partition_coefficient": None,
-            "calculated_distribution_coefficient": None,
-            "has_basic_center": None,
-            "topological_polar_surface_area": None,
-            "hydrogen_bond_donors": None,
-            "pka": None,
-        }
+def _d_molecular_weight(v: float) -> float:
+    if v <= 360.0:
+        return 1.0
+    if v >= 500.0:
+        return 0.0
+    return _lerp(v, 360.0, 500.0, 1.0, 0.0)
 
-    def output_fields(self) -> list[tuple[str, Any]]:
-        return [
-            ("heavy_atom_count", pa.int16()),
-            ("molecular_weight", pa.float32()),
-            ("calculated_partition_coefficient", pa.float32()),
-            ("calculated_distribution_coefficient", pa.float32()),
-            ("has_basic_center", pa.bool_()),
-            ("topological_polar_surface_area", pa.float32()),
-            ("hydrogen_bond_donors", pa.int16()),
-            ("pka", pa.float32()),
-        ]
+
+def _d_total_polar_surface_area(v: float) -> float:
+    if 40.0 <= v <= 90.0:
+        return 1.0
+    if v < 20.0 or v > 120.0:
+        return 0.0
+    if v < 40.0:
+        return _lerp(v, 20.0, 40.0, 0.0, 1.0)
+    return _lerp(v, 90.0, 120.0, 1.0, 0.0)
+
+
+def _d_hydrogen_bond_donors(v: float) -> float:
+    if v <= 0.0:
+        return 1.0
+    if v >= 3.0:
+        return 0.0
+    return _lerp(v, 0.0, 3.0, 1.0, 0.0)
+
+
+def _d_pka(v: Optional[float]) -> float:
+    if v is None or v <= 8.0:
+        return 1.0
+    if v >= 10.0:
+        return 0.0
+    return _lerp(v, 8.0, 10.0, 1.0, 0.0)
+
+
+def cns_mpo(
+    clogp: float,
+    clogd: float,
+    molecular_weight: float,
+    total_polar_surface_area: float,
+    hydrogen_bond_donors: int,
+    pka: float,
+) -> float:
+    return (
+        _d_clogp(clogp)
+        + _d_clogd(clogd)
+        + _d_molecular_weight(molecular_weight)
+        + _d_total_polar_surface_area(total_polar_surface_area)
+        + _d_hydrogen_bond_donors(hydrogen_bond_donors)
+        + _d_pka(pka)
+    )

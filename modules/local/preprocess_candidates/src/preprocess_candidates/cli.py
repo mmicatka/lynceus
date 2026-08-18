@@ -11,7 +11,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 from rdkit import Chem, RDLogger
 
-from .steps import DescriptorsStep, Step
+from .steps import DescriptorsStep, MorganFingerprintStep, PainsStep, Step
 
 # RDKit prints a lot of low-level parsing warnings to stderr by default;
 # we handle/report parse failures ourselves, so silence RDKit's own logger.
@@ -152,7 +152,6 @@ def _preprocess(
             iterator = _iter_smiles(input_path)
             batches = _batch(iterator, _BATCH_SIZE)
 
-            # Map the batched data over our pool of processes
             for results in executor.map(_process_batch, batches):
                 record_batch = _results_to_frame(results, schema)
                 writer.write_batch(record_batch)
@@ -166,16 +165,13 @@ def _preprocess(
 
 
 def _build_pipeline() -> list[Step]:
-    return [
-        DescriptorsStep(),
-    ]
+    return [DescriptorsStep(), PainsStep(), MorganFingerprintStep(2, 1024)]
 
 
 class NumWorkersType(click.ParamType):
     name = "num_workers"
 
     def convert(self, value, param, ctx):
-        # Click already converts integers if passed directly, so handle str
         val_str = str(value).lower().strip()
         if val_str == "auto":
             return os.cpu_count() or 1
