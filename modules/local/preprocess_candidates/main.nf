@@ -1,9 +1,8 @@
 // modules/local/preprocess_candidates/main.nf
 
 process PREPROCESS_CANDIDATES {
-    container "${params.registry}/lynceus/preprocess-candidates:0.1.0"
-
-    publishDir "s3://${params.candidate_output_bucket}/preprocessed", mode: 'copy'
+    container "${params.registry}/lynceus/preprocess-candidates:0.1.2"
+    label 'heavy_cpu'
 
     input:
     path smi_gz

@@ -18,7 +18,7 @@ build-lynceus-chem:
 	docker buildx build --platform linux/amd64,linux/arm64 --push -t $(IMAGE_PREFIX)/lynceus-chem:$(VERSION) libs/lynceus-chem
 
 build-preprocess-candidates:
-	docker buildx build --platform linux/amd64,linux/arm64 --push -t $(IMAGE_PREFIX)/preprocess-candidates:$(VERSION) modules/local/preprocess_candidates
+	docker buildx build --platform linux/amd64,linux/arm64 --push -t $(IMAGE_PREFIX)/preprocess-candidates:0.1.2 modules/local/preprocess_candidates
 
 build-protein-conformational-ensemble:
 	docker buildx build --platform linux/amd64,linux/arm64 --push -t $(IMAGE_PREFIX)/protein-conformational-ensemble:$(VERSION) libs/protein-conformational-ensemble
@@ -46,10 +46,13 @@ build-nf-driver:
 run-dev:
 	nextflow run main.nf -resume -params-file conf/examples/dev.yaml
 
+run-k8s-local:
+	nextflow run main.nf -resume -profile k8s-onprem -params-file conf/params.yaml
+
 # k8s-onprem environment: runs in-cluster via the nf-driver pod
 run-k8s:
 	kubectl exec -it deploy/$(NF_DRIVER_DEPLOYMENT) -n $(K8S_NAMESPACE) -- \
-		bash -c "cd /app/lynceus && nextflow run main.nf -profile k8s-onprem -resume -params-file conf/examples/dev.yaml"
+		bash -c "cd /app/lynceus && nextflow run main.nf -profile k8s-onprem -resume"
 
 # Drop into a shell on the driver pod
 driver-exec:

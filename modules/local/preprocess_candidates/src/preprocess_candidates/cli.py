@@ -29,7 +29,7 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 
-logger = logging.getLogger(__name__)
+logger = logger = logging.getLogger(__name__)
 
 _LOG_INTERVAL = 1_000
 _BATCH_SIZE = 1_000
@@ -56,6 +56,19 @@ def _build_arrow_schema(steps: list[Step]) -> pa.Schema:
         for name, dtype in step.output_fields():
             fields.append(pa.field(name, dtype))
     return pa.schema(fields)
+
+
+def _count_smiles(path: Path) -> int:
+    """Counts the total number of valid molecule lines in a whitespace-delimited SMILES file."""
+    count = 0
+    with gzip.open(path, "rt", encoding="utf-8") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line or line.lower().startswith("smiles"):
+                continue
+            if len(line.split(None, 2)) >= 2:
+                count += 1
+    return count
 
 
 def _iter_smiles(path: Path) -> Iterator[tuple[str, str]]:
@@ -133,15 +146,19 @@ def _preprocess(
     num_workers: int,
     steps: list[Step],
 ) -> None:
-    logger.info(
-        "starting preprocessing with %d workers, steps=%s",
-        num_workers,
-        [s.name for s in steps],
-    )
-
     input_path = Path(input_path)
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    logger.info("Counting total molecules in %s...", input_path.name)
+    total_molecules = _count_smiles(input_path)
+
+    logger.info(
+        "starting preprocessing %d molecules with %d workers, steps=%s",
+        total_molecules,
+        num_workers,
+        [s.name for s in steps],
+    )
 
     schema = _build_arrow_schema(steps)
 
@@ -161,10 +178,18 @@ def _preprocess(
 
                 total_processed += len(results)
                 if total_processed >= next_log_at:
-                    logger.info("Processed %d molecules...", total_processed)
+                    logger.info(
+                        "Processed %d of %d molecules...",
+                        total_processed,
+                        total_molecules,
+                    )
                     next_log_at = total_processed + _LOG_INTERVAL
 
-    logger.info("Finished preprocessing. Total processed: %d", total_processed)
+    logger.info(
+        "Finished preprocessing. Processed %d of %d molecules.",
+        total_processed,
+        total_molecules,
+    )
 
 
 def _build_pipeline(morgan_radius: int, morgan_n_bits: int, seed: int) -> list[Step]:
