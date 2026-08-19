@@ -2,7 +2,6 @@
 
 from typing import Any
 
-import numpy as np
 import pyarrow as pa
 from rdkit.Chem import Mol, rdFingerprintGenerator
 

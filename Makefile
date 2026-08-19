@@ -10,12 +10,15 @@ IMAGE_PREFIX := $(REGISTRY)/$(NAMESPACE)
 K8S_NAMESPACE ?= lynceus
 NF_DRIVER_DEPLOYMENT ?= nf-driver
 
-.PHONY: build push build-* push-* run-dev run-k8s driver-exec driver-restart clean reset lint
+.PHONY: build push build-* run-dev run-k8s driver-exec driver-restart clean reset lint
 
-build: build-lynceus-chem build-detect-putative-binding-sites build-protein-conformational-ensemble build-docking-prep build-sample-candidates build-physiochemical-filter  build-docking-run-gpu build-nf-driver
+build: build-lynceus-chem build-preprocess-candidates build-detect-putative-binding-sites build-protein-conformational-ensemble build-docking-prep build-sample-candidates build-physiochemical-filter build-docking-run-gpu build-nf-driver
 
 build-lynceus-chem:
 	docker buildx build --platform linux/amd64,linux/arm64 --push -t $(IMAGE_PREFIX)/lynceus-chem:$(VERSION) libs/lynceus-chem
+
+build-preprocess-candidates:
+	docker buildx build --platform linux/amd64,linux/arm64 --push -t $(IMAGE_PREFIX)/preprocess-candidates:$(VERSION) modules/local/preprocess_candidates
 
 build-protein-conformational-ensemble:
 	docker buildx build --platform linux/amd64,linux/arm64 --push -t $(IMAGE_PREFIX)/protein-conformational-ensemble:$(VERSION) libs/protein-conformational-ensemble
@@ -44,10 +47,9 @@ run-dev:
 	nextflow run main.nf -resume -params-file conf/examples/dev.yaml
 
 # k8s-onprem environment: runs in-cluster via the nf-driver pod
-# Usage: make run-k8s ARGS="-params-file conf/examples/dev.yaml -resume"
 run-k8s:
 	kubectl exec -it deploy/$(NF_DRIVER_DEPLOYMENT) -n $(K8S_NAMESPACE) -- \
-		bash -c "cd /app/lynceus && nextflow run main.nf -profile k8s-onprem $(ARGS)"
+		bash -c "cd /app/lynceus && nextflow run main.nf -profile k8s-onprem -resume -params-file conf/examples/dev.yaml"
 
 # Drop into a shell on the driver pod
 driver-exec:

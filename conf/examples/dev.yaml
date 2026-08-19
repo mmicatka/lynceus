@@ -1,8 +1,8 @@
 ---
 # conf/examples/dev.yaml
 
-# uri_list: assets/candidate_uris.blackhole.txt
-candidates_local_path: "/app/lynceus/work/assets/candidates/*.smi.gz"
+uri_list: assets/candidates.sample.txt
+# candidates_local_path: "/app/lynceus/work/assets/candidates/*.smi.gz"
 
 outdir: results/dev
 

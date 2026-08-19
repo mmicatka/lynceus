@@ -2163,6 +2163,7 @@ name = "preprocess-candidates"
 version = "0.1.0"
 source = { editable = "modules/local/preprocess_candidates" }
 dependencies = [
+    { name = "blake3" },
     { name = "click" },
     { name = "dimorphite-dl" },
     { name = "numpy" },
@@ -2173,6 +2174,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "blake3", specifier = ">=1.0.9" },
     { name = "click", specifier = ">=8.4.2" },
     { name = "dimorphite-dl", git = "https://github.com/mmicatka/dimorphite_dl.git" },
     { name = "numpy", specifier = ">=2.5.1" },

@@ -11,6 +11,7 @@ dependencies = [
     "pyarrow>=24.0.0",
     "rdkit>=2026.3.4",
     "dimorphite-dl",
+    "blake3>=1.0.9",
 ]
 
 [project.scripts]
