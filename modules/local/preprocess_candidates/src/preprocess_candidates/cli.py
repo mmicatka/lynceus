@@ -59,7 +59,6 @@ def _build_arrow_schema(steps: list[Step]) -> pa.Schema:
 
 
 def _count_smiles(path: Path) -> int:
-    """Counts the total number of valid molecule lines in a whitespace-delimited SMILES file."""
     count = 0
     with gzip.open(path, "rt", encoding="utf-8") as fh:
         for line in fh:
