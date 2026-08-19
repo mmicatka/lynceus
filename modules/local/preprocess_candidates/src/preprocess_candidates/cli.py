@@ -11,7 +11,13 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 from rdkit import Chem, RDLogger
 
-from .steps import DescriptorsStep, MorganFingerprintStep, PainsStep, Step
+from .steps import (
+    ConformersStep,
+    DescriptorsStep,
+    MorganFingerprintStep,
+    PainsStep,
+    Step,
+)
 
 # RDKit prints a lot of low-level parsing warnings to stderr by default;
 # we handle/report parse failures ourselves, so silence RDKit's own logger.
@@ -25,8 +31,8 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
-_LOG_INTERVAL = 5_000
-_BATCH_SIZE = 10_000
+_LOG_INTERVAL = 1_000
+_BATCH_SIZE = 1_000
 
 _worker_steps: list[Step] = []
 
@@ -112,9 +118,6 @@ def _process_batch(batch: list[tuple[str, str]]) -> list[dict[str, Any]]:
                     if out:
                         row.update(out)
             except Exception as exc:
-                logger.warning(
-                    "Step computation failed for catalog_id=%s: %s", catalog_id, exc
-                )
                 row["steps_ok"] = False
                 row["error_reason"] = f"step_failed: {exc}"
                 for step in _worker_steps:
@@ -164,8 +167,13 @@ def _preprocess(
     logger.info("Finished preprocessing. Total processed: %d", total_processed)
 
 
-def _build_pipeline() -> list[Step]:
-    return [DescriptorsStep(), PainsStep(), MorganFingerprintStep(2, 1024)]
+def _build_pipeline(morgan_radius: int, morgan_n_bits: int, seed: int) -> list[Step]:
+    return [
+        DescriptorsStep(),
+        PainsStep(),
+        MorganFingerprintStep(morgan_radius, morgan_n_bits),
+        ConformersStep(seed=seed),
+    ]
 
 
 class NumWorkersType(click.ParamType):
@@ -211,8 +219,15 @@ NUM_WORKERS = NumWorkersType()
     show_default=True,
     help="Number of parallel workers (integer >= 1 or 'auto').",
 )
-def preprocess(input_path: str, output_path: str, num_workers: int):
-    steps = _build_pipeline()
+@click.option(
+    "--seed",
+    default=1000,
+    type=int,
+    show_default=True,
+    help="Random seed.",
+)
+def preprocess(input_path: str, output_path: str, num_workers: int, seed: int):
+    steps = _build_pipeline(2, 1024, seed)
     _preprocess(
         input_path=input_path,
         output_path=output_path,

@@ -2,9 +2,7 @@
 name = "preprocess-candidates"
 version = "0.1.0"
 description = "Add your description here"
-authors = [
-    { name = "Mike Micatka", email = "mike.micatka@gmail.com" }
-]
+authors = [{ name = "Mike Micatka", email = "mike.micatka@gmail.com" }]
 requires-python = ">=3.12"
 dependencies = [
     "click>=8.4.2",
@@ -12,6 +10,7 @@ dependencies = [
     "polars>=1.42.1",
     "pyarrow>=24.0.0",
     "rdkit>=2026.3.4",
+    "dimorphite-dl",
 ]
 
 [project.scripts]
@@ -20,3 +19,6 @@ preprocess-candidates = "preprocess_candidates.cli:preprocess"
 [build-system]
 requires = ["uv_build>=0.12.3,<0.13.0"]
 build-backend = "uv_build"
+
+[tool.uv.sources]
+dimorphite-dl = { git = "https://github.com/mmicatka/dimorphite_dl.git" }

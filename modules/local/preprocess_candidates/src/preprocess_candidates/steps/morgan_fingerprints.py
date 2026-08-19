@@ -26,12 +26,11 @@ class MorganFingerprintStep:
                 f"{self.name}: init_worker() must be called before compute()"
             )
 
-        morgan_fingerprint = np.stack(self._mfp_gen.GetFingerprintAsNumPy(mol))
-
-        return {"morgan_fingerprint": morgan_fingerprint}
+        morgan_fingerprint = self._mfp_gen.GetFingerprintAsNumPy(mol)
+        return {"morgan_fingerprint": morgan_fingerprint.tolist()}
 
     def failure_result(self) -> dict[str, Any]:
-        return {"morgan_fingerprint": []}
+        return {"morgan_fingerprint": [0] * self._morgan_n_bits}
 
     def output_fields(self) -> list[tuple[str, Any]]:
         return [("morgan_fingerprint", pa.list_(pa.uint8(), self._morgan_n_bits))]
