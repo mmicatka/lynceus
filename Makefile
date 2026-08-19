@@ -1,53 +1,73 @@
 # Lynceus pipeline
 #
 # Each `run-<env>` target wraps `nextflow run main.nf -params-file conf/examples/<env>.yaml`
-# so environment-specific parameters never need to be typed by hand or
-# forgotten on the command line.
 
-.PHONY: build build-lynceus-chem build-detect-putative-binding-sites build-protein-conformational-ensemble build-docking-prep build-sample-candidates build-physiochemical-filter build-docking-run-cpu build-docking-run-gpu run-dev clean reset
+# --- Configuration Variables ---
+REGISTRY ?= registry.nebula.lan:5000
+NAMESPACE ?= lynceus
+VERSION ?= 0.1.0
+IMAGE_PREFIX := $(REGISTRY)/$(NAMESPACE)
+K8S_NAMESPACE ?= lynceus
+NF_DRIVER_DEPLOYMENT ?= nf-driver
 
-build:
-	$(MAKE) build-lynceus-chem
-	$(MAKE) build-protein-conformational-ensemble
-	$(MAKE) build-detect-putative-binding-sites
-	$(MAKE) build-docking-prep
-	$(MAKE) build-sample-candidates
-	$(MAKE) build-physiochemical-filter
-	$(MAKE) build-docking-run-cpu
-	$(MAKE) build-docking-run-gpu
+.PHONY: build push build-* run-dev run-k8s driver-exec driver-restart clean reset lint
+
+build: build-lynceus-chem build-preprocess-candidates build-detect-putative-binding-sites build-protein-conformational-ensemble build-docking-prep build-sample-candidates build-physiochemical-filter build-docking-run-gpu build-nf-driver
 
 build-lynceus-chem:
-	docker build -t lynceus/lynceus-chem:0.1.0 libs/lynceus-chem
+	docker buildx build --platform linux/amd64,linux/arm64 --push -t $(IMAGE_PREFIX)/lynceus-chem:$(VERSION) libs/lynceus-chem
+
+build-preprocess-candidates:
+	docker buildx build --platform linux/amd64,linux/arm64 --push -t $(IMAGE_PREFIX)/preprocess-candidates:0.1.2 modules/local/preprocess_candidates
 
 build-protein-conformational-ensemble:
-	docker build -t lynceus/protein-conformational-ensemble:0.1.0 libs/protein-conformational-ensemble
+	docker buildx build --platform linux/amd64,linux/arm64 --push -t $(IMAGE_PREFIX)/protein-conformational-ensemble:$(VERSION) libs/protein-conformational-ensemble
 
 build-detect-putative-binding-sites:
-	docker build -f modules/local/detect_putative_binding_sites/Dockerfile -t lynceus/detect-putative-binding-sites:0.1.0 .
+	docker buildx build --platform linux/amd64,linux/arm64 --push -f modules/local/detect_putative_binding_sites/Dockerfile -t $(IMAGE_PREFIX)/detect-putative-binding-sites:$(VERSION) .
 
 build-docking-prep:
-	docker build -f modules/local/docking_prep/Dockerfile -t lynceus/docking-prep:0.1.0 .
+	docker buildx build --platform linux/amd64,linux/arm64 --push -f modules/local/docking_prep/Dockerfile -t $(IMAGE_PREFIX)/docking-prep:$(VERSION) .
 
 build-sample-candidates:
-	docker build -t lynceus/sample-candidates:0.1.0 modules/local/sample_candidates
+	docker buildx build --platform linux/amd64,linux/arm64 --push -t $(IMAGE_PREFIX)/sample-candidates:$(VERSION) modules/local/sample_candidates
 
 build-physiochemical-filter:
-	docker build -t lynceus/physiochemical-filter:0.1.0 modules/local/physiochemical_filter
-
-build-docking-run-cpu:
-	docker build --target cpu -t lynceus/docking-run:cpu-0.1.0 modules/local/docking_run
+	docker buildx build --platform linux/amd64,linux/arm64 --push -t $(IMAGE_PREFIX)/physiochemical-filter:$(VERSION) modules/local/physiochemical_filter
 
 build-docking-run-gpu:
-	docker build --target gpu -t lynceus/docking-run:gpu-0.1.0 modules/local/docking_run
+	docker buildx build --platform linux/amd64 --push --target gpu -t $(IMAGE_PREFIX)/docking-run:gpu-$(VERSION) modules/local/docking_run
 
+build-nf-driver:
+	docker buildx build --platform linux/amd64 --push -f driver.Dockerfile -t $(IMAGE_PREFIX)/nf-driver:$(VERSION) .
+
+# --- Utilities ---
 # Dev environment: loads conf/examples/dev.yaml
 run-dev:
 	nextflow run main.nf -resume -params-file conf/examples/dev.yaml
+
+run-k8s-local:
+	nextflow run main.nf -resume -profile k8s-onprem -params-file conf/params.yaml
+
+# k8s-onprem environment: runs in-cluster via the nf-driver pod
+run-k8s:
+	kubectl exec -it deploy/$(NF_DRIVER_DEPLOYMENT) -n $(K8S_NAMESPACE) -- \
+		bash -c "cd /app/lynceus && nextflow run main.nf -profile k8s-onprem -resume"
+
+# Drop into a shell on the driver pod
+driver-exec:
+	kubectl exec -it deploy/$(NF_DRIVER_DEPLOYMENT) -n $(K8S_NAMESPACE) -- bash
+
+# Force a fresh pull of the latest nf-driver image (after build-nf-driver + push)
+driver-restart:
+	kubectl rollout restart deployment/$(NF_DRIVER_DEPLOYMENT) -n $(K8S_NAMESPACE)
+	kubectl rollout status deployment/$(NF_DRIVER_DEPLOYMENT) -n $(K8S_NAMESPACE)
 
 clean:
 	rm -rf work/
 	rm -rf .nextflow*
 	rm -f nextflow.log*
+	rm -rf null/
 
 reset: clean
 	rm -rf results/*

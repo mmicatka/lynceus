@@ -1,7 +1,7 @@
 // modules/local/detect_putative_binding_sites/main.nf
 
 process DETECT_PUTATIVE_BINDING_SITES {
-    container 'lynceus/detect-putative-binding-sites:0.1.0'
+    container "${params.registry}/lynceus/detect-putative-binding-sites:0.1.0"
 
     input:
     tuple val(ensemble_id), path(ensemble_dir)

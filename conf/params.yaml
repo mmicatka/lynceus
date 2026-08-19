@@ -1,10 +1,24 @@
 ---
-#conf/params.yaml
+# conf/params.yaml
 
-# Default parameters for the Lynceus pipeline.
-# Override with: nextflow run main.nf -params-file my_params.yaml
-# or: nextflow run main.nf --uri_list path/to/uris.txt
+candidates:
+  uri_list: assets/candidates.sample.txt
+  filter:
+    config: "/app/lynceus/work/conf/examples/physiochemical_filter.yaml"
+    batch_size: 50000
 
-uri_list: assets/candidate_uris.txt
+surrogate_model:
+  training:
+    seed: 1000
+    num_samples: 10000
 
-outdir: results
+target:
+  ensemble:
+    ensemble_id: "T4_lysozyme_L99_static"
+    type: "static"
+    components:
+      - pdb_id: "1L83"
+        weight: 1.0
+
+    capabilities_required:
+      - "standalone_cif"

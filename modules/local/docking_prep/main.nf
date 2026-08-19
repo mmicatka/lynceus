@@ -2,7 +2,9 @@
 
 process DOCKING_PREP_TARGET {
     tag "${ensemble_id}"
-    container 'lynceus/docking-prep:0.1.0'
+    container "${params.registry}/lynceus/docking-prep:0.1.0"
+
+    label 'pvc_io_retry'
 
     input:
     tuple val(ensemble_id), path(ensemble_dir)
@@ -21,7 +23,7 @@ process DOCKING_PREP_TARGET {
 
 process DOCKING_PREP_CANDIDATE_CONFORMER_GENERATE {
     label 'process_single'
-    container 'lynceus/docking-prep:0.1.0'
+    container "${params.registry}/lynceus/docking-prep:0.1.0"
 
     input:
     path input_parquet
@@ -39,7 +41,7 @@ process DOCKING_PREP_CANDIDATE_CONFORMER_GENERATE {
 
 process DOCKING_PREP_CANDIDATE_CONVERT_PDBQT {
     label 'process_single'
-    container 'lynceus/docking-prep:0.1.0'
+    container "${params.registry}/lynceus/docking-prep:0.1.0"
 
     input:
     path input_dir

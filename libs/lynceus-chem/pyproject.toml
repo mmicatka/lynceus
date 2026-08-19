@@ -13,8 +13,6 @@ dependencies = [
     "rdkit>=2026.3.3",
 ]
 
-[project.scripts]
-lynceus-chem-preprocess = "lynceus_chem.preprocess:preprocess"
 lynceus-chem-retrieve-pdbs = "lynceus_chem.utils:retrieve_pdbs"
 
 [build-system]
