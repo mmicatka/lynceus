@@ -148,11 +148,9 @@ def _configure_s3(
     s3_url_style: str,
     s3_use_ssl: bool,
 ) -> None:
-    endpoint_host = s3_endpoint.removeprefix("https://").removeprefix("http://")
-
     con.execute("INSTALL httpfs")
     con.execute("LOAD httpfs")
-    con.execute("SET s3_endpoint = ?", [endpoint_host])
+    con.execute("SET s3_endpoint = ?", [s3_endpoint])
     con.execute("SET s3_region = ?", [s3_region])
     con.execute("SET s3_url_style = ?", [s3_url_style])
     con.execute(f"SET s3_use_ssl = {'true' if s3_use_ssl else 'false'}")
@@ -178,7 +176,7 @@ def _write_table_to_s3(
 
 def _preprocess(
     input_path: Path,
-    output_uri: str,
+    output_path: str,
     num_workers: int,
     steps: list[Step],
     s3_endpoint: str,
@@ -233,13 +231,13 @@ def _preprocess(
 
     con = duckdb.connect()
     _configure_s3(con, s3_endpoint, s3_region, s3_url_style, s3_use_ssl)
-    _write_table_to_s3(con, table, output_uri)
+    _write_table_to_s3(con, table, output_path)
 
     logger.info(
         "Finished preprocessing. Processed %d of %d molecules. Wrote to %s",
         total_processed,
         total_molecules,
-        output_uri,
+        output_path,
     )
 
 
@@ -282,11 +280,11 @@ NUM_WORKERS = NumWorkersType()
     help="Path to the input file.",
 )
 @click.option(
-    "--output-uri",
-    "output_uri",
+    "--output",
+    "output",
     type=str,
     required=True,
-    help="S3 URI to write the output Parquet file to.",
+    help="Output Parquet file.",
 )
 @click.option(
     "--num-workers",
@@ -313,7 +311,7 @@ NUM_WORKERS = NumWorkersType()
 @click.option("--s3-use-ssl", is_flag=True, default=False)
 def preprocess(
     input_path: str,
-    output_uri: str,
+    output: str,
     num_workers: int,
     seed: int,
     s3_endpoint: str,
@@ -324,7 +322,7 @@ def preprocess(
     steps = _build_pipeline(2, 1024, seed)
     _preprocess(
         input_path=input_path,
-        output_uri=output_uri,
+        output_path=output,
         num_workers=num_workers,
         steps=steps,
         s3_endpoint=s3_endpoint,

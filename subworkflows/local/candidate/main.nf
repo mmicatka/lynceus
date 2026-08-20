@@ -18,10 +18,7 @@ workflow CANDIDATE {
 
   ch_smi_gz = ch_candidates.filter { candidate_file -> candidate_file.name.endsWith('.smi.gz') }
 
-  PREPROCESS_CANDIDATES(
-    ch_smi_gz,
-    "s3://${params.candidates.output_bucket}/preprocessed",
-  )
+  PREPROCESS_CANDIDATES(ch_smi_gz)
 
   ch_preprocess_done = PREPROCESS_CANDIDATES.out.done.collect()
 

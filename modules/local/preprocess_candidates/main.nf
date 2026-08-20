@@ -8,7 +8,6 @@ process PREPROCESS_CANDIDATES {
 
     input:
     path smi_gz
-    val output_uri_prefix
 
     output:
     val true, emit: done
@@ -18,7 +17,7 @@ process PREPROCESS_CANDIDATES {
     """
     preprocess-candidates \\
         --input ${smi_gz} \\
-        --output-uri ${params.s3_endpoint}/${output_uri_prefix}/${prefix}.parquet \\
+        --output preprocessed/${prefix}.parquet \\
         --s3-endpoint '${params.s3_endpoint}' \\
         --s3-region '${params.s3_region ?: "garage"}' \\
         --s3-url-style '${params.s3_url_style ?: "path"}'
