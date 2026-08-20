@@ -12,6 +12,7 @@ dependencies = [
     "rdkit>=2026.3.4",
     "dimorphite-dl",
     "blake3>=1.0.9",
+    "duckdb>=1.5.4",
 ]
 
 [project.scripts]

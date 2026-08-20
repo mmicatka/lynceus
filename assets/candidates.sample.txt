@@ -1,3 +1,3 @@
-s3://lynceus/smiles/H13P000.smi.gz
-s3://lynceus/smiles/H13M100.smi.gz
-s3://lynceus/smiles/H13P010.smi.gz
+s3://lynceus/smiles/H06P070.smi.gz
+s3://lynceus/smiles/H07P090.smi.gz
+s3://lynceus/smiles/H07P110.smi.gz

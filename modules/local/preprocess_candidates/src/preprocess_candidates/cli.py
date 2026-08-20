@@ -1,14 +1,16 @@
 # modules/local/preprocess_candidates/src/preprocess_candidates/preprocess.py
+
 import gzip
 import logging
 import os
+import sys
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 from typing import Any, Iterator
 
 import click
+import duckdb
 import pyarrow as pa
-import pyarrow.parquet as pq
 from rdkit import Chem, RDLogger
 
 from .steps import (
@@ -29,7 +31,7 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 
-logger = logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 _LOG_INTERVAL = 1_000
 _BATCH_SIZE = 1_000
@@ -87,7 +89,7 @@ def _iter_smiles(path: Path) -> Iterator[tuple[str, str]]:
                 )
 
 
-def _results_to_frame(
+def _results_to_batch(
     results: list[dict[str, Any]], schema: pa.Schema
 ) -> pa.RecordBatch:
     return pa.RecordBatch.from_pylist(results, schema=schema)
@@ -139,15 +141,52 @@ def _process_batch(batch: list[tuple[str, str]]) -> list[dict[str, Any]]:
     return results
 
 
+def _configure_s3(
+    con: duckdb.DuckDBPyConnection,
+    s3_endpoint: str,
+    s3_region: str,
+    s3_url_style: str,
+    s3_use_ssl: bool,
+) -> None:
+    endpoint_host = s3_endpoint.removeprefix("https://").removeprefix("http://")
+
+    con.execute("INSTALL httpfs")
+    con.execute("LOAD httpfs")
+    con.execute("SET s3_endpoint = ?", [endpoint_host])
+    con.execute("SET s3_region = ?", [s3_region])
+    con.execute("SET s3_url_style = ?", [s3_url_style])
+    con.execute(f"SET s3_use_ssl = {'true' if s3_use_ssl else 'false'}")
+    access_key_id = os.environ.get("AWS_ACCESS_KEY_ID")
+    secret_access_key = os.environ.get("AWS_SECRET_ACCESS_KEY")
+    if not access_key_id or not secret_access_key:
+        logger.error("AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY must both be set")
+        sys.exit(1)
+
+    con.execute("SET s3_access_key_id = ?", [access_key_id])
+    con.execute("SET s3_secret_access_key = ?", [secret_access_key])
+
+
+def _write_table_to_s3(
+    con: duckdb.DuckDBPyConnection, table: pa.Table, output_uri: str
+) -> None:
+    con.register("processed_candidates", table)
+    con.execute(
+        f"COPY (SELECT * FROM processed_candidates) TO '{output_uri}' (FORMAT PARQUET)"
+    )
+    con.unregister("processed_candidates")
+
+
 def _preprocess(
     input_path: Path,
-    output_path: Path,
+    output_uri: str,
     num_workers: int,
     steps: list[Step],
+    s3_endpoint: str,
+    s3_region: str,
+    s3_url_style: str,
+    s3_use_ssl: bool,
 ) -> None:
     input_path = Path(input_path)
-    output_path = Path(output_path)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
 
     logger.info("Counting total molecules in %s...", input_path.name)
     total_molecules = _count_smiles(input_path)
@@ -163,31 +202,44 @@ def _preprocess(
 
     total_processed = 0
     next_log_at = _LOG_INTERVAL
+    record_batches: list[pa.RecordBatch] = []
 
-    with pq.ParquetWriter(output_path, schema) as writer:
-        with ProcessPoolExecutor(
-            max_workers=num_workers, initializer=_init_worker, initargs=(steps,)
-        ) as executor:
-            iterator = _iter_smiles(input_path)
-            batches = _batch(iterator, _BATCH_SIZE)
+    with ProcessPoolExecutor(
+        max_workers=num_workers, initializer=_init_worker, initargs=(steps,)
+    ) as executor:
+        iterator = _iter_smiles(input_path)
+        batches = _batch(iterator, _BATCH_SIZE)
 
-            for results in executor.map(_process_batch, batches):
-                record_batch = _results_to_frame(results, schema)
-                writer.write_batch(record_batch)
+        for results in executor.map(_process_batch, batches):
+            record_batches.append(_results_to_batch(results, schema))
 
-                total_processed += len(results)
-                if total_processed >= next_log_at:
-                    logger.info(
-                        "Processed %d of %d molecules...",
-                        total_processed,
-                        total_molecules,
-                    )
-                    next_log_at = total_processed + _LOG_INTERVAL
+            total_processed += len(results)
+            if total_processed >= next_log_at:
+                logger.info(
+                    "Processed %d of %d molecules...",
+                    total_processed,
+                    total_molecules,
+                )
+                next_log_at = total_processed + _LOG_INTERVAL
+
+    if total_processed == 0:
+        logger.error(
+            "no molecules were processed from %s; refusing to write empty output",
+            input_path,
+        )
+        sys.exit(1)
+
+    table = pa.Table.from_batches(record_batches, schema=schema)
+
+    con = duckdb.connect()
+    _configure_s3(con, s3_endpoint, s3_region, s3_url_style, s3_use_ssl)
+    _write_table_to_s3(con, table, output_uri)
 
     logger.info(
-        "Finished preprocessing. Processed %d of %d molecules.",
+        "Finished preprocessing. Processed %d of %d molecules. Wrote to %s",
         total_processed,
         total_molecules,
+        output_uri,
     )
 
 
@@ -230,11 +282,11 @@ NUM_WORKERS = NumWorkersType()
     help="Path to the input file.",
 )
 @click.option(
-    "--output",
-    "output_path",
-    type=click.Path(writable=True),
+    "--output-uri",
+    "output_uri",
+    type=str,
     required=True,
-    help="Path to save the output.",
+    help="S3 URI to write the output Parquet file to.",
 )
 @click.option(
     "--num-workers",
@@ -250,11 +302,33 @@ NUM_WORKERS = NumWorkersType()
     show_default=True,
     help="Random seed.",
 )
-def preprocess(input_path: str, output_path: str, num_workers: int, seed: int):
+@click.option("--s3-endpoint", required=True)
+@click.option("--s3-region", default="garage", show_default=True)
+@click.option(
+    "--s3-url-style",
+    default="path",
+    type=click.Choice(["path", "vhost"]),
+    show_default=True,
+)
+@click.option("--s3-use-ssl", is_flag=True, default=False)
+def preprocess(
+    input_path: str,
+    output_uri: str,
+    num_workers: int,
+    seed: int,
+    s3_endpoint: str,
+    s3_region: str,
+    s3_url_style: str,
+    s3_use_ssl: bool,
+):
     steps = _build_pipeline(2, 1024, seed)
     _preprocess(
         input_path=input_path,
-        output_path=output_path,
+        output_uri=output_uri,
         num_workers=num_workers,
         steps=steps,
+        s3_endpoint=s3_endpoint,
+        s3_region=s3_region,
+        s3_url_style=s3_url_style,
+        s3_use_ssl=s3_use_ssl,
     )

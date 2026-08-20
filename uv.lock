@@ -23,6 +23,7 @@ members = [
     "physiochemical-filter",
     "preprocess-candidates",
     "protein-conformational-ensemble",
+    "rebalance-candidates",
     "sample-candidates",
     "surrogate-model",
 ]
@@ -1532,6 +1533,7 @@ dependencies = [
     { name = "physiochemical-filter" },
     { name = "preprocess-candidates" },
     { name = "protein-conformational-ensemble" },
+    { name = "rebalance-candidates" },
     { name = "sample-candidates" },
     { name = "surrogate-model" },
 ]
@@ -1556,6 +1558,7 @@ requires-dist = [
     { name = "physiochemical-filter", editable = "modules/local/physiochemical_filter" },
     { name = "preprocess-candidates", editable = "modules/local/preprocess_candidates" },
     { name = "protein-conformational-ensemble", editable = "libs/protein-conformational-ensemble" },
+    { name = "rebalance-candidates", editable = "modules/local/rebalance_candidates" },
     { name = "sample-candidates", editable = "modules/local/sample_candidates" },
     { name = "surrogate-model", editable = "modules/local/surrogate_model" },
 ]
@@ -2166,6 +2169,7 @@ dependencies = [
     { name = "blake3" },
     { name = "click" },
     { name = "dimorphite-dl" },
+    { name = "duckdb" },
     { name = "numpy" },
     { name = "polars" },
     { name = "pyarrow" },
@@ -2177,6 +2181,7 @@ requires-dist = [
     { name = "blake3", specifier = ">=1.0.9" },
     { name = "click", specifier = ">=8.4.2" },
     { name = "dimorphite-dl", git = "https://github.com/mmicatka/dimorphite_dl.git" },
+    { name = "duckdb", specifier = ">=1.5.4" },
     { name = "numpy", specifier = ">=2.5.1" },
     { name = "polars", specifier = ">=1.42.1" },
     { name = "pyarrow", specifier = ">=24.0.0" },
@@ -2634,6 +2639,21 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/c9/84/cb2f0276f997efdd019b2babb35b50ff1faeca0a20d6a9fd47e9d07c2001/rdkit-2026.3.4-cp314-cp314-manylinux_2_28_aarch64.whl", hash = "sha256:5c0b86cd5243713c07203e602899b623f169752cbe5a20b311e5cbc3ae12dca0", size = 35906893, upload-time = "2026-07-16T10:13:13.062Z" },
     { url = "https://files.pythonhosted.org/packages/e1/11/1a9a693e424b2a75755d56ecb67ccc6f77e6e5bb7417dec5e73d9c410314/rdkit-2026.3.4-cp314-cp314-manylinux_2_28_x86_64.whl", hash = "sha256:1218f1d3d1e348ced44f815b2acc8d8a941da1ad67e3cf64e9c20fa090522882", size = 37425224, upload-time = "2026-07-16T10:13:17.675Z" },
     { url = "https://files.pythonhosted.org/packages/53/0b/160aae5c7c8d9023be553f88fb0e3d4e8b736e24cce4a681b91d9c4bb43d/rdkit-2026.3.4-cp314-cp314-win_amd64.whl", hash = "sha256:a9a71fe0f14e9a08818530aed77e89bae8506f479bb99b0e362ebb7fe156899a", size = 25225184, upload-time = "2026-07-16T10:13:21.848Z" },
+]
+
+[[package]]
+name = "rebalance-candidates"
+version = "0.1.0"
+source = { editable = "modules/local/rebalance_candidates" }
+dependencies = [
+    { name = "duckdb" },
+    { name = "pyarrow" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "duckdb", specifier = ">=1.5.4" },
+    { name = "pyarrow", specifier = ">=24.0.0" },
 ]
 
 [[package]]

@@ -1,5 +1,6 @@
 FROM python:3.12-slim-trixie
 
+ARG TARGETARCH
 ARG NEXTFLOW_VERSION=26.04.6
 ARG KUBECTL_VERSION=v1.31.0
 
@@ -9,10 +10,11 @@ RUN apt-get update \
   curl \
   ca-certificates \
   git \
+  make \
   && rm -rf /var/lib/apt/lists/*
 
 RUN curl -fsSL -o /usr/local/bin/kubectl \
-  "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl" \
+  "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/${TARGETARCH}/kubectl" \
   && chmod +x /usr/local/bin/kubectl
 
 RUN curl -fsSL https://github.com/nextflow-io/nextflow/releases/download/v${NEXTFLOW_VERSION}/nextflow \

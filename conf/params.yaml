@@ -1,11 +1,15 @@
 ---
 # conf/params.yaml
 
+s3_endpoint: http://192.168.1.4:3900
+s3_region: garage
+s3_url_style: path
+
 candidates:
   uri_list: assets/candidates.sample.txt
-  filter:
-    config: "/app/lynceus/work/conf/examples/physiochemical_filter.yaml"
-    batch_size: 50000
+  filter_config: "/app/lynceus/work/conf/examples/physiochemical_filter.yaml"
+  num_shards: 8
+  output_bucket: lynceus
 
 surrogate_model:
   training:

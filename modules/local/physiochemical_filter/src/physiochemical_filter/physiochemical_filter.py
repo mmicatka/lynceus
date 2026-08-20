@@ -70,28 +70,6 @@ def _apply_property_filters(
     return rel
 
 
-def _write_partitions(
-    rel: duckdb.DuckDBPyRelation,
-    n_rows: int,
-    output_dir: Path,
-    prefix: str,
-    partition_size: int,
-) -> list[Path]:
-    output_dir.mkdir(parents=True, exist_ok=True)
-    n_partitions = max(1, (n_rows + partition_size - 1) // partition_size)
-    width = max(5, len(str(n_partitions)))
-
-    written = []
-    for i in range(n_partitions):
-        offset = i * partition_size
-        chunk = rel.limit(partition_size, offset=offset)
-        out_path = output_dir / f"{prefix}-{i:0{width}d}.parquet"
-        chunk.write_parquet(str(out_path))
-        written.append(out_path)
-
-    return written
-
-
 def _parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument(
@@ -105,21 +83,10 @@ def _parse_args() -> argparse.Namespace:
         "--config", required=True, type=Path, help="YAML filter configuration"
     )
     p.add_argument(
-        "--output-dir",
+        "--output",
         required=True,
         type=Path,
-        help="Directory to write partitioned output parquet files",
-    )
-    p.add_argument(
-        "--output-prefix",
-        default="candidates_filtered",
-        help="Filename prefix for output partitions",
-    )
-    p.add_argument(
-        "--partition-size",
-        required=True,
-        type=int,
-        help="Max rows per output partition file",
+        help="Path to write the single output parquet file",
     )
     p.add_argument(
         "--report",
@@ -130,46 +97,56 @@ def _parse_args() -> argparse.Namespace:
     return p.parse_args()
 
 
+def load_config(config_path: Path) -> dict:
+    with open(config_path) as fh:
+        return yaml.safe_load(fh) or {}
+
+
+def apply_all_filters(
+    rel: duckdb.DuckDBPyRelation, config: dict, report: dict
+) -> duckdb.DuckDBPyRelation:
+    columns = set(rel.columns)
+
+    rel = _apply_property_filters(rel, config.get("properties", {}), columns, report)
+    rel = _apply_pains_filter(rel, config.get("pains", {}), report)
+    rel = _apply_cns_mpo_filter(rel, config.get("cns_mpo", {}), report)
+
+    return rel
+
+
+def save_outputs(
+    rel: duckdb.DuckDBPyRelation, report: dict, output_path: Path, report_path: Path
+) -> None:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    rel.write_parquet(str(output_path))
+    logger.info("Wrote output file to %s", output_path)
+
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(report_path, "w") as fh:
+        json.dump(report, fh, indent=2)
+
+
 def physiochemical_filter():
     args = _parse_args()
-
-    with open(args.config) as fh:
-        config = yaml.safe_load(fh) or {}
-
-    property_cfg = config.get("properties", {})
-    pains_cfg = config.get("pains", {})
-    cns_mpo_cfg = config.get("cns_mpo", {})
+    config = load_config(args.config)
 
     logger.info(
         "Reading %d input parquet file(s) as a combined dataset", len(args.input)
     )
     rel = duckdb.read_parquet([str(p) for p in args.input])
-    columns = set(rel.columns)
 
     report = {"n_input": rel.count("*").fetchone()[0], "fail_reasons": {}}
 
-    rel = _apply_property_filters(rel, property_cfg, columns, report)
-    rel = _apply_pains_filter(rel, pains_cfg, report)
-    rel = _apply_cns_mpo_filter(rel, cns_mpo_cfg, report)
+    rel = apply_all_filters(rel, config, report)
 
-    n_pass = rel.count("*").fetchone()[0]
-    report["n_pass"] = n_pass
-    report["n_fail"] = report["n_input"] - n_pass
+    report["n_pass"] = rel.count("*").fetchone()[0]
+    report["n_fail"] = report["n_input"] - report["n_pass"]
 
     logger.info(
-        "Filtered %d -> %d rows (%d failed); writing partitions of up to %d rows",
+        "Filtered %d -> %d rows (%d failed)",
         report["n_input"],
         report["n_pass"],
         report["n_fail"],
-        args.partition_size,
     )
 
-    written = _write_partitions(
-        rel, n_pass, args.output_dir, args.output_prefix, args.partition_size
-    )
-    report["n_partitions"] = len(written)
-
-    with open(args.report, "w") as fh:
-        json.dump(report, fh, indent=2)
-
-    logger.info("Wrote %d partition file(s) to %s", len(written), args.output_dir)
+    save_outputs(rel, report, args.output, args.report)

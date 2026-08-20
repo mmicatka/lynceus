@@ -12,13 +12,16 @@ NF_DRIVER_DEPLOYMENT ?= nf-driver
 
 .PHONY: build push build-* run-dev run-k8s driver-exec driver-restart clean reset lint
 
-build: build-lynceus-chem build-preprocess-candidates build-detect-putative-binding-sites build-protein-conformational-ensemble build-docking-prep build-sample-candidates build-physiochemical-filter build-docking-run-gpu build-nf-driver
+build: build-lynceus-chem build-preprocess-candidates build-rebalance-candidates build-detect-putative-binding-sites build-protein-conformational-ensemble build-docking-prep build-sample-candidates build-physiochemical-filter build-docking-run-gpu build-nf-driver
 
 build-lynceus-chem:
 	docker buildx build --platform linux/amd64,linux/arm64 --push -t $(IMAGE_PREFIX)/lynceus-chem:$(VERSION) libs/lynceus-chem
 
 build-preprocess-candidates:
-	docker buildx build --platform linux/amd64,linux/arm64 --push -t $(IMAGE_PREFIX)/preprocess-candidates:0.1.2 modules/local/preprocess_candidates
+	docker buildx build --platform linux/amd64,linux/arm64 --push -t $(IMAGE_PREFIX)/preprocess-candidates:$(VERSION) modules/local/preprocess_candidates
+
+build-rebalance-candidates:
+	docker buildx build --platform linux/amd64,linux/arm64 --push -t $(IMAGE_PREFIX)/rebalance-candidates:$(VERSION) modules/local/rebalance_candidates
 
 build-protein-conformational-ensemble:
 	docker buildx build --platform linux/amd64,linux/arm64 --push -t $(IMAGE_PREFIX)/protein-conformational-ensemble:$(VERSION) libs/protein-conformational-ensemble

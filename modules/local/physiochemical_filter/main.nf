@@ -7,24 +7,21 @@ process PHYSIOCHEMICAL_FILTER {
     label 'pvc_io_retry'
 
     input:
-    path parquet_files, stageAs: 'input??/*'
+    path candidates
     path filter_config
-    val partition_size
 
     output:
-    path "partitions/*.parquet", emit: parquet
-    path "filter_report.json", emit: report
+    path "*.parquet", emit: filtered
 
     when:
     task.ext.when == null || task.ext.when
 
     script:
+    def prefix = candidates.simpleName
     """
     physiochemical-filter \\
-        --input ${parquet_files} \\
+        --input ${candidates} \\
         --config ${filter_config} \\
-        --output-dir partitions \\
-        --partition-size ${partition_size} \\
-        --report filter_report.json
+        --output ${prefix}.filtered.parquet
     """
 }
