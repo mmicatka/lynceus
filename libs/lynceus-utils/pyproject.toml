@@ -1,0 +1,14 @@
+[project]
+name = "lynceus-utils"
+version = "0.1.0"
+description = "Add your description here"
+authors = [{ name = "Mike Micatka", email = "mike.micatka@gmail.com" }]
+requires-python = ">=3.12"
+dependencies = ["duckdb>=1.5.4", "pyarrow>=24.0.0", "pydantic>=2.13.4"]
+
+[project.optional-dependencies]
+s3 = ["s3fs>=2024.1"]
+
+[build-system]
+requires = ["uv_build>=0.12.5,<0.13.0"]
+build-backend = "uv_build"

@@ -13,6 +13,7 @@ dependencies = [
     "dimorphite-dl",
     "blake3>=1.0.9",
     "duckdb>=1.5.4",
+    "lynceus-utils",
 ]
 
 [project.scripts]
@@ -24,3 +25,4 @@ build-backend = "uv_build"
 
 [tool.uv.sources]
 dimorphite-dl = { git = "https://github.com/mmicatka/dimorphite_dl.git" }
+lynceus-utils = { workspace = true }

@@ -9,8 +9,9 @@ from pathlib import Path
 from typing import Any, Iterator
 
 import click
-import duckdb
 import pyarrow as pa
+from lynceus_utils.duckdb import export_parquet, get_connection
+from lynceus_utils.storage.blob_storage import get_blob_storage_settings
 from rdkit import Chem, RDLogger
 
 from .steps import (
@@ -141,49 +142,11 @@ def _process_batch(batch: list[tuple[str, str]]) -> list[dict[str, Any]]:
     return results
 
 
-def _configure_s3(
-    con: duckdb.DuckDBPyConnection,
-    s3_endpoint: str,
-    s3_region: str,
-    s3_url_style: str,
-    s3_use_ssl: bool,
-) -> None:
-    con.execute("INSTALL httpfs")
-    con.execute("LOAD httpfs")
-    con.execute("SET s3_endpoint = ?", [s3_endpoint])
-    con.execute("SET s3_region = ?", [s3_region])
-    con.execute("SET s3_url_style = ?", [s3_url_style])
-    con.execute(f"SET s3_use_ssl = {'true' if s3_use_ssl else 'false'}")
-    access_key_id = os.environ.get("AWS_ACCESS_KEY_ID")
-    secret_access_key = os.environ.get("AWS_SECRET_ACCESS_KEY")
-    if not access_key_id or not secret_access_key:
-        logger.error("AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY must both be set")
-        sys.exit(1)
-
-    con.execute("SET s3_access_key_id = ?", [access_key_id])
-    con.execute("SET s3_secret_access_key = ?", [secret_access_key])
-
-
-def _write_table_to_s3(
-    con: duckdb.DuckDBPyConnection, table: pa.Table, output_uri: str
-) -> None:
-    con.register("processed_candidates", table)
-    con.execute(
-        f"COPY (SELECT * FROM processed_candidates) TO '{output_uri}' (FORMAT PARQUET)"
-    )
-    con.unregister("processed_candidates")
-
-
 def _preprocess(
     input_path: Path,
-    output_path: str,
     num_workers: int,
     steps: list[Step],
-    s3_endpoint: str,
-    s3_region: str,
-    s3_url_style: str,
-    s3_use_ssl: bool,
-) -> None:
+) -> pa.Table:
     input_path = Path(input_path)
 
     logger.info("Counting total molecules in %s...", input_path.name)
@@ -227,18 +190,13 @@ def _preprocess(
         )
         sys.exit(1)
 
-    table = pa.Table.from_batches(record_batches, schema=schema)
-
-    con = duckdb.connect()
-    _configure_s3(con, s3_endpoint, s3_region, s3_url_style, s3_use_ssl)
-    _write_table_to_s3(con, table, output_path)
-
     logger.info(
-        "Finished preprocessing. Processed %d of %d molecules. Wrote to %s",
+        "Finished preprocessing. Processed %d of %d molecules.",
         total_processed,
         total_molecules,
-        output_path,
     )
+
+    return pa.Table.from_batches(record_batches, schema=schema)
 
 
 def _build_pipeline(morgan_radius: int, morgan_n_bits: int, seed: int) -> list[Step]:
@@ -300,33 +258,30 @@ NUM_WORKERS = NumWorkersType()
     show_default=True,
     help="Random seed.",
 )
-@click.option("--s3-endpoint", required=True)
-@click.option("--s3-region", default="garage", show_default=True)
 @click.option(
-    "--s3-url-style",
-    default="path",
-    type=click.Choice(["path", "vhost"]),
-    show_default=True,
+    "--use-blob-storage",
+    is_flag=True,
+    help="Output Parquet file..",
 )
-@click.option("--s3-use-ssl", is_flag=True, default=False)
 def preprocess(
     input_path: str,
     output: str,
     num_workers: int,
     seed: int,
-    s3_endpoint: str,
-    s3_region: str,
-    s3_url_style: str,
-    s3_use_ssl: bool,
+    use_blob_storage: bool,
 ):
     steps = _build_pipeline(2, 1024, seed)
-    _preprocess(
+
+    table: pa.Table = _preprocess(
         input_path=input_path,
-        output_path=output,
         num_workers=num_workers,
         steps=steps,
-        s3_endpoint=s3_endpoint,
-        s3_region=s3_region,
-        s3_url_style=s3_url_style,
-        s3_use_ssl=s3_use_ssl,
     )
+
+    if use_blob_storage:
+        logger.info("using blob storage...")
+        blob_storage_settings = get_blob_storage_settings()
+        conn = get_connection(blob_storage_settings)
+        export_parquet(conn, table, output)
+    # else:
+    #     _write_local_parquet(table, output)
