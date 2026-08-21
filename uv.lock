@@ -3341,6 +3341,7 @@ name = "sample-candidates"
 version = "0.1.0"
 source = { editable = "modules/local/sample_candidates" }
 dependencies = [
+    { name = "click" },
     { name = "duckdb" },
     { name = "polars" },
     { name = "pyarrow" },
@@ -3349,6 +3350,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "click", specifier = ">=8.4.2" },
     { name = "duckdb", specifier = ">=1.5.4" },
     { name = "polars", specifier = ">=1.42.1" },
     { name = "pyarrow", specifier = ">=24.0.0" },

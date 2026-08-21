@@ -6,6 +6,7 @@ version = "0.1.0"
 description = "Add your description here"
 requires-python = ">=3.12"
 dependencies = [
+  "click>=8.4.2",
   "duckdb>=1.5.4",
   "polars>=1.42.1",
   "pyarrow>=24.0.0",
@@ -13,7 +14,7 @@ dependencies = [
 ]
 
 [project.scripts]
-sample-candidates = "sample_candidates.sample_candidates:sample_candidates"
+sample-candidates = "sample_candidates.cli:sample_candidates"
 
 [build-system]
 requires = ["uv_build>=0.11.30,<0.12.0"]

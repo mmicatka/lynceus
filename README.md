@@ -23,17 +23,18 @@ flowchart TD
   end
 
   subgraph Candidate
-    RetrieveCandidates[/"Retrieve Candidates"/] --> Candidates@{ shape: st-rect, label: "Candidates" }
-    Candidates --> PhysioChemFilter{"Physiochemical Filter(s)<br>(PAINS, CNS-MPO, etc.)"}
-    PhysioChemFilter --> PhysioChemFilteredCandidates@{shape: st-rect, label: "Filtered Candidates"}
+    RetrieveCandidates@{ shape: st-rect, label: "Retrieve Candidates"} --> Candidates@{ shape: st-rect, label: "Candidates" }
+    Candidates --> Preprocessing["Preprocessing"]
+    Preprocessing --> Repartition["Repartition"]
+    Repartition --> BalancedCandidates@{ shape: st-rect, label: "Candidates" }
+    BalancedCandidates --> PhysioChemFilter{"Physiochemical Filter(s)<br>(PAINS, CNS-MPO, etc.)"}
+    PhysioChemFilter --> FilteredCandidates@{shape: st-rect, label: "Filtered Candidates"}
   end
 
   subgraph Surrogate Model
-    PhysioChemFilteredCandidates -- "sample" --> TrainingCandidates@{ shape: st-rect, label: "Training Candidates" }
-    TrainingCandidates --> TrainingConformerGeneration{{"Training Conformer Generation"}}
-    TrainingConformerGeneration --> TrainingConformers@{shape: st-rect, label: "Training Conformers"}
+    FilteredCandidates -- "sample" --> TrainingCandidates@{ shape: st-rect, label: "Training Candidates" }
 
-    TrainingConformers --> ModelComplexGeneration["Complex Generation"]
+    TrainingCandidates --> ModelComplexGeneration["Complex Generation"]
     PutativeBindingSites --> ModelComplexGeneration
 
     ModelComplexGeneration --> TrainingComplexes@{shape: st-rect, label: "Training Complexes"}
@@ -44,7 +45,7 @@ flowchart TD
 
   subgraph Surrogate Model Filter
     SurrogateModel --> SurrogateModelFilter{"Model Filter"}
-    PhysioChemFilteredCandidates -- "full library" --> SurrogateModelFilter
+    FilteredCandidates -- "full library" --> SurrogateModelFilter
     SurrogateModelFilter --> SurrogateFilteredCandidates@{shape: st-rect, label: "Surrogate Filtered Candidates"}
   end
 
