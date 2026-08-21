@@ -1,0 +1,18 @@
+metadata_dir = "/var/lib/garage/meta"
+data_dir = "/var/lib/garage/data"
+db_engine = "lmdb"
+
+replication_factor = 1
+consistency_mode = "consistent"
+
+# Generate a unique secret key for your node cluster
+rpc_secret = "32bf55231aed7bbaa6c2ca5fc1e5960d43b906543992e0d91ef8b1bcf2efb3ad"
+rpc_bind_addr = "[::]:3901"
+
+[s3_api]
+s3_region = "garage"
+api_bind_addr = "[::]:3900"
+
+[admin]
+api_bind_addr = "[::]:3903"
+admin_token = "96791330ddaaec99de69e1e08e16eaac2bbce6cc1d9db2b1c8dc6e664982b7f1"

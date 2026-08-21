@@ -1,0 +1,28 @@
+services:
+  garage:
+    image: dxflrs/garage:v2.3.0
+    container_name: garage
+    restart: unless-stopped
+    ports:
+      - "3900:3900" # S3 API
+      - "3901:3901" # RPC Cluster
+      - "3903:3903" # Admin API
+    volumes:
+      - ./.docker/garage/garage.toml:/etc/garage.toml:ro
+      - garage:/var/lib/garage
+
+  garage-ui:
+    image: noooste/garage-ui:v0.12.1
+    container_name: garage-ui
+    restart: unless-stopped
+    ports:
+      - "8080:3000"
+    environment:
+      - GARAGE_UI_GARAGE_ENDPOINT=http://garage:3900
+      - GARAGE_UI_GARAGE_ADMIN_ENDPOINT=http://garage:3903
+      - GARAGE_UI_GARAGE_ADMIN_TOKEN=96791330ddaaec99de69e1e08e16eaac2bbce6cc1d9db2b1c8dc6e664982b7f1
+    depends_on:
+      - garage
+
+volumes:
+  garage: {}
