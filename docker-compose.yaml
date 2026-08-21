@@ -8,8 +8,8 @@ services:
       - "3901:3901" # RPC Cluster
       - "3903:3903" # Admin API
     volumes:
-      - ./.docker/garage/garage.toml:/etc/garage.toml:ro
-      - garage:/var/lib/garage
+      - ./garage.toml:/etc/garage.toml:ro
+      - garage-vol:/var/lib/garage
 
   garage-ui:
     image: noooste/garage-ui:v0.12.1
@@ -25,4 +25,4 @@ services:
       - garage
 
 volumes:
-  garage: {}
+  garage-vol: {}
