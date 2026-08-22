@@ -26,7 +26,10 @@ def get_connection(
     return con
 
 
-def export_parquet(con: duckdb.DuckDBPyConnection, table: pa.Table, output: str):
+def export_parquet(
+    con: duckdb.DuckDBPyConnection, table: pa.Table, bucket: str, output: str
+):
+    output = f"{bucket}/{output}"
     if not output.startswith("s3://"):
         output = f"s3://{output}"
 

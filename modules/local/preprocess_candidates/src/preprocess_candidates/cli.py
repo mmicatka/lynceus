@@ -10,6 +10,7 @@ from typing import Any, Iterator
 
 import click
 import pyarrow as pa
+import pyarrow.parquet as pq
 from lynceus_utils.duckdb import export_parquet, get_connection
 from lynceus_utils.storage.blob_storage import get_blob_storage_settings
 from rdkit import Chem, RDLogger
@@ -208,6 +209,10 @@ def _build_pipeline(morgan_radius: int, morgan_n_bits: int, seed: int) -> list[S
     ]
 
 
+def _write_local_parquet(table: pa.Table, output: str):
+    pq.write_table(table, output)
+
+
 class NumWorkersType(click.ParamType):
     name = "num_workers"
 
@@ -263,12 +268,14 @@ NUM_WORKERS = NumWorkersType()
     is_flag=True,
     help="Output Parquet file..",
 )
+@click.option("--bucket", type=str, default="lynceus", help="Output bucket name")
 def preprocess(
     input_path: str,
     output: str,
     num_workers: int,
     seed: int,
     use_blob_storage: bool,
+    bucket: str,
 ):
     steps = _build_pipeline(2, 1024, seed)
 
@@ -282,6 +289,6 @@ def preprocess(
         logger.info("using blob storage...")
         blob_storage_settings = get_blob_storage_settings()
         conn = get_connection(blob_storage_settings)
-        export_parquet(conn, table, output)
-    # else:
-    #     _write_local_parquet(table, output)
+        export_parquet(conn, table, bucket, output)
+    else:
+        _write_local_parquet(table, output)
