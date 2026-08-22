@@ -27,7 +27,9 @@ def get_connection(
 
 
 def export_parquet(con: duckdb.DuckDBPyConnection, table: pa.Table, output: str):
-    output = f"s3://{output}"
+    if not output.startswith("s3://"):
+        output = f"s3://{output}"
+
     con.register("_output_table", table)
     con.execute(f"COPY (SELECT * FROM _output_table) TO '{output}' (FORMAT PARQUET)")
     con.unregister("_output_table")
