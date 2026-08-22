@@ -11,15 +11,14 @@ COPY --from=ghcr.io/astral-sh/uv:0.11.28-python3.12-trixie /usr/local/bin/uv /us
 
 WORKDIR /app
 
-COPY pyproject.toml uv.lock* ./
+COPY pyproject.toml uv.lock ./
 
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv pip compile pyproject.toml -o /tmp/requirements.txt && \
-    uv pip install --system -r /tmp/requirements.txt && \
-    rm /tmp/requirements.txt
+COPY libs/lynceus-utils ./libs/lynceus-utils
 
-COPY src ./src
+COPY modules/local/preprocess_candidates ./modules/local/preprocess_candidates
 
-RUN uv pip install --system --no-deps .
+WORKDIR /app/modules/local/preprocess_candidates
+
+RUN uv pip install --system .
 
 ENTRYPOINT []

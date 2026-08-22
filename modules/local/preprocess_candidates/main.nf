@@ -8,6 +8,7 @@ process PREPROCESS_CANDIDATES {
 
     input:
     path smi_gz
+    val bucket
 
     output:
     val true, emit: done
@@ -17,9 +18,8 @@ process PREPROCESS_CANDIDATES {
     """
     preprocess-candidates \\
         --input ${smi_gz} \\
-        --output preprocessed/${prefix}.parquet \\
-        --s3-endpoint '${params.s3_endpoint}' \\
-        --s3-region '${params.s3_region ?: "garage"}' \\
-        --s3-url-style '${params.s3_url_style ?: "path"}'
+        --output candidates/preprocessed/${prefix}.parquet \\
+        --use-blob-storage \\
+        --bucket ${bucket} \\
     """
 }

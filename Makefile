@@ -18,7 +18,7 @@ build-lynceus-chem:
 	docker buildx build --platform linux/amd64,linux/arm64 --push -t $(IMAGE_PREFIX)/lynceus-chem:$(VERSION) libs/lynceus-chem
 
 build-preprocess-candidates:
-	docker buildx build --platform linux/amd64,linux/arm64 --push -t $(IMAGE_PREFIX)/preprocess-candidates:$(VERSION) modules/local/preprocess_candidates
+	docker buildx build --platform linux/amd64,linux/arm64 --push -f modules/local/preprocess_candidates/Dockerfile -t $(IMAGE_PREFIX)/preprocess-candidates:$(VERSION) .
 
 build-rebalance-candidates:
 	docker buildx build --platform linux/amd64,linux/arm64 --push -t $(IMAGE_PREFIX)/rebalance-candidates:$(VERSION) modules/local/rebalance_candidates

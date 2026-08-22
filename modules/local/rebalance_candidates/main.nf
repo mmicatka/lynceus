@@ -6,7 +6,7 @@ process REBALANCE_CANDIDATES {
     input:
     val input_uri
     val output_uri_prefix
-    val num_shards
+    val num_per_shard
 
     output:
     val true, emit: done
@@ -16,9 +16,6 @@ process REBALANCE_CANDIDATES {
     rebalance-candidates \\
         --input-uri '${input_uri}' \\
         --output-uri-prefix '${output_uri_prefix}' \\
-        --num-shards ${num_shards} \\
-        --s3-endpoint '${params.s3_endpoint}' \\
-        --s3-region '${params.s3_region ?: "garage"}' \\
-        --s3-url-style '${params.s3_url_style ?: "path"}'
+        --num-shards ${num_per_shard} \\
     """
 }
