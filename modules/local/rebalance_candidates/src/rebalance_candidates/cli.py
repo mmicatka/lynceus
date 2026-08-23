@@ -1,116 +1,123 @@
-# modules/local/rebalance_candidates/src/rebalance_candidates/cli.py
-
-import argparse
 import logging
-import os
-import sys
+from typing import Iterator, Sequence
 
-import duckdb
+import click
+import pyarrow as pa
+from lynceus_utils.duckdb import export_parquet, get_connection
+from lynceus_utils.storage.blob_storage import get_blob_storage_settings
 
-logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
-logger = logging.getLogger("gather_shard_candidates")
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
 
-HASH_KEY_CANDIDATES = ("blake3_hash", "candidate_id", "smiles")
-
-
-def _parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--input-uri", required=True)
-    parser.add_argument("--output-uri-prefix", required=True)
-    parser.add_argument("--num-shards", type=int, required=True)
-    parser.add_argument("--s3-endpoint", required=True)
-    parser.add_argument("--s3-region", default="garage")
-    parser.add_argument("--s3-url-style", default="path", choices=["path", "vhost"])
-    parser.add_argument("--s3-use-ssl", action="store_true")
-    return parser.parse_args()
+logger = logging.getLogger(__name__)
 
 
-def _configure_s3(con: duckdb.DuckDBPyConnection, args: argparse.Namespace) -> None:
-    endpoint_host = args.s3_endpoint.removeprefix("https://").removeprefix("http://")
-
-    con.execute("INSTALL httpfs")
-    con.execute("LOAD httpfs")
-    con.execute("SET s3_endpoint = ?", [endpoint_host])
-    con.execute("SET s3_region = ?", [args.s3_region])
-    con.execute("SET s3_url_style = ?", [args.s3_url_style])
-    con.execute(f"SET s3_use_ssl = {'true' if args.s3_use_ssl else 'false'}")
-    access_key_id = os.environ.get("AWS_ACCESS_KEY_ID")
-    secret_access_key = os.environ.get("AWS_SECRET_ACCESS_KEY")
-    if not access_key_id or not secret_access_key:
-        logger.error("AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY must both be set")
-        sys.exit(1)
-
-    con.execute("SET s3_access_key_id = ?", [access_key_id])
-    con.execute("SET s3_secret_access_key = ?", [secret_access_key])
-
-
-def _resolve_hash_key(con: duckdb.DuckDBPyConnection, input_uri: str) -> str:
-    schema_columns = {
-        row[0]
-        for row in con.execute(
-            f"DESCRIBE SELECT * FROM read_parquet('{input_uri}') LIMIT 0"
-        ).fetchall()
-    }
-    for candidate_column in HASH_KEY_CANDIDATES:
-        if candidate_column in schema_columns:
-            return candidate_column
-    logger.error(
-        "no usable hash key column found; expected one of %s, got %s",
-        HASH_KEY_CANDIDATES,
-        sorted(schema_columns),
-    )
-    sys.exit(1)
-
-
-def _write_shards(
-    con: duckdb.DuckDBPyConnection,
-    input_uri: str,
-    hash_key: str,
-    num_shards: int,
-    output_uri_prefix: str,
-) -> None:
-    con.execute(
-        f"""
-        CREATE VIEW candidates AS
-        SELECT *, hash({hash_key}) % {num_shards} AS shard_id
-        FROM read_parquet('{input_uri}', union_by_name=true)
-        """
+def _build_filtered_query(
+    input_path: str, skip_col_vals: Sequence[tuple[str, str]]
+) -> str:
+    filter_conditions = [
+        f"NOT COALESCE(LOWER(CAST({col} AS VARCHAR)) = '{val.lower()}', FALSE)"
+        for col, val in skip_col_vals
+    ]
+    where_clause = (
+        f"WHERE {' AND '.join(filter_conditions)}" if filter_conditions else ""
     )
 
-    row_count = con.execute("SELECT count(*) FROM candidates").fetchone()[0]
-    if row_count == 0:
-        logger.error(
-            "input %s matched zero rows; refusing to write empty shards", input_uri
-        )
-        sys.exit(1)
+    excluded_cols = list({col for col, _ in skip_col_vals})
+    exclude_clause = f"EXCLUDE ({', '.join(excluded_cols)})" if excluded_cols else ""
 
-    logger.info(
-        "gathered %d rows from %s into %d shards", row_count, input_uri, num_shards
-    )
-
-    for shard_id in range(num_shards):
-        shard_uri = f"{output_uri_prefix.rstrip('/')}/shard_{shard_id:04d}.parquet"
-        con.execute(
-            f"""
-            COPY (
-                SELECT * EXCLUDE (shard_id)
-                FROM candidates
-                WHERE shard_id = {shard_id}
-            ) TO '{shard_uri}' (FORMAT PARQUET)
-            """
-        )
-        logger.info("wrote shard %d -> %s", shard_id, shard_uri)
+    return f"""
+        SELECT * {exclude_clause}
+        FROM read_parquet('{input_path}')
+        {where_clause}
+    """
 
 
-def rebalance_candidates() -> None:
-    args = _parse_args()
+def _generate_sharded_tables(
+    reader: pa.RecordBatchReader, num_per_shard: int
+) -> Iterator[pa.Table]:
+    current_batches: list[pa.RecordBatch] = []
+    current_rows = 0
 
-    con = duckdb.connect()
-    _configure_s3(con, args)
+    for batch in reader:
+        current_batches.append(batch)
+        current_rows += batch.num_rows
 
-    hash_key = _resolve_hash_key(con, args.input_uri)
-    logger.info("using hash key column: %s", hash_key)
+        while current_rows >= num_per_shard:
+            table = pa.Table.from_batches(current_batches)
+            shard_table = table.slice(0, num_per_shard)
+            remainder_table = table.slice(num_per_shard)
 
-    _write_shards(
-        con, args.input_uri, hash_key, args.num_shards, args.output_uri_prefix
-    )
+            yield shard_table
+
+            if remainder_table.num_rows > 0:
+                current_batches = remainder_table.to_batches()
+                current_rows = remainder_table.num_rows
+            else:
+                current_batches = []
+                current_rows = 0
+
+    if current_rows > 0:
+        yield pa.Table.from_batches(current_batches)
+
+
+@click.command()
+@click.option("--input-path", type=str, required=True, help="Input path.")
+@click.option("--output-path", type=str, required=True, help="Output path.")
+@click.option(
+    "--num-per-shard",
+    default=10000,
+    type=int,
+    show_default=True,
+    help="Number of candidates per shard.",
+)
+@click.option(
+    "--skip-col-val",
+    type=(str, str),
+    multiple=True,
+    help="Column and value pair to skip (e.g. --skip-col-val steps_ok False)."
+    " Can be passed multiple times.",
+)
+@click.option(
+    "--use-blob-storage",
+    is_flag=True,
+    help="Output Parquet file to blob storage.",
+)
+@click.option("--bucket", type=str, default="lynceus", help="Output bucket name")
+def rebalance_candidates(
+    input_path: str,
+    output_path: str,
+    num_per_shard: int,
+    skip_col_val: list[tuple[str, str]],
+    use_blob_storage: bool,
+    bucket: str,
+):
+    input_path = f"{input_path.rstrip('/')}/**/*.parquet"
+    blob_storage_settings = None
+
+    if use_blob_storage:
+        blob_storage_settings = get_blob_storage_settings()
+        target_dir = f"s3://{bucket}/{output_path.lstrip('/')}"
+        input_path = f"s3://{bucket}/{input_path}"
+    else:
+        target_dir = output_path.rstrip("/")
+
+    query = _build_filtered_query(input_path, skip_col_val)
+    conn = get_connection(blob_storage_settings)
+
+    logger.info(f"Reading from {input_path} with {num_per_shard} rows per file")
+
+    reader = conn.execute(query).fetch_record_batch()
+
+    shards_written = 0
+    for shard_idx, shard_table in enumerate(
+        _generate_sharded_tables(reader, num_per_shard)
+    ):
+        shard_file = f"{target_dir}/shard_{shard_idx}.parquet"
+        export_parquet(conn, shard_table, shard_file)
+        shards_written += 1
+
+    logger.info(f"Successfully wrote {shards_written} shards to {output_path}")

@@ -3129,13 +3129,17 @@ name = "rebalance-candidates"
 version = "0.1.0"
 source = { editable = "modules/local/rebalance_candidates" }
 dependencies = [
+    { name = "click" },
     { name = "duckdb" },
+    { name = "lynceus-utils" },
     { name = "pyarrow" },
 ]
 
 [package.metadata]
 requires-dist = [
+    { name = "click", specifier = ">=8.4.2" },
     { name = "duckdb", specifier = ">=1.5.4" },
+    { name = "lynceus-utils", editable = "libs/lynceus-utils" },
     { name = "pyarrow", specifier = ">=24.0.0" },
 ]
 

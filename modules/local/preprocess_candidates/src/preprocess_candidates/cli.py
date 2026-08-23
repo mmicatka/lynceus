@@ -11,7 +11,7 @@ from typing import Any, Iterator
 import click
 import pyarrow as pa
 import pyarrow.parquet as pq
-from lynceus_utils.duckdb import export_parquet, get_connection
+from lynceus_utils.duckdb import export_parquet, file_exists, get_connection
 from lynceus_utils.storage.blob_storage import get_blob_storage_settings
 from rdkit import Chem, RDLogger
 
@@ -266,9 +266,14 @@ NUM_WORKERS = NumWorkersType()
 @click.option(
     "--use-blob-storage",
     is_flag=True,
-    help="Output Parquet file..",
+    help="Output Parquet file to blob storage.",
 )
 @click.option("--bucket", type=str, default="lynceus", help="Output bucket name")
+@click.option(
+    "--skip-if-exists",
+    is_flag=True,
+    help="Skip processing if the output file already exists.",
+)
 def preprocess(
     input_path: str,
     output: str,
@@ -276,7 +281,19 @@ def preprocess(
     seed: int,
     use_blob_storage: bool,
     bucket: str,
+    skip_if_exists: bool,
 ):
+    if use_blob_storage:
+        blob_storage_settings = get_blob_storage_settings()
+        output = f"s3://{bucket}/{output.lstrip('/')}"
+
+    conn = get_connection(blob_storage_settings)
+
+    if skip_if_exists:
+        if file_exists(conn, output):
+            logger.info(f"{output} already exists. Skipping.")
+            return
+
     steps = _build_pipeline(2, 1024, seed)
 
     table: pa.Table = _preprocess(
@@ -285,10 +302,4 @@ def preprocess(
         steps=steps,
     )
 
-    if use_blob_storage:
-        logger.info("using blob storage...")
-        blob_storage_settings = get_blob_storage_settings()
-        conn = get_connection(blob_storage_settings)
-        export_parquet(conn, table, bucket, output)
-    else:
-        _write_local_parquet(table, output)
+    export_parquet(conn, table, output)

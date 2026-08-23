@@ -6,28 +6,26 @@ include { REBALANCE_CANDIDATES } from '../../../modules/local/rebalance_candidat
 
 workflow CANDIDATE {
   take:
-  uri_list // path: file containing one s3:// URI per line
   bucket // bucket name
-  filter_config // path: filter config
   num_per_shard // int
+  _filter_config // path: filter config
 
   main:
-  ch_candidates = channel.fromPath(uri_list)
-    .splitText { line -> line.trim() }
-    .filter { line -> line }
-    .map { uri -> file(uri) }
+  directory = "s3://${bucket}/candidates"
 
-  ch_smi_gz = ch_candidates.filter { candidate_file -> candidate_file.name.endsWith('.smi.gz') }
+  ch_smi_gz = channel.fromPath("${directory}/raw/H0*/*.smi.gz")
+    .map { f -> tuple(f.parent.name, f) }
 
   PREPROCESS_CANDIDATES(ch_smi_gz, bucket)
 
-  // ch_preprocess_done = PREPROCESS_CANDIDATES.out.done.collect()
+  ch_preprocess_done = PREPROCESS_CANDIDATES.out.done.collect()
 
-  // REBALANCE_CANDIDATES(
-  //   ch_preprocess_done.map { "s3://${params.candidates.output_bucket}/preprocessed" },
-  //   ch_preprocess_done.map { "s3://${params.candidates.output_bucket}/rebalanced" },
-  //   num_per_shard,
-  // )
+  REBALANCE_CANDIDATES(
+    ch_preprocess_done.map { "${directory}/preprocessed/H0*/*.parquet" },
+    "${directory}/rebalanced",
+    bucket,
+    num_per_shard,
+  )
 
   // ch_shards = REBALANCE_CANDIDATES.out.done.flatMap { _shard -> file("s3://${params.candidates.output_bucket}/rebalanced/shard_*.parquet") }
 

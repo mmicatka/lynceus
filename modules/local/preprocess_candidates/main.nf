@@ -7,7 +7,7 @@ process PREPROCESS_CANDIDATES {
     label 'pvc_io_retry'
 
     input:
-    path smi_gz
+    tuple val(tranche), path(smi_gz)
     val bucket
 
     output:
@@ -18,8 +18,9 @@ process PREPROCESS_CANDIDATES {
     """
     preprocess-candidates \\
         --input ${smi_gz} \\
-        --output candidates/preprocessed/${prefix}.parquet \\
+        --output candidates/preprocessed/${tranche}/${prefix}.parquet \\
         --use-blob-storage \\
         --bucket ${bucket} \\
+        --skip-if-exists
     """
 }

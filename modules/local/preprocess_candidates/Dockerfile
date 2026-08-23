@@ -21,4 +21,6 @@ WORKDIR /app/modules/local/preprocess_candidates
 
 RUN uv pip install --system .
 
+RUN python -c "import duckdb; duckdb.execute('INSTALL httpfs')"
+
 ENTRYPOINT []

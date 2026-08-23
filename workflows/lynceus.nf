@@ -3,7 +3,5 @@
 include { CANDIDATE } from '../subworkflows/local/candidate'
 
 workflow LYNCEUS {
-  ch_uri_list = file(params.candidates.uri_list, checkIfExists: true)
-
-  CANDIDATE(ch_uri_list, params.candidates.bucket, params.candidates.filter_config, params.candidates.num_per_shard)
+  CANDIDATE(params.candidates.bucket, params.candidates.filter_config, params.candidates.num_per_shard)
 }
