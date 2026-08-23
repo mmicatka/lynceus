@@ -1,9 +1,12 @@
 # libs/lynceus-utils/src/lynceus_utils/duckdb.py
 
+import os
+import tempfile
 from typing import Optional
 
 import duckdb
 import pyarrow as pa
+import pyarrow.parquet as pq
 
 from .storage import BlobStorageSettings
 
@@ -33,9 +36,25 @@ def export_parquet(
     table: pa.Table,
     file_path: str,
 ):
-    con.register("_output_table", table)
-    con.execute(f"COPY (SELECT * FROM _output_table) TO '{file_path}' (FORMAT PARQUET)")
-    con.unregister("_output_table")
+    with tempfile.NamedTemporaryFile(suffix=".parquet", delete=False) as tmp:
+        tmp_path = tmp.name
+
+    try:
+        pq.write_table(table, tmp_path)
+        con.execute(
+            (
+                f"COPY (SELECT * FROM read_parquet('{tmp_path}')) TO '{file_path}'"
+                " (FORMAT PARQUET)"
+            )
+        )
+        if not file_exists(con, file_path):
+            raise RuntimeError(
+                f"export_parquet: COPY reported success but {file_path} "
+                "is not readable back via read_parquet — write did not land"
+            )
+    finally:
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
 
 
 def file_exists(con: duckdb.DuckDBPyConnection, file_path: str) -> bool:

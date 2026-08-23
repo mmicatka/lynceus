@@ -21,6 +21,7 @@ process PREPROCESS_CANDIDATES {
         --output candidates/preprocessed/${tranche}/${prefix}.parquet \\
         --use-blob-storage \\
         --bucket ${bucket} \\
+        --num-workers ${task.cpus} \\
         --skip-if-exists
     """
 }

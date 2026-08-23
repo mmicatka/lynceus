@@ -5,7 +5,7 @@ process REBALANCE_CANDIDATES {
 
     input:
     val input_path
-    path output_path
+    val output_path
     val bucket
     val num_per_shard
 
@@ -15,7 +15,7 @@ process REBALANCE_CANDIDATES {
     script:
     """
     rebalance-candidates \\
-        --input-path ${input_path} \\
+        --input-path '${input_path}' \\
         --output-path ${output_path} \\
         --num-per-shard ${num_per_shard} \\
         --use-blob-storage \\

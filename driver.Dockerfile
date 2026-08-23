@@ -11,6 +11,7 @@ RUN apt-get update \
   ca-certificates \
   git \
   make \
+  vim \
   && rm -rf /var/lib/apt/lists/*
 
 RUN curl -fsSL -o /usr/local/bin/kubectl \

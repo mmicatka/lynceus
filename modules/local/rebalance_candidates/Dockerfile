@@ -10,9 +10,15 @@ COPY --from=ghcr.io/astral-sh/uv:0.11.28-python3.12-trixie /usr/local/bin/uv /us
 
 WORKDIR /app
 
-COPY pyproject.toml ./
-COPY src ./src
+COPY pyproject.toml uv.lock ./
+
+COPY libs/lynceus-utils ./libs/lynceus-utils
+
+COPY modules/local/rebalance_candidates ./modules/local/rebalance_candidates
+WORKDIR /app/modules/local/rebalance_candidates
 
 RUN uv pip install --system .
+
+RUN python -c "import duckdb; duckdb.execute('INSTALL httpfs')"
 
 ENTRYPOINT []

@@ -95,13 +95,11 @@ def rebalance_candidates(
     use_blob_storage: bool,
     bucket: str,
 ):
-    input_path = f"{input_path.rstrip('/')}/**/*.parquet"
     blob_storage_settings = None
 
     if use_blob_storage:
         blob_storage_settings = get_blob_storage_settings()
         target_dir = f"s3://{bucket}/{output_path.lstrip('/')}"
-        input_path = f"s3://{bucket}/{input_path}"
     else:
         target_dir = output_path.rstrip("/")
 
@@ -120,4 +118,4 @@ def rebalance_candidates(
         export_parquet(conn, shard_table, shard_file)
         shards_written += 1
 
-    logger.info(f"Successfully wrote {shards_written} shards to {output_path}")
+    logger.info(f"Successfully wrote {shards_written} shards to {target_dir}")

@@ -21,7 +21,7 @@ build-preprocess-candidates:
 	docker buildx build --platform linux/amd64,linux/arm64 --push -f modules/local/preprocess_candidates/Dockerfile -t $(IMAGE_PREFIX)/preprocess-candidates:$(VERSION) .
 
 build-rebalance-candidates:
-	docker buildx build --platform linux/amd64,linux/arm64 --push -t $(IMAGE_PREFIX)/rebalance-candidates:$(VERSION) modules/local/rebalance_candidates
+	docker buildx build --platform linux/amd64,linux/arm64 --push -f modules/local/rebalance_candidates/Dockerfile -t $(IMAGE_PREFIX)/rebalance-candidates:$(VERSION) .
 
 build-protein-conformational-ensemble:
 	docker buildx build --platform linux/amd64,linux/arm64 --push -t $(IMAGE_PREFIX)/protein-conformational-ensemble:$(VERSION) libs/protein-conformational-ensemble
