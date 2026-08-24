@@ -17,6 +17,8 @@ process REBALANCE_CANDIDATES {
     rebalance-candidates \\
         --input-path '${input_path}' \\
         --output-path ${output_path} \\
+        --skip-col-val steps_ok False \\
+        --skip-col-val parse_ok False \\
         --num-per-shard ${num_per_shard} \\
         --use-blob-storage \\
         --bucket ${bucket}

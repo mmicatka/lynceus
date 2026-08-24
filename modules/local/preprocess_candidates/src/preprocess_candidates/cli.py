@@ -286,6 +286,8 @@ def preprocess(
     if use_blob_storage:
         blob_storage_settings = get_blob_storage_settings()
         output = f"s3://{bucket}/{output.lstrip('/')}"
+    else:
+        blob_storage_settings = None
 
     conn = get_connection(blob_storage_settings)
 

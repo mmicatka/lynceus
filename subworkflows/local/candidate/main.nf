@@ -8,7 +8,7 @@ workflow CANDIDATE {
   take:
   bucket
   num_per_shard
-  _filter_config
+  filter_config
 
   main:
   directory = "s3://${bucket}/candidates"
@@ -33,4 +33,8 @@ workflow CANDIDATE {
     bucket,
     num_per_shard,
   )
+
+  ch_rebalanced = REBALANCE_CANDIDATES.out.done.flatMap { file("${directory}/rebalanced/*.parquet") }
+
+  PHYSIOCHEMICAL_FILTER(ch_rebalanced, filter_config, bucket)
 }

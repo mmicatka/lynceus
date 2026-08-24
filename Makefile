@@ -36,7 +36,7 @@ build-sample-candidates:
 	docker buildx build --platform linux/amd64,linux/arm64 --push -t $(IMAGE_PREFIX)/sample-candidates:$(VERSION) modules/local/sample_candidates
 
 build-physiochemical-filter:
-	docker buildx build --platform linux/amd64,linux/arm64 --push -t $(IMAGE_PREFIX)/physiochemical-filter:$(VERSION) modules/local/physiochemical_filter
+	docker buildx build --platform linux/amd64,linux/arm64 --push -f modules/local/physiochemical_filter/Dockerfile -t $(IMAGE_PREFIX)/physiochemical-filter:$(VERSION) .
 
 build-docking-run-gpu:
 	docker buildx build --platform linux/amd64 --push --target gpu -t $(IMAGE_PREFIX)/docking-run:gpu-$(VERSION) modules/local/docking_run

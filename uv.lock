@@ -2405,13 +2405,19 @@ name = "physiochemical-filter"
 version = "0.1.0"
 source = { editable = "modules/local/physiochemical_filter" }
 dependencies = [
+    { name = "click" },
     { name = "duckdb" },
+    { name = "lynceus-utils" },
+    { name = "pyarrow" },
     { name = "pyyaml" },
 ]
 
 [package.metadata]
 requires-dist = [
+    { name = "click", specifier = ">=8.4.2" },
     { name = "duckdb", specifier = ">=1.5.4" },
+    { name = "lynceus-utils", editable = "libs/lynceus-utils" },
+    { name = "pyarrow", specifier = ">=24.0.0" },
     { name = "pyyaml", specifier = ">=6.0.3" },
 ]
 
@@ -3131,16 +3137,20 @@ source = { editable = "modules/local/rebalance_candidates" }
 dependencies = [
     { name = "click" },
     { name = "duckdb" },
+    { name = "fsspec" },
     { name = "lynceus-utils" },
     { name = "pyarrow" },
+    { name = "s3fs" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "click", specifier = ">=8.4.2" },
     { name = "duckdb", specifier = ">=1.5.4" },
+    { name = "fsspec", specifier = ">=2026.6.0" },
     { name = "lynceus-utils", editable = "libs/lynceus-utils" },
     { name = "pyarrow", specifier = ">=24.0.0" },
+    { name = "s3fs", specifier = ">=2026.6.0" },
 ]
 
 [[package]]

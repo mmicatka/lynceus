@@ -5,7 +5,13 @@ name = "physiochemical-filter"
 version = "0.1.0"
 description = "Performs physiochemical-based filtering"
 requires-python = ">=3.12"
-dependencies = ["duckdb>=1.5.4", "pyyaml>=6.0.3"]
+dependencies = [
+    "click>=8.4.2",
+    "duckdb>=1.5.4",
+    "lynceus-utils",
+    "pyarrow>=24.0.0",
+    "pyyaml>=6.0.3",
+]
 
 [project.scripts]
 physiochemical-filter = "physiochemical_filter.physiochemical_filter:physiochemical_filter"
@@ -16,3 +22,6 @@ build-backend = "uv_build"
 
 [tool.ruff.lint]
 select = ["E", "F", "I"]
+
+[tool.uv.sources]
+lynceus-utils = { workspace = true }

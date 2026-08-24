@@ -7,21 +7,24 @@ process PHYSIOCHEMICAL_FILTER {
     label 'pvc_io_retry'
 
     input:
-    path candidates
+    path candidate
     path filter_config
+    val bucket
 
     output:
-    path "*.parquet", emit: filtered
+    val (candidate), emit: done
 
     when:
     task.ext.when == null || task.ext.when
 
     script:
-    def prefix = candidates.simpleName
+    def prefix = candidate.simpleName
     """
     physiochemical-filter \\
-        --input ${candidates} \\
+        --input ${candidate} \\
         --config ${filter_config} \\
-        --output ${prefix}.filtered.parquet
+        --output candidates/filtered/${prefix}.parquet \\
+        --use-blob-storage \\
+        --bucket ${bucket} \\
     """
 }

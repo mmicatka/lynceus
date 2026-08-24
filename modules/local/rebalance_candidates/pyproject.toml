@@ -7,8 +7,10 @@ requires-python = ">=3.12"
 dependencies = [
     "click>=8.4.2",
     "duckdb>=1.5.4",
+    "fsspec>=2026.6.0",
     "lynceus-utils",
     "pyarrow>=24.0.0",
+    "s3fs>=2026.6.0",
 ]
 
 [project.scripts]
