@@ -2,6 +2,7 @@
 
 from .docking_result import DockingResult
 from .errors import DockingError
+from .ligand_record import LigandRecord
 from .search_box import SearchBox
 
-__all__ = ["DockingResult", "DockingError", "SearchBox"]
+__all__ = ["DockingResult", "DockingError", "SearchBox", "LigandRecord"]

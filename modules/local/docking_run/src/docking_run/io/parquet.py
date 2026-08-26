@@ -1,10 +1,4 @@
-# modules/local/docking_run/src/docking_run/output/parquet.py
-
-"""Serialization of docking results to columnar (Parquet) output.
-
-Kept separate from docking_run.py so the row schema and writer can be
-reused or tested independently of CLI argument parsing.
-"""
+# modules/local/docking_run/src/docking_run/io/parquet.py
 
 from __future__ import annotations
 
@@ -15,7 +9,20 @@ from typing import Iterable, Iterator
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from docking_run.types.docking_result import DockingResult
+from docking_run.types import DockingResult, LigandRecord
+
+
+def iter_ligand_records(
+    parquet_path, id_col: str, mol_col: str
+) -> Iterator[LigandRecord]:
+    table = pq.read_table(parquet_path, columns=[id_col, mol_col])
+    for ligand_id, mol_bytes in zip(
+        table[id_col].to_pylist(), table[mol_col].to_pylist()
+    ):
+        if mol_bytes is None:
+            continue
+        yield LigandRecord(ligand_id=ligand_id, mol_bytes=mol_bytes)
+
 
 # Default number of pose-rows buffered before flushing a RecordBatch to
 # the Parquet writer. Bounds peak memory independent of how many ligands

@@ -13,9 +13,9 @@ workflow CANDIDATE {
   main:
   directory = "s3://${bucket}/candidates"
 
-  tranches = "0*,10,11"
+  tranches = "TEST"
 
-  ch_smi_gz = channel.fromPath("${directory}/raw/H{${tranches}}/*.smi.gz")
+  ch_smi_gz = channel.fromPath("${directory}/raw/{${tranches}}/*.smi.gz")
     .map { f -> tuple(f.parent.name, f) }
     .filter { tranche, f ->
       def stem = f.name.replaceAll(/\.smi\.gz$/, '')
@@ -28,7 +28,7 @@ workflow CANDIDATE {
   _ch_preprocess_done = PREPROCESS_CANDIDATES.out.done.collect()
 
   REBALANCE_CANDIDATES(
-    "${directory}/preprocessed/**/*.parquet",
+    _ch_preprocess_done.map { "${directory}/preprocessed/**/*.parquet" },
     "candidates/rebalanced",
     bucket,
     num_per_shard,
