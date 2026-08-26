@@ -5,7 +5,7 @@ import logging
 import sys
 from pathlib import Path
 
-from .output import DEFAULT_STREAM_BATCH_ROWS, write_docking_results_parquet
+from .io import DEFAULT_STREAM_BATCH_ROWS, write_docking_results_parquet
 from .providers import ProviderNotAvailableError, available_providers, get_provider
 from .types import DockingError, SearchBox
 
