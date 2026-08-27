@@ -21,7 +21,7 @@ class LigandRecordReadError(DockingError):
 
 
 def _mol_from_molblock(molblock: str) -> Chem.Mol:
-    mol = Chem.MolFromMolBlock(molblock)
+    mol = Chem.MolFromMolBlock(molblock, removeHs=False)
     if mol is None:
         raise LigandRecordReadError("Failed to parse conformer_sdf as a valid molblock")
     return mol
