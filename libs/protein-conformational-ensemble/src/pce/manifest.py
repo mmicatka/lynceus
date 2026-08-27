@@ -1,4 +1,4 @@
-# libs/protein-conformational-ensemble/src/protein_conformational_ensemble/manifest.py
+# libs/protein-conformational-ensemble/src/pce/manifest.py
 
 from __future__ import annotations
 
@@ -6,18 +6,18 @@ from typing import Any
 
 import yaml
 
-from protein_conformational_ensemble.errors import (
+from pce.errors import (
     SemanticValidationError,
     UnsupportedCapabilityError,
     UnsupportedSchemaVersionError,
 )
-from protein_conformational_ensemble.models import (
+from pce.models import (
     KNOWN_CAPABILITIES,
     Manifest,
     TrajectoryStructure,
 )
-from protein_conformational_ensemble.schema import validate_schema
-from protein_conformational_ensemble.weight_scheme import WEIGHT_SEMANTICS
+from pce.schema import validate_schema
+from pce.weight_scheme import WEIGHT_SEMANTICS
 
 SUPPORTED_SCHEMA_VERSIONS = frozenset({"1.0.0"})
 

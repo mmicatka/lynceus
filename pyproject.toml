@@ -37,6 +37,7 @@ members = [
     "modules/local/surrogate_model",
     "modules/local/preprocess_candidates",
     "modules/local/rebalance_candidates",
+    "modules/local/generate_manifest",
 ]
 
 [tool.uv.sources]

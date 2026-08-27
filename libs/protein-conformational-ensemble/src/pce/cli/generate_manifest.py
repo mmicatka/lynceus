@@ -6,11 +6,11 @@ from typing import Any
 
 import yaml
 
-from protein_conformational_ensemble.generation import (
+from pce.generation import (
     ConformationalStateSpec,
     generate_ensemble,
 )
-from protein_conformational_ensemble.models import WeightScheme
+from pce.models import WeightScheme
 
 _STRUCTURE_SUFFIXES = {".cif", ".pdb", ".mmcif"}
 _WEIGHTS_FILENAME = "weights.yaml"

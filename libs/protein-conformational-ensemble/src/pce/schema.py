@@ -1,4 +1,4 @@
-# libs/protein-conformational-ensemble/src/protein_conformational_ensemble/schema.py
+# libs/protein-conformational-ensemble/src/pce/schema.py
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from typing import Any
 
 import jsonschema
 
-from protein_conformational_ensemble.errors import SchemaValidationError
+from pce.errors import SchemaValidationError
 
 
 @functools.lru_cache(maxsize=1)

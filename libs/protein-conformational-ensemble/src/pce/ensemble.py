@@ -1,4 +1,4 @@
-# libs/protein-conformational-ensemble/src/protein_conformational_ensemble/package.py
+# libs/protein-conformational-ensemble/src/pce/package.py
 
 
 from __future__ import annotations
@@ -6,17 +6,17 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from protein_conformational_ensemble.errors import ContentHashMismatchError
-from protein_conformational_ensemble.hashing import (
+from pce.errors import ContentHashMismatchError
+from pce.hashing import (
     StructureBytesResolver,
     default_structure_bytes,
     verify_content_hash,
 )
-from protein_conformational_ensemble.manifest import (
+from pce.manifest import (
     check_capabilities_supported,
     parse_manifest_yaml,
 )
-from protein_conformational_ensemble.models import Manifest
+from pce.models import Manifest
 
 MANIFEST_FILENAME = "manifest.yaml"
 

@@ -1,4 +1,4 @@
-# libs/protein-conformational-ensemble/src/protein_conformational_ensemble/generation.py
+# libs/protein-conformational-ensemble/src/pce/generation.py
 
 from __future__ import annotations
 
@@ -6,18 +6,18 @@ import shutil
 from dataclasses import dataclass, replace
 from pathlib import Path
 
-from protein_conformational_ensemble.canonical import canonical_serialize
-from protein_conformational_ensemble.ensemble import MANIFEST_FILENAME
-from protein_conformational_ensemble.hashing import (
+from pce.canonical import canonical_serialize
+from pce.ensemble import MANIFEST_FILENAME
+from pce.hashing import (
     StructureBytesResolver,
     compute_content_hash,
     default_structure_bytes,
 )
-from protein_conformational_ensemble.manifest import (
+from pce.manifest import (
     SUPPORTED_SCHEMA_VERSIONS,
     validate_semantics,
 )
-from protein_conformational_ensemble.models import (
+from pce.models import (
     CAPABILITY_STANDALONE_CIF,
     ConformationalState,
     Manifest,

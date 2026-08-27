@@ -1,0 +1,17 @@
+[project]
+name = "generate-manifest"
+version = "0.1.0"
+description = "Add your description here"
+authors = [{ name = "Mike Micatka", email = "mike.micatka@gmail.com" }]
+requires-python = ">=3.12"
+dependencies = [
+    "click>=8.4.2",
+    "protein-conformational-ensemble",
+]
+
+[build-system]
+requires = ["uv_build>=0.12.5,<0.13.0"]
+build-backend = "uv_build"
+
+[tool.uv.sources]
+protein-conformational-ensemble = { workspace = true }

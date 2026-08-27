@@ -11,6 +11,7 @@ workflow CANDIDATE {
   filter_config
 
   main:
+  // TODO: Move this fully to parameters
   directory = "s3://${bucket}/candidates"
 
   tranches = ["TEST"]
