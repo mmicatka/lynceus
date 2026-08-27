@@ -1,3 +1,4 @@
-s3://lynceus/smiles/H13P000.smi.gz
-s3://lynceus/smiles/H13M100.smi.gz
-s3://lynceus/smiles/H13P010.smi.gz
+s3://lynceus/candidates/raw/H06/H06M000.smi.gz
+s3://lynceus/candidates/raw/H06/H06M100.smi.gz
+s3://lynceus/candidates/raw/H06/H06M200.smi.gz
+s3://lynceus/candidates/raw/H06/H06M300.smi.gz

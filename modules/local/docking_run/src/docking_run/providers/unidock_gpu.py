@@ -8,7 +8,8 @@ import subprocess
 from pathlib import Path
 from typing import Iterator
 
-from docking_run.types import DockingError, DockingResult, SearchBox
+from docking_run.ligand_prep import materialize_ligands
+from docking_run.types import DockingError, DockingResult, LigandRecord, SearchBox
 
 from .provider import DockingProvider, ProviderNotAvailableError
 from .utils import parse_vina_output_pdbqt
@@ -65,34 +66,32 @@ class UnidockGPUProvider(DockingProvider):
     def dock(
         self,
         receptor_path: Path,
-        ligand_path: Path,
+        ligand: LigandRecord,
         box: SearchBox,
         scoring_mode: str = _SCORING_MODE_VINA,
     ) -> list[DockingResult]:
         results_by_id = dict(
-            self._run_gpu_batch_contained(
-                receptor_path, [ligand_path], box, scoring_mode
-            )
+            self._run_gpu_batch_contained(receptor_path, [ligand], box, scoring_mode)
         )
-        return results_by_id.get(ligand_path.stem, [])
+        return results_by_id.get(ligand.ligand_id, [])
 
     def dock_batch(
         self,
         receptor_path: Path,
-        ligand_paths: list[Path],
+        ligands: list[LigandRecord],
         box: SearchBox,
         batch_size: int | None = None,
         scoring_mode: str = _SCORING_MODE_VINA,
     ) -> Iterator[tuple[str, list[DockingResult]]]:
         chunk_size = batch_size or _DEFAULT_BATCH_SIZE
-        n_chunks = -(-len(ligand_paths) // chunk_size)  # ceil div
+        n_chunks = -(-len(ligands) // chunk_size)  # ceil div
 
         n_ligands_seen = 0
         n_ligands_failed = 0
         n_ligands_quarantined = 0
 
-        for chunk_idx, start in enumerate(range(0, len(ligand_paths), chunk_size), 1):
-            chunk = ligand_paths[start : start + chunk_size]
+        for chunk_idx, start in enumerate(range(0, len(ligands), chunk_size), 1):
+            chunk = ligands[start : start + chunk_size]
             n_ligands_seen += len(chunk)
             n_yielded_this_chunk = 0
             n_quarantined_before = len(self.quarantine)
@@ -138,31 +137,32 @@ class UnidockGPUProvider(DockingProvider):
     def _run_gpu_batch_contained(
         self,
         receptor_path: Path,
-        ligand_paths: list[Path],
+        ligands: list[LigandRecord],
         box: SearchBox,
         scoring_mode: str,
     ) -> Iterator[tuple[str, list[DockingResult]]]:
-        yield from self._run_with_bisection(
-            receptor_path, ligand_paths, box, scoring_mode, retries_used=0
-        )
+        with materialize_ligands(ligands) as paths_by_id:
+            yield from self._run_with_bisection(
+                receptor_path, paths_by_id, box, scoring_mode, retries_used=0
+            )
 
     def _run_with_bisection(
         self,
         receptor_path: Path,
-        ligand_paths: list[Path],
+        paths_by_id: dict[str, Path],
         box: SearchBox,
         scoring_mode: str,
         retries_used: int,
     ) -> Iterator[tuple[str, list[DockingResult]]]:
-        if not ligand_paths:
+        if not paths_by_id:
             return
 
-        chunk_out_dir = self._chunk_out_dir(ligand_paths)
+        chunk_out_dir = self._chunk_out_dir(paths_by_id)
 
         try:
             crashed = False
             proc = self._invoke_unidock(
-                receptor_path, ligand_paths, box, scoring_mode, chunk_out_dir
+                receptor_path, paths_by_id, box, scoring_mode, chunk_out_dir
             )
         except _UnidockCrash as exc:
             crashed = True
@@ -173,13 +173,13 @@ class UnidockGPUProvider(DockingProvider):
                 "unidock subprocess crashed (returncode=%d) on a batch of "
                 "%d ligand(s) in %s: %s",
                 proc.returncode,
-                len(ligand_paths),
+                len(paths_by_id),
                 chunk_out_dir,
                 proc.stderr.strip() if proc.stderr else "(no stderr)",
             )
 
             recovered, unresolved = self._partition_by_output_present(
-                ligand_paths, chunk_out_dir
+                paths_by_id, chunk_out_dir
             )
             for ligand_id, results in self._collect_chunk_results(
                 recovered, chunk_out_dir
@@ -207,7 +207,7 @@ class UnidockGPUProvider(DockingProvider):
                 return
 
             if len(unresolved) <= _MIN_BISECT_SIZE:
-                ligand_ids = [lig.stem for lig in unresolved]
+                ligand_ids = list(unresolved.keys())
                 logger.error(
                     "Quarantining %d ligand(s) after repeated unidock "
                     "crashes at minimum bisection size: %s",
@@ -224,8 +224,9 @@ class UnidockGPUProvider(DockingProvider):
                 )
                 return
 
-            midpoint = len(unresolved) // 2
-            left, right = unresolved[:midpoint], unresolved[midpoint:]
+            items = list(unresolved.items())
+            midpoint = len(items) // 2
+            left, right = dict(items[:midpoint]), dict(items[midpoint:])
             logger.warning(
                 "Bisecting crashed sub-batch of %d ligand(s) into halves "
                 "of %d and %d to isolate the failure.",
@@ -241,12 +242,12 @@ class UnidockGPUProvider(DockingProvider):
             )
             return
 
-        yield from self._collect_chunk_results(ligand_paths, chunk_out_dir)
+        yield from self._collect_chunk_results(paths_by_id, chunk_out_dir)
 
     def _invoke_unidock(
         self,
         receptor_path: Path,
-        ligand_paths: list[Path],
+        paths_by_id: dict[str, Path],
         box: SearchBox,
         scoring_mode: str,
         chunk_out_dir: Path,
@@ -254,7 +255,7 @@ class UnidockGPUProvider(DockingProvider):
         chunk_out_dir.mkdir(parents=True, exist_ok=True)
 
         ligand_index_path = chunk_out_dir / "ligand_index.txt"
-        ligand_index_path.write_text("\n".join(str(lig) for lig in ligand_paths))
+        ligand_index_path.write_text("\n".join(str(p) for p in paths_by_id.values()))
 
         cmd = [
             _UNIDOCK_BINARY,
@@ -290,20 +291,19 @@ class UnidockGPUProvider(DockingProvider):
         return proc
 
     def _partition_by_output_present(
-        self, ligand_paths: list[Path], chunk_out_dir: Path
-    ) -> tuple[list[Path], list[Path]]:
-        present: list[Path] = []
-        absent: list[Path] = []
-        for lig in ligand_paths:
-            matches = list(chunk_out_dir.glob(f"{lig.stem}_out.pdbqt"))
-            (present if matches else absent).append(lig)
+        self, paths_by_id: dict[str, Path], chunk_out_dir: Path
+    ) -> tuple[dict[str, Path], dict[str, Path]]:
+        present: dict[str, Path] = {}
+        absent: dict[str, Path] = {}
+        for ligand_id, path in paths_by_id.items():
+            matches = list(chunk_out_dir.glob(f"{ligand_id}_out.pdbqt"))
+            (present if matches else absent)[ligand_id] = path
         return present, absent
 
     def _collect_chunk_results(
-        self, ligand_paths: list[Path], chunk_out_dir: Path
+        self, paths_by_id: dict[str, Path], chunk_out_dir: Path
     ) -> Iterator[tuple[str, list[DockingResult]]]:
-        for lig in ligand_paths:
-            ligand_id = lig.stem
+        for ligand_id in paths_by_id:
             candidates = list(chunk_out_dir.glob(f"{ligand_id}_out.pdbqt"))
 
             if not candidates:
@@ -350,12 +350,11 @@ class UnidockGPUProvider(DockingProvider):
                     candidates[0],
                 )
 
-    def _chunk_out_dir(self, ligand_pdbqts: list[Path]) -> Path:
-        if not ligand_pdbqts:
+    def _chunk_out_dir(self, paths_by_id: dict[str, Path]) -> Path:
+        if not paths_by_id:
             return self.out_dir / "chunk_empty"
-        first_id = ligand_pdbqts[0].stem
-        last_id = ligand_pdbqts[-1].stem
-        return self.out_dir / f"chunk_{first_id}_{last_id}_{len(ligand_pdbqts)}"
+        ids = list(paths_by_id.keys())
+        return self.out_dir / f"chunk_{ids[0]}_{ids[-1]}_{len(ids)}"
 
 
 class _UnidockCrash(Exception):

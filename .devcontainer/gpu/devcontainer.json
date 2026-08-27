@@ -9,8 +9,7 @@
   ],
   "features": {
     "ghcr.io/devcontainers/features/docker-in-docker:4": {},
-    "ghcr.io/devcontainers/features/kubectl-helm-minikube:1": {},
-    "ghcr.io/devcontainer-community/devcontainer-features/dotenv.org:1": {}
+    "ghcr.io/devcontainers/features/kubectl-helm-minikube:1": {}
   },
   "customizations": {
     "vscode": {

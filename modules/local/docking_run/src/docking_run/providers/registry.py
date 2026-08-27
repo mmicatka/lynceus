@@ -4,10 +4,8 @@ from typing import Any
 
 from .provider import DockingProvider
 from .unidock_gpu import UnidockGPUProvider
-from .vina_cpu import VinaCPUProvider
 
 _PROVIDERS: dict[str, type[DockingProvider]] = {
-    "cpu": VinaCPUProvider,
     "gpu": UnidockGPUProvider,
 }
 

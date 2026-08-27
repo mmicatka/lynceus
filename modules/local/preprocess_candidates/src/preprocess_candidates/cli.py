@@ -1,7 +1,9 @@
 # modules/local/preprocess_candidates/src/preprocess_candidates/preprocess.py
+
 import gzip
 import logging
 import os
+import sys
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 from typing import Any, Iterator
@@ -9,6 +11,8 @@ from typing import Any, Iterator
 import click
 import pyarrow as pa
 import pyarrow.parquet as pq
+from lynceus_utils.duckdb import export_parquet, file_exists, get_connection
+from lynceus_utils.storage.blob_storage import get_blob_storage_settings
 from rdkit import Chem, RDLogger
 
 from .steps import (
@@ -29,7 +33,7 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 
-logger = logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 _LOG_INTERVAL = 1_000
 _BATCH_SIZE = 1_000
@@ -87,7 +91,7 @@ def _iter_smiles(path: Path) -> Iterator[tuple[str, str]]:
                 )
 
 
-def _results_to_frame(
+def _results_to_batch(
     results: list[dict[str, Any]], schema: pa.Schema
 ) -> pa.RecordBatch:
     return pa.RecordBatch.from_pylist(results, schema=schema)
@@ -141,13 +145,10 @@ def _process_batch(batch: list[tuple[str, str]]) -> list[dict[str, Any]]:
 
 def _preprocess(
     input_path: Path,
-    output_path: Path,
     num_workers: int,
     steps: list[Step],
-) -> None:
+) -> pa.Table:
     input_path = Path(input_path)
-    output_path = Path(output_path)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
 
     logger.info("Counting total molecules in %s...", input_path.name)
     total_molecules = _count_smiles(input_path)
@@ -163,32 +164,40 @@ def _preprocess(
 
     total_processed = 0
     next_log_at = _LOG_INTERVAL
+    record_batches: list[pa.RecordBatch] = []
 
-    with pq.ParquetWriter(output_path, schema) as writer:
-        with ProcessPoolExecutor(
-            max_workers=num_workers, initializer=_init_worker, initargs=(steps,)
-        ) as executor:
-            iterator = _iter_smiles(input_path)
-            batches = _batch(iterator, _BATCH_SIZE)
+    with ProcessPoolExecutor(
+        max_workers=num_workers, initializer=_init_worker, initargs=(steps,)
+    ) as executor:
+        iterator = _iter_smiles(input_path)
+        batches = _batch(iterator, _BATCH_SIZE)
 
-            for results in executor.map(_process_batch, batches):
-                record_batch = _results_to_frame(results, schema)
-                writer.write_batch(record_batch)
+        for results in executor.map(_process_batch, batches):
+            record_batches.append(_results_to_batch(results, schema))
 
-                total_processed += len(results)
-                if total_processed >= next_log_at:
-                    logger.info(
-                        "Processed %d of %d molecules...",
-                        total_processed,
-                        total_molecules,
-                    )
-                    next_log_at = total_processed + _LOG_INTERVAL
+            total_processed += len(results)
+            if total_processed >= next_log_at:
+                logger.info(
+                    "Processed %d of %d molecules...",
+                    total_processed,
+                    total_molecules,
+                )
+                next_log_at = total_processed + _LOG_INTERVAL
+
+    if total_processed == 0:
+        logger.error(
+            "no molecules were processed from %s; refusing to write empty output",
+            input_path,
+        )
+        sys.exit(1)
 
     logger.info(
         "Finished preprocessing. Processed %d of %d molecules.",
         total_processed,
         total_molecules,
     )
+
+    return pa.Table.from_batches(record_batches, schema=schema)
 
 
 def _build_pipeline(morgan_radius: int, morgan_n_bits: int, seed: int) -> list[Step]:
@@ -198,6 +207,10 @@ def _build_pipeline(morgan_radius: int, morgan_n_bits: int, seed: int) -> list[S
         MorganFingerprintStep(morgan_radius, morgan_n_bits),
         ConformersStep(seed=seed),
     ]
+
+
+def _write_local_parquet(table: pa.Table, output: str):
+    pq.write_table(table, output)
 
 
 class NumWorkersType(click.ParamType):
@@ -231,10 +244,10 @@ NUM_WORKERS = NumWorkersType()
 )
 @click.option(
     "--output",
-    "output_path",
-    type=click.Path(writable=True),
+    "output",
+    type=str,
     required=True,
-    help="Path to save the output.",
+    help="Output Parquet file.",
 )
 @click.option(
     "--num-workers",
@@ -250,11 +263,45 @@ NUM_WORKERS = NumWorkersType()
     show_default=True,
     help="Random seed.",
 )
-def preprocess(input_path: str, output_path: str, num_workers: int, seed: int):
+@click.option(
+    "--use-blob-storage",
+    is_flag=True,
+    help="Output Parquet file to blob storage.",
+)
+@click.option("--bucket", type=str, default="lynceus", help="Output bucket name")
+@click.option(
+    "--skip-if-exists",
+    is_flag=True,
+    help="Skip processing if the output file already exists.",
+)
+def preprocess(
+    input_path: str,
+    output: str,
+    num_workers: int,
+    seed: int,
+    use_blob_storage: bool,
+    bucket: str,
+    skip_if_exists: bool,
+):
+    if use_blob_storage:
+        blob_storage_settings = get_blob_storage_settings()
+        output = f"s3://{bucket}/{output.lstrip('/')}"
+    else:
+        blob_storage_settings = None
+
+    conn = get_connection(blob_storage_settings)
+
+    if skip_if_exists:
+        if file_exists(conn, output):
+            logger.info(f"{output} already exists. Skipping.")
+            return
+
     steps = _build_pipeline(2, 1024, seed)
-    _preprocess(
+
+    table: pa.Table = _preprocess(
         input_path=input_path,
-        output_path=output_path,
         num_workers=num_workers,
         steps=steps,
     )
+
+    export_parquet(conn, table, output)

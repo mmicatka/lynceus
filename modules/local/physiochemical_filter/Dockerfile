@@ -10,9 +10,16 @@ COPY --from=ghcr.io/astral-sh/uv:0.11.28-python3.12-trixie /usr/local/bin/uv /us
 
 WORKDIR /app
 
-COPY pyproject.toml ./
-COPY src ./src
+COPY pyproject.toml uv.lock ./
+
+COPY libs/lynceus-utils ./libs/lynceus-utils
+
+COPY modules/local/physiochemical_filter ./modules/local/physiochemical_filter
+
+WORKDIR /app/modules/local/physiochemical_filter
 
 RUN uv pip install --system .
+
+RUN python -c "import duckdb; duckdb.execute('INSTALL httpfs')"
 
 ENTRYPOINT []

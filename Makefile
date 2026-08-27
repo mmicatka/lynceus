@@ -12,13 +12,16 @@ NF_DRIVER_DEPLOYMENT ?= nf-driver
 
 .PHONY: build push build-* run-dev run-k8s driver-exec driver-restart clean reset lint
 
-build: build-lynceus-chem build-preprocess-candidates build-detect-putative-binding-sites build-protein-conformational-ensemble build-docking-prep build-sample-candidates build-physiochemical-filter build-docking-run-gpu build-nf-driver
+build: build-lynceus-chem build-preprocess-candidates build-rebalance-candidates build-detect-putative-binding-sites build-protein-conformational-ensemble build-docking-prep build-sample-candidates build-physiochemical-filter build-docking-run-gpu build-nf-driver
 
 build-lynceus-chem:
 	docker buildx build --platform linux/amd64,linux/arm64 --push -t $(IMAGE_PREFIX)/lynceus-chem:$(VERSION) libs/lynceus-chem
 
 build-preprocess-candidates:
-	docker buildx build --platform linux/amd64,linux/arm64 --push -t $(IMAGE_PREFIX)/preprocess-candidates:0.1.2 modules/local/preprocess_candidates
+	docker buildx build --platform linux/amd64,linux/arm64 --push -f modules/local/preprocess_candidates/Dockerfile -t $(IMAGE_PREFIX)/preprocess-candidates:$(VERSION) .
+
+build-rebalance-candidates:
+	docker buildx build --platform linux/amd64,linux/arm64 --push -f modules/local/rebalance_candidates/Dockerfile -t $(IMAGE_PREFIX)/rebalance-candidates:$(VERSION) .
 
 build-protein-conformational-ensemble:
 	docker buildx build --platform linux/amd64,linux/arm64 --push -t $(IMAGE_PREFIX)/protein-conformational-ensemble:$(VERSION) libs/protein-conformational-ensemble
@@ -33,7 +36,7 @@ build-sample-candidates:
 	docker buildx build --platform linux/amd64,linux/arm64 --push -t $(IMAGE_PREFIX)/sample-candidates:$(VERSION) modules/local/sample_candidates
 
 build-physiochemical-filter:
-	docker buildx build --platform linux/amd64,linux/arm64 --push -t $(IMAGE_PREFIX)/physiochemical-filter:$(VERSION) modules/local/physiochemical_filter
+	docker buildx build --platform linux/amd64,linux/arm64 --push -f modules/local/physiochemical_filter/Dockerfile -t $(IMAGE_PREFIX)/physiochemical-filter:$(VERSION) .
 
 build-docking-run-gpu:
 	docker buildx build --platform linux/amd64 --push --target gpu -t $(IMAGE_PREFIX)/docking-run:gpu-$(VERSION) modules/local/docking_run
