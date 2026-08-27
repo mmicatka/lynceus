@@ -23,8 +23,6 @@ dependencies = [
 
 [project.scripts]
 docking-prepare-ensemble = "docking_prep.ensemble:prepare_ensemble"
-conformer-generate = "docking_prep.ligand:conformer_generate"
-convert-pdbqt = "docking_prep.ligand:convert_pdbqt"
 
 [build-system]
 requires = ["uv_build>=0.11.30,<0.12.0"]

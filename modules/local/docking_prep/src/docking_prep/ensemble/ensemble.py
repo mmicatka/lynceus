@@ -8,8 +8,8 @@ import sys
 from pathlib import Path
 
 import gemmi
+from pce.models import ConformationalState
 from protein_conformational_ensemble.ensemble import Ensemble, load_ensemble
-from protein_conformational_ensemble.models import ConformationalState
 
 from docking_prep.ensemble.models import (
     EnsembleMemberPrepResult,

@@ -6,6 +6,7 @@ version = "0.1.0"
 description = "Add your description here"
 requires-python = ">=3.12"
 dependencies = [
+    "click>=8.4.2",
     "gemmi>=0.7.5",
     "lynceus-chem",
     "protein-conformational-ensemble",

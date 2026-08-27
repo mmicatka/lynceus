@@ -12,10 +12,11 @@ import tempfile
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
+import click
 import gemmi
 from lynceus_chem.models.binding_site import BindingSite, Sphere
-from protein_conformational_ensemble.ensemble import Ensemble, load_ensemble
-from protein_conformational_ensemble.models import (
+from pce.ensemble import Ensemble, load_ensemble
+from pce.models import (
     ConformationalState,
     MultiModelStructure,
     StandaloneStructure,
@@ -312,32 +313,28 @@ def _parse_num_workers(value: str) -> int:
     return n
 
 
-def _parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument(
-        "--ensemble",
-        type=Path,
-        help="Protein conformational ensemble package directory.",
-    )
-    p.add_argument(
-        "--out",
-        type=Path,
-        required=True,
-        help="Output path for combined raw BindingSite JSON list",
-    )
-    p.add_argument(
-        "--workers",
-        type=_parse_num_workers,
-        default="auto",
-        help="Number of parallel p2rank workers, or 'auto' for os.cpu_count()",
-    )
-    return p.parse_args()
-
-
-def detect_putative_binding_sites():
-    args = _parse_args()
+@click.command(help=__doc__)
+@click.option(
+    "--ensemble",
+    type=click.Path(exists=True, path_type=Path),
+    help="Protein conformational ensemble package directory.",
+)
+@click.option(
+    "--out",
+    required=True,
+    type=click.Path(path_type=Path),
+    help="Output path for combined raw BindingSite JSON list.",
+)
+@click.option(
+    "--workers",
+    default="auto",
+    show_default=True,
+    type=_parse_num_workers,
+    help="Number of parallel p2rank workers, or 'auto' for os.cpu_count()",
+)
+def detect_putative_binding_sites(ensemble: Path | None, out: Path, workers: int | str):
     putative_binding_sites: list[BindingSite] = _detect_putative_binding_sites_ensemble(
-        args.ensemble, args.workers
+        ensemble, workers
     )
 
-    _write_putative_binding_sites(putative_binding_sites, args.out)
+    _write_putative_binding_sites(putative_binding_sites, out)

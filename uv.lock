@@ -810,6 +810,7 @@ name = "detect-putative-binding-sites"
 version = "0.1.0"
 source = { editable = "modules/local/detect_putative_binding_sites" }
 dependencies = [
+    { name = "click" },
     { name = "gemmi" },
     { name = "lynceus-chem" },
     { name = "protein-conformational-ensemble" },
@@ -817,6 +818,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "click", specifier = ">=8.4.2" },
     { name = "gemmi", specifier = ">=0.7.5" },
     { name = "lynceus-chem", editable = "libs/lynceus-chem" },
     { name = "protein-conformational-ensemble", editable = "libs/protein-conformational-ensemble" },
@@ -880,13 +882,21 @@ name = "docking-run"
 version = "0.1.0"
 source = { editable = "modules/local/docking_run" }
 dependencies = [
+    { name = "click" },
+    { name = "gemmi" },
+    { name = "meeko" },
     { name = "pyarrow" },
+    { name = "rdkit" },
     { name = "tqdm" },
 ]
 
 [package.metadata]
 requires-dist = [
+    { name = "click", specifier = ">=8.4.2" },
+    { name = "gemmi", specifier = ">=0.7.5" },
+    { name = "meeko", specifier = ">=0.7.1" },
     { name = "pyarrow", specifier = ">=24.0.0" },
+    { name = "rdkit", specifier = ">=2026.3.4" },
     { name = "tqdm", specifier = ">=4.70.0" },
 ]
 

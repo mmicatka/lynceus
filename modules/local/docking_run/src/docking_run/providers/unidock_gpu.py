@@ -8,7 +8,7 @@ import subprocess
 from pathlib import Path
 from typing import Iterator
 
-from docking_run.ligand_prep import materialize_ligands
+from docking_run.prep.ligand import materialize_ligands
 from docking_run.types import DockingError, DockingResult, LigandRecord, SearchBox
 
 from .provider import DockingProvider, ProviderNotAvailableError

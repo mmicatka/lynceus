@@ -1,0 +1,311 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/pce/schemas/manifest.schema.json",
+  "title": "PCE Manifest",
+  "description": "Structural schema for manifest.yaml per the PCE specification v1.0.0. This schema validates structure, types, enums, and simple conditionals only.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "id",
+    "content_hash",
+    "parent_ensemble",
+    "topology_reference",
+    "conformational_states"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "content_hash": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9_-]+:[0-9a-f]+$"
+    },
+    "parent_ensemble": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/parent_ensemble"
+        }
+      ]
+    },
+    "topology_reference": {
+      "$ref": "#/$defs/topology_reference"
+    },
+    "weight_scheme": {
+      "$ref": "#/$defs/weight_scheme"
+    },
+    "capabilities_required": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true,
+      "default": [
+        "standalone_cif"
+      ]
+    },
+    "conformational_states": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/conformational_state"
+      }
+    },
+    "metadata": {
+      "type": "object"
+    },
+    "dynamics": {
+      "type": "object"
+    }
+  },
+  "$defs": {
+    "parent_ensemble": {
+      "type": "object",
+      "required": [
+        "id",
+        "content_hash",
+        "relationship"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "content_hash": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_-]+:[0-9a-f]+$"
+        },
+        "relationship": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "topology_reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "conformational_state_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "external_reference": {
+          "type": "object",
+          "required": [
+            "uri"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "uri": {
+              "type": "string",
+              "minLength": 1
+            },
+            "source": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "oneOf": [
+        {
+          "required": [
+            "conformational_state_id"
+          ]
+        },
+        {
+          "required": [
+            "external_reference"
+          ]
+        }
+      ]
+    },
+    "weight_scheme_type": {
+      "type": "string",
+      "enum": [
+        "equilibrium_probability",
+        "cluster_fraction",
+        "experimental_occupancy",
+        "uniform",
+        "custom"
+      ]
+    },
+    "weight_scheme": {
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/weight_scheme_type"
+        },
+        "normalized": {
+          "type": "boolean"
+        },
+        "custom_semantics": {
+          "type": "object"
+        }
+      },
+      "if": {
+        "properties": {
+          "type": {
+            "const": "custom"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "type",
+          "custom_semantics"
+        ]
+      }
+    },
+    "weight": {
+      "type": "object",
+      "required": [
+        "value"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "value": {
+          "type": "number"
+        },
+        "type": {
+          "$ref": "#/$defs/weight_scheme_type"
+        }
+      }
+    },
+    "residue_mapping": {
+      "type": "object",
+      "required": [
+        "uri",
+        "format"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "uri": {
+          "type": "string",
+          "minLength": 1
+        },
+        "format": {
+          "type": "string"
+        }
+      }
+    },
+    "structure_standalone": {
+      "type": "object",
+      "required": [
+        "uri"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "uri": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "structure_multi_model": {
+      "type": "object",
+      "required": [
+        "uri",
+        "model_index"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "uri": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model_index": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "structure_trajectory": {
+      "type": "object",
+      "required": [
+        "topology_uri",
+        "trajectory_uri",
+        "frame_index",
+        "trajectory_format"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "topology_uri": {
+          "type": "string",
+          "minLength": 1
+        },
+        "trajectory_uri": {
+          "type": "string",
+          "minLength": 1
+        },
+        "frame_index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "trajectory_format": {
+          "type": "string",
+          "enum": [
+            "xtc",
+            "dcd",
+            "trr",
+            "nc"
+          ]
+        }
+      }
+    },
+    "structure": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/structure_trajectory"
+        },
+        {
+          "$ref": "#/$defs/structure_multi_model"
+        },
+        {
+          "$ref": "#/$defs/structure_standalone"
+        }
+      ]
+    },
+    "conformational_state": {
+      "type": "object",
+      "required": [
+        "id",
+        "structure"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "structure": {
+          "$ref": "#/$defs/structure"
+        },
+        "weight": {
+          "$ref": "#/$defs/weight"
+        },
+        "residue_mapping": {
+          "$ref": "#/$defs/residue_mapping"
+        },
+        "provenance": {
+          "type": "object"
+        },
+        "thermodynamics": {
+          "type": "object"
+        }
+      }
+    }
+  }
+}
