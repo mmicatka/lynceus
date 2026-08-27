@@ -13,19 +13,26 @@ workflow CANDIDATE {
   main:
   directory = "s3://${bucket}/candidates"
 
-  tranches = "TEST"
+  tranches = ["TEST"]
 
-  ch_smi_gz = channel.fromPath("${directory}/raw/{${tranches}}/*.smi.gz")
+  def pattern = tranches.size() == 1
+    ? "${directory}/raw/${tranches[0]}/*.smi.gz"
+    : "${directory}/raw/{${tranches.join(',')}}/*.smi.gz"
+
+  ch_smi_gz = channel.fromPath(pattern, checkIfExists: true)
     .map { f -> tuple(f.parent.name, f) }
     .filter { tranche, f ->
       def stem = f.name.replaceAll(/\.smi\.gz$/, '')
       def expected = file("${directory}/preprocessed/${tranche}/${stem}.parquet")
       !expected.exists()
     }
+    .view()
 
   PREPROCESS_CANDIDATES(ch_smi_gz, bucket)
 
-  _ch_preprocess_done = PREPROCESS_CANDIDATES.out.done.collect()
+  _ch_preprocess_done = PREPROCESS_CANDIDATES.out.done
+    .collect()
+    .ifEmpty { true }
 
   REBALANCE_CANDIDATES(
     _ch_preprocess_done.map { "${directory}/preprocessed/**/*.parquet" },
@@ -34,7 +41,7 @@ workflow CANDIDATE {
     num_per_shard,
   )
 
-  ch_rebalanced = REBALANCE_CANDIDATES.out.done.flatMap { file("${directory}/rebalanced/*.parquet") }
+  ch_rebalanced = REBALANCE_CANDIDATES.out.done.flatMap { file("${directory}/rebalanced/*.parquet") }.ifEmpty { true }
 
   PHYSIOCHEMICAL_FILTER(ch_rebalanced, filter_config, bucket)
 }
