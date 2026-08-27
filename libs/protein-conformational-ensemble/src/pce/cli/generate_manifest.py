@@ -1,98 +1,57 @@
 # libs/protein-conformational-ensemble/src/pce/cli/generate_manifest.py
 
-import argparse
 from pathlib import Path
-from typing import Any
 
-import yaml
+import click
 
-from pce.generation import (
-    ConformationalStateSpec,
-    generate_ensemble,
+from pce.discovery import discover_member_specs
+from pce.generation import generate_ensemble
+
+
+@click.command(
+    help="Generate a multi-member PCE manifest from a directory of member structures."
 )
-from pce.models import WeightScheme
-
-_STRUCTURE_SUFFIXES = {".cif", ".pdb", ".mmcif"}
-_WEIGHTS_FILENAME = "weights.yaml"
-
-
-def _discover_member_specs(
+@click.option(
+    "--members-dir",
+    type=click.Path(exists=True, path_type=Path),
+    required=True,
+    help="Directory containing member structures.",
+)
+@click.option(
+    "--ensemble-id",
+    type=str,
+    required=True,
+    help="Unique identifier for the ensemble.",
+)
+@click.option(
+    "--outdir",
+    type=click.Path(path_type=Path),
+    required=True,
+    help="Output directory for the manifest.",
+)
+@click.option(
+    "--topology-member-id",
+    type=str,
+    default=None,
+    help="Defaults to the first member found if omitted.",
+)
+def generate_manifest(
     members_dir: Path,
-) -> tuple[list[ConformationalStateSpec], WeightScheme | None]:
-    weights_path = members_dir / _WEIGHTS_FILENAME
-    weights_data: dict[str, Any] | None = None
-    if weights_path.exists():
-        with weights_path.open() as f:
-            weights_data = yaml.safe_load(f)
-
-    structure_files = sorted(
-        p for p in members_dir.iterdir() if p.suffix.lower() in _STRUCTURE_SUFFIXES
-    )
-    if not structure_files:
-        raise ValueError(
-            f"No structure files ({sorted(_STRUCTURE_SUFFIXES)}) found under "
-            f"{members_dir}"
-        )
-
-    weight_values: dict[str, float] = (weights_data or {}).get("values", {})
-    weight_type = (weights_data or {}).get("type")
-
-    specs = []
-    for path in structure_files:
-        member_id = path.stem
-        weight_value = weight_values.get(member_id)
-        specs.append(
-            ConformationalStateSpec(
-                id=member_id,
-                source_path=path,
-                weight_value=weight_value,
-                weight_type=weight_type if weight_value is not None else None,
-            )
-        )
-
-    weight_scheme = None
-    if weights_data is not None:
-        weight_scheme = WeightScheme(
-            type=weights_data["type"],
-            normalized=weights_data.get("normalized", False),
-            custom_semantics=weights_data.get("custom_semantics"),
-        )
-
-    return specs, weight_scheme
-
-
-def _parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(
-        description=(
-            "Generate a multi-member PCE manifest from a directory "
-            "of member structures."
-        )
-    )
-    p.add_argument("--members-dir", type=Path, required=True)
-    p.add_argument("--ensemble-id", type=str, required=True)
-    p.add_argument("--outdir", type=Path, required=True)
-    p.add_argument(
-        "--topology-member-id",
-        type=str,
-        default=None,
-        help="Defaults to the first member found if omitted.",
-    )
-    return p.parse_args()
-
-
-def generate_manifest():
-    args = _parse_args()
-    member_specs, weight_scheme = _discover_member_specs(args.members_dir)
+    ensemble_id: str,
+    outdir: Path,
+    topology_member_id: str | None,
+):
+    member_specs, weight_scheme = discover_member_specs(members_dir)
 
     manifest = generate_ensemble(
-        ensemble_id=args.ensemble_id,
+        ensemble_id=ensemble_id,
         conformational_states_specs=member_specs,
-        package_root=args.outdir,
+        package_root=outdir,
         weight_scheme=weight_scheme,
-        topology_conformational_state_id=args.topology_member_id,
+        topology_conformational_state_id=topology_member_id,
     )
 
-    print(
-        f"Wrote PCE manifest: {args.outdir / 'manifest.yaml'} "
+    click.echo(
+        f"Wrote PCE manifest: {outdir / 'manifest.yaml'} "
         f"({len(manifest.conformational_states)} members)"
     )

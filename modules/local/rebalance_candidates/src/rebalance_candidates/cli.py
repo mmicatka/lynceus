@@ -3,15 +3,15 @@
 import json
 import logging
 import re
-from typing import Iterator, Optional, Sequence
+from typing import Iterator, Sequence
 
 import click
 import fsspec
 import pyarrow as pa
 from lynceus_utils.duckdb import export_parquet, file_exists, get_connection
 from lynceus_utils.storage.blob_storage import (
-    BlobStorageSettings,
     get_blob_storage_settings,
+    get_filesystem,
 )
 
 logging.basicConfig(
@@ -87,42 +87,6 @@ def _generate_sharded_tables(
 
     if current_rows > 0:
         yield pa.Table.from_batches(current_batches)
-
-
-def _fsspec_storage_options(
-    blob_storage_settings: Optional[BlobStorageSettings],
-) -> dict:
-    if blob_storage_settings is None:
-        return {}
-
-    scheme = "https" if blob_storage_settings.use_ssl else "http"
-    endpoint = str(blob_storage_settings.endpoint)
-    if not endpoint.startswith(("http://", "https://")):
-        endpoint = f"{scheme}://{endpoint}"
-
-    return {
-        "key": blob_storage_settings.access_key_id,
-        "secret": blob_storage_settings.access_key,
-        "client_kwargs": {
-            "endpoint_url": endpoint,
-            "region_name": blob_storage_settings.region,
-        },
-        "config_kwargs": {
-            "s3": {
-                "addressing_style": (
-                    "path" if blob_storage_settings.url_style == "path" else "virtual"
-                )
-            }
-        },
-    }
-
-
-def _get_fs(
-    target_dir: str, blob_storage_settings: Optional[BlobStorageSettings]
-) -> fsspec.AbstractFileSystem:
-    if target_dir.startswith("s3://"):
-        return fsspec.filesystem("s3", **_fsspec_storage_options(blob_storage_settings))
-    return fsspec.filesystem("file")
 
 
 def _manifest_path(target_dir: str) -> str:
@@ -314,7 +278,7 @@ def rebalance_candidates(
         target_dir = output_path.rstrip("/")
 
     conn = get_connection(blob_storage_settings)
-    fs = _get_fs(target_dir, blob_storage_settings)
+    fs = get_filesystem(target_dir, blob_storage_settings)
 
     manifest_path = _manifest_path(target_dir)
     manifest = _load_manifest(fs, manifest_path)
@@ -360,7 +324,3 @@ def rebalance_candidates(
         f"Successfully wrote {entry['shard_count']} shards to {target_dir} "
         f"and updated manifest at {manifest_path}"
     )
-
-
-if __name__ == "__main__":
-    rebalance_candidates()

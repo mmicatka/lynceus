@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
-import shutil
 from dataclasses import dataclass, replace
 from pathlib import Path
+from typing import Optional
+
+import fsspec
+from lynceus_utils.storage import BlobStorageSettings, get_filesystem
 
 from pce.canonical import canonical_serialize
 from pce.ensemble import MANIFEST_FILENAME
@@ -26,6 +29,7 @@ from pce.models import (
     Weight,
     WeightScheme,
 )
+from pce.uris import join_uri
 
 _PLACEHOLDER_HASH = "blake3:" + "0" * 64
 
@@ -42,11 +46,21 @@ class ConformationalStateSpec:
 
 
 def _copy_structure_into_package(
-    spec: ConformationalStateSpec, package_root: Path
+    spec: ConformationalStateSpec,
+    package_root: str,
+    source_filesystem: fsspec.AbstractFileSystem,
+    dest_filesystem: fsspec.AbstractFileSystem,
 ) -> str:
     dest_name = f"{spec.id}{spec.source_path.suffix}"
-    dest_path = package_root / dest_name
-    shutil.copyfile(spec.source_path, dest_path)
+    dest_uri = join_uri(package_root, dest_name)
+
+    with source_filesystem.open(str(spec.source_path), "rb") as src:
+        with dest_filesystem.open(dest_uri, "wb") as dst:
+            # FIXME: streams the whole structure file into memory; fine for
+            # typical CIF/PDB sizes but revisit if trajectory-backed members
+            # bring much larger files into this path.
+            dst.write(src.read())
+
     return dest_name
 
 
@@ -68,21 +82,31 @@ def generate_ensemble(
     *,
     ensemble_id: str,
     conformational_states_specs: list[ConformationalStateSpec],
-    package_root: Path,
+    package_root: str,
     weight_scheme: WeightScheme | None = None,
     topology_conformational_state_id: str | None = None,
     capabilities_required: tuple[str, ...] = (CAPABILITY_STANDALONE_CIF,),
     structure_bytes: StructureBytesResolver = default_structure_bytes,
+    blob_storage_settings: Optional[BlobStorageSettings] = None,
+    source_blob_storage_settings: Optional[BlobStorageSettings] = None,
 ) -> Manifest:
     if not conformational_states_specs:
         msg = "generate_ensemble() requires at least one ConformationalStateSpec"
         raise ValueError(msg)
 
-    package_root.mkdir(parents=True, exist_ok=True)
+    dest_filesystem = get_filesystem(blob_storage_settings)
+    source_filesystem = (
+        get_filesystem(source_blob_storage_settings)
+        if source_blob_storage_settings is not None
+        else dest_filesystem
+    )
 
-    # Copy structures first; URIs must exist on disk before hashing.
+    dest_filesystem.makedirs(package_root, exist_ok=True)
+
     uris = {
-        spec.id: _copy_structure_into_package(spec, package_root)
+        spec.id: _copy_structure_into_package(
+            spec, package_root, source_filesystem, dest_filesystem
+        )
         for spec in conformational_states_specs
     }
     conformational_states = tuple(
@@ -116,14 +140,18 @@ def generate_ensemble(
     )
 
     real_hash = compute_content_hash(
-        provisional, package_root, structure_bytes=structure_bytes
+        provisional,
+        package_root,
+        structure_bytes=structure_bytes,
+        filesystem=dest_filesystem,
     )
     final_manifest = replace(provisional, content_hash=real_hash)
 
     validate_semantics(final_manifest)
 
-    manifest_path = package_root / MANIFEST_FILENAME
+    manifest_uri = join_uri(package_root, MANIFEST_FILENAME)
     manifest_yaml = canonical_serialize(final_manifest.to_canonical())
-    manifest_path.write_bytes(manifest_yaml)
+    with dest_filesystem.open(manifest_uri, "wb") as f:
+        f.write(manifest_yaml)
 
     return final_manifest

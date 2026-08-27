@@ -18,7 +18,7 @@ members = [
     "detect-putative-binding-sites",
     "docking-prep",
     "docking-run",
-    "generate-manifest",
+    "generate-pce-manifest",
     "lynceus-chem",
     "lynceus-dev",
     "lynceus-utils",
@@ -1151,17 +1151,19 @@ wheels = [
 ]
 
 [[package]]
-name = "generate-manifest"
+name = "generate-pce-manifest"
 version = "0.1.0"
-source = { editable = "modules/local/generate_manifest" }
+source = { editable = "modules/local/generate_pce_manifest" }
 dependencies = [
     { name = "click" },
+    { name = "lynceus-utils" },
     { name = "protein-conformational-ensemble" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "click", specifier = ">=8.4.2" },
+    { name = "lynceus-utils", editable = "libs/lynceus-utils" },
     { name = "protein-conformational-ensemble", editable = "libs/protein-conformational-ensemble" },
 ]
 
@@ -1815,6 +1817,7 @@ dependencies = [
     { name = "detect-putative-binding-sites" },
     { name = "docking-prep" },
     { name = "docking-run" },
+    { name = "generate-pce-manifest" },
     { name = "lynceus-chem" },
     { name = "lynceus-utils" },
     { name = "physiochemical-filter" },
@@ -1841,6 +1844,7 @@ requires-dist = [
     { name = "detect-putative-binding-sites", editable = "modules/local/detect_putative_binding_sites" },
     { name = "docking-prep", editable = "modules/local/docking_prep" },
     { name = "docking-run", editable = "modules/local/docking_run" },
+    { name = "generate-pce-manifest", editable = "modules/local/generate_pce_manifest" },
     { name = "lynceus-chem", editable = "libs/lynceus-chem" },
     { name = "lynceus-utils", editable = "libs/lynceus-utils" },
     { name = "physiochemical-filter", editable = "modules/local/physiochemical_filter" },
@@ -1868,6 +1872,7 @@ version = "0.1.0"
 source = { editable = "libs/lynceus-utils" }
 dependencies = [
     { name = "duckdb" },
+    { name = "fsspec" },
     { name = "pyarrow" },
     { name = "pydantic" },
 ]
@@ -1880,6 +1885,7 @@ s3 = [
 [package.metadata]
 requires-dist = [
     { name = "duckdb", specifier = ">=1.5.4" },
+    { name = "fsspec", specifier = ">=2026.6.0" },
     { name = "pyarrow", specifier = ">=24.0.0" },
     { name = "pydantic", specifier = ">=2.13.4" },
     { name = "s3fs", marker = "extra == 's3'", specifier = ">=2024.1" },
@@ -2743,6 +2749,8 @@ version = "0.1.0"
 source = { editable = "libs/protein-conformational-ensemble" }
 dependencies = [
     { name = "blake3" },
+    { name = "click" },
+    { name = "fsspec" },
     { name = "jsonschema" },
     { name = "pyyaml" },
 ]
@@ -2757,6 +2765,8 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "blake3", specifier = ">=1.0.9" },
+    { name = "click", specifier = ">=8.4.2" },
+    { name = "fsspec", specifier = ">=2026.6.0" },
     { name = "jsonschema", specifier = ">=4.26.0" },
     { name = "pyyaml", specifier = ">=6.0.3" },
 ]

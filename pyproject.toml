@@ -20,6 +20,7 @@ dependencies = [
     "surrogate-model",
     "preprocess-candidates",
     "rebalance-candidates",
+    "generate-pce-manifest",
 ]
 
 [tool.uv.workspace]
@@ -37,7 +38,7 @@ members = [
     "modules/local/surrogate_model",
     "modules/local/preprocess_candidates",
     "modules/local/rebalance_candidates",
-    "modules/local/generate_manifest",
+    "modules/local/generate_pce_manifest",
 ]
 
 [tool.uv.sources]
@@ -53,6 +54,7 @@ docking-run = { workspace = true }
 surrogate-model = { workspace = true }
 preprocess-candidates = { workspace = true }
 rebalance-candidates = { workspace = true }
+generate-pce-manifest = { workspace = true }
 
 [dependency-groups]
 dev = [

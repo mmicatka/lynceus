@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
-from pathlib import Path
 from typing import Protocol
 
+import fsspec
 from blake3 import blake3
+from fsspec.implementations.local import LocalFileSystem
 
 from pce.canonical import canonical_serialize
 from pce.models import (
@@ -14,13 +14,17 @@ from pce.models import (
     Manifest,
     TrajectoryStructure,
 )
+from pce.uris import join_uri
 
 ALGORITHM_PREFIX = "blake3"
 
 
 class StructureBytesResolver(Protocol):
     def __call__(
-        self, conformational_state: ConformationalState, package_root: Path
+        self,
+        conformational_state: ConformationalState,
+        package_root: str,
+        filesystem: fsspec.AbstractFileSystem,
     ) -> bytes: ...
 
 
@@ -29,7 +33,9 @@ def _blake3_digest(data: bytes) -> bytes:
 
 
 def default_structure_bytes(
-    conformational_state: ConformationalState, package_root: Path
+    conformational_state: ConformationalState,
+    package_root: str,
+    filesystem: fsspec.AbstractFileSystem,
 ) -> bytes:
     structure = conformational_state.structure
     if isinstance(structure, TrajectoryStructure):
@@ -43,52 +49,20 @@ def default_structure_bytes(
         )
         raise NotImplementedError(msg)
 
-    path = package_root / structure.uri
-    return path.read_bytes()
-
-
-def extract_trajectory_frame_bytes(
-    conformational_state: ConformationalState,
-    package_root: Path,
-    *,
-    frame_reader: Callable[[Path, Path, int, str], bytes] | None = None,
-) -> bytes:
-    structure = conformational_state.structure
-    if not isinstance(structure, TrajectoryStructure):
-        msg = (
-            f"Conformational State {conformational_state.id!r} is not trajectory-backed"
-        )
-        raise TypeError(msg)
-
-    if frame_reader is None:
-        msg = (
-            "extract_trajectory_frame_bytes requires a frame_reader callable "
-            "(path_to_trajectory, path_to_topology, frame_index, format) -> bytes; "
-            "no default trajectory-format reader is bundled with this reference "
-            "implementation."
-        )
-        raise NotImplementedError(msg)
-
-    topology_path = package_root / structure.topology_uri
-    trajectory_path = package_root / structure.trajectory_uri
-    frame_bytes = frame_reader(
-        trajectory_path,
-        topology_path,
-        structure.frame_index,
-        structure.trajectory_format,
-    )
-    topology_bytes = topology_path.read_bytes()
-    return frame_bytes + topology_bytes
+    uri = join_uri(package_root, structure.uri)
+    with filesystem.open(uri, "rb") as f:
+        return f.read()
 
 
 def conformational_state_leaf_hash(
     conformational_state: ConformationalState,
-    package_root: Path,
+    package_root: str,
+    filesystem: fsspec.AbstractFileSystem,
     *,
     structure_bytes: StructureBytesResolver = default_structure_bytes,
 ) -> bytes:
     canonical_entry = canonical_serialize(conformational_state.to_canonical())
-    struct_bytes = structure_bytes(conformational_state, package_root)
+    struct_bytes = structure_bytes(conformational_state, package_root, filesystem)
     struct_digest = _blake3_digest(struct_bytes)
     return _blake3_digest(canonical_entry + struct_digest)
 
@@ -110,15 +84,19 @@ def merkle_root(leaf_hashes: list[bytes]) -> bytes:
 
 def compute_content_hash(
     manifest: Manifest,
-    package_root: Path,
+    package_root: str,
     *,
     structure_bytes: StructureBytesResolver = default_structure_bytes,
+    filesystem: fsspec.AbstractFileSystem | None = None,
 ) -> str:
+    filesystem = filesystem or LocalFileSystem()
     ordered_conformational_states = sorted(
         manifest.conformational_states, key=lambda c: c.id
     )
     leaves = [
-        conformational_state_leaf_hash(m, package_root, structure_bytes=structure_bytes)
+        conformational_state_leaf_hash(
+            m, package_root, filesystem, structure_bytes=structure_bytes
+        )
         for m in ordered_conformational_states
     ]
     root = merkle_root(leaves)
@@ -127,9 +105,10 @@ def compute_content_hash(
 
 def verify_content_hash(
     manifest: Manifest,
-    package_root: Path,
+    package_root: str,
     *,
     structure_bytes: StructureBytesResolver = default_structure_bytes,
+    filesystem: fsspec.AbstractFileSystem | None = None,
 ) -> bool:
     algorithm, _, _ = manifest.content_hash.partition(":")
     if algorithm != ALGORITHM_PREFIX:
@@ -140,6 +119,6 @@ def verify_content_hash(
         raise NotImplementedError(msg)
 
     recomputed = compute_content_hash(
-        manifest, package_root, structure_bytes=structure_bytes
+        manifest, package_root, structure_bytes=structure_bytes, filesystem=filesystem
     )
     return recomputed == manifest.content_hash
