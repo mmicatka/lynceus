@@ -1,7 +1,7 @@
-// modules/local/generate_manifest/main.nf
+// modules/local/generate_pce_manifest/main.nf
 
-process GENERATE_MANIFEST {
-    container "${params.registry}/lynceus/generate-manifest:0.1.0"
+process GENERATE_PCE_MANIFEST {
+    container "${params.registry}/lynceus/generate-pce-manifest:0.1.0"
 
     label 'pvc_io_retry'
 
@@ -9,12 +9,13 @@ process GENERATE_MANIFEST {
     tuple val(ensemble_id), path(ensemble_dir)
 
     output:
-    tuple val(ensemble_id), path("${ensemble_id}"), emit: protein_conformational_ensemble
+    path ("${ensemble_id}"), emit: done
 
     script:
     """
     generate-manifest \\
-        --members-dir ${ensemble_dir} \\
+        --input-path ${ensemble_dir} \\
+        
         --ensemble-id ${ensemble_id} \\
         --outdir ${ensemble_id}
     """

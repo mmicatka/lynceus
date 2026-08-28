@@ -3,10 +3,10 @@
 include { SAMPLE_CANDIDATES } from '../../../modules/local/sample_candidates'
 include { DOCKING } from '../docking'
 
-workflow SURROGATE_MODEL_TRAIN {
+workflow SURROGATE_TRAIN {
     take:
-    protein_conformational_ensemble // protein conformational ensemble
     candidates // path: filtered + repartitioned candidate parquets
+    protein_conformational_ensemble // protein conformational ensemble
     training_config // training configuration
 
     main:
@@ -16,4 +16,7 @@ workflow SURROGATE_MODEL_TRAIN {
     emit:
     sampled_candidates = SAMPLE_CANDIDATES.out.candidates
     results = DOCKING.out.results
+}
+
+workflow SURROGATE_FILTER {
 }

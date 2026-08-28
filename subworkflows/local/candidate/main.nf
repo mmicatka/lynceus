@@ -11,7 +11,6 @@ workflow CANDIDATE {
   filter_config
 
   main:
-  // TODO: Move this fully to parameters
   directory = "s3://${bucket}/candidates"
 
   tranches = ["TEST"]
@@ -27,7 +26,6 @@ workflow CANDIDATE {
       def expected = file("${directory}/preprocessed/${tranche}/${stem}.parquet")
       !expected.exists()
     }
-    .view()
 
   PREPROCESS_CANDIDATES(ch_smi_gz, bucket)
 
@@ -42,7 +40,10 @@ workflow CANDIDATE {
     num_per_shard,
   )
 
-  ch_rebalanced = REBALANCE_CANDIDATES.out.done.flatMap { file("${directory}/rebalanced/*.parquet") }.ifEmpty { true }
+  ch_rebalanced = REBALANCE_CANDIDATES.out.done.flatMap { file("${directory}/rebalanced/*.parquet") }
 
   PHYSIOCHEMICAL_FILTER(ch_rebalanced, filter_config, bucket)
+
+  emit:
+  done = PHYSIOCHEMICAL_FILTER.out.done
 }

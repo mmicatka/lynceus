@@ -1,3 +1,5 @@
+# modules/local/generate_pce_manifest/pyproject.toml
+
 [project]
 name = "generate-pce-manifest"
 version = "0.1.0"
