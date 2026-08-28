@@ -14,6 +14,7 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 
 COPY libs/lynceus-utils ./libs/lynceus-utils
+COPY libs/protein-conformational-ensemble ./libs/protein-conformational-ensemble
 
 COPY modules/local/preprocess_candidates ./modules/local/preprocess_candidates
 
