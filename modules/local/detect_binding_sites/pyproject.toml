@@ -1,23 +1,21 @@
-# modules/local/detect_putative_binding_sites/pyproject.toml
+# modules/local/detect_binding_sites/pyproject.toml
 
 [project]
-name = "detect-putative-binding-sites"
+name = "detect-binding-sites"
 version = "0.1.0"
 description = "Add your description here"
 requires-python = ">=3.12"
 dependencies = [
     "click>=8.4.2",
     "gemmi>=0.7.5",
-    "lynceus-chem",
     "protein-conformational-ensemble",
 ]
 
 [project.scripts]
-detect-putative-binding-sites = "detect_putative_binding_sites.detect_putative_binding_sites:detect_putative_binding_sites"
+detect-binding-sites = "detect_binding_sites.detect_binding_sites:detect_binding_sites"
 
 [tool.uv.sources]
 protein-conformational-ensemble = { workspace = true }
-lynceus-chem = { workspace = true }
 
 [build-system]
 requires = ["uv_build>=0.11.30,<0.12.0"]

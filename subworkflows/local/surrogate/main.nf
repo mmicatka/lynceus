@@ -5,18 +5,18 @@ include { DOCKING } from '../docking'
 
 workflow SURROGATE_TRAIN {
     take:
-    candidates // path: filtered + repartitioned candidate parquets
+    bucket // bucket
     protein_conformational_ensemble // protein conformational ensemble
-    training_config // training configuration
+    config // training configuration
 
     main:
-    SAMPLE_CANDIDATES(candidates, training_config.num_samples, training_config.seed)
+    directory = "s3://${bucket}/candidates"
+
+
+    SAMPLE_CANDIDATES(candidates, config.sample)
     DOCKING(protein_conformational_ensemble, SAMPLE_CANDIDATES.out.candidates)
 
     emit:
     sampled_candidates = SAMPLE_CANDIDATES.out.candidates
     results = DOCKING.out.results
-}
-
-workflow SURROGATE_FILTER {
 }

@@ -1,4 +1,4 @@
-# libs/lynceus-chem/src/lynceus_chem/models/binding_site.py
+# modules/local/detect_binding_sites/src/detect_binding_sites/models.py
 
 
 from typing import Annotated, Any, Literal, Union

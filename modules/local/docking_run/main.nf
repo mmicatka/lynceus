@@ -1,6 +1,6 @@
 // modules/local/docking_run/main.nf
 
-process DOCKING_RUN_GPU {
+process DOCKING_RUN {
     tag "${conformational_state_id}:${site_id}"
 
     label 'gpu'

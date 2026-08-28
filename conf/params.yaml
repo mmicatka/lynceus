@@ -11,10 +11,11 @@ candidates:
 
   filter_config: "/app/lynceus/work/conf/examples/physiochemical_filter.yaml"
 
-surrogate_model:
-  training:
-    seed: 1000
-    num_samples: 10000
+surrogate:
+  train:
+    sample:
+      seed: 1000
+      num_samples: 10000
 
 target:
   ensemble_id: "T4_lysozyme_L99_static"

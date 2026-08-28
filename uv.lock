@@ -15,11 +15,10 @@ resolution-markers = [
 
 [manifest]
 members = [
-    "detect-putative-binding-sites",
+    "detect-binding-sites",
     "docking-prep",
     "docking-run",
     "generate-pce-manifest",
-    "lynceus-chem",
     "lynceus-dev",
     "lynceus-utils",
     "physiochemical-filter",
@@ -806,13 +805,12 @@ wheels = [
 ]
 
 [[package]]
-name = "detect-putative-binding-sites"
+name = "detect-binding-sites"
 version = "0.1.0"
-source = { editable = "modules/local/detect_putative_binding_sites" }
+source = { editable = "modules/local/detect_binding_sites" }
 dependencies = [
     { name = "click" },
     { name = "gemmi" },
-    { name = "lynceus-chem" },
     { name = "protein-conformational-ensemble" },
 ]
 
@@ -820,7 +818,6 @@ dependencies = [
 requires-dist = [
     { name = "click", specifier = ">=8.4.2" },
     { name = "gemmi", specifier = ">=0.7.5" },
-    { name = "lynceus-chem", editable = "libs/lynceus-chem" },
     { name = "protein-conformational-ensemble", editable = "libs/protein-conformational-ensemble" },
 ]
 
@@ -1787,38 +1784,14 @@ wheels = [
 ]
 
 [[package]]
-name = "lynceus-chem"
-version = "0.1.0"
-source = { editable = "libs/lynceus-chem" }
-dependencies = [
-    { name = "httpx" },
-    { name = "numpy" },
-    { name = "polars" },
-    { name = "pyarrow" },
-    { name = "pydantic" },
-    { name = "rdkit" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "httpx", specifier = ">=0.28.1" },
-    { name = "numpy", specifier = ">=2.5.1" },
-    { name = "polars", specifier = ">=1.42.1" },
-    { name = "pyarrow", specifier = ">=24.0.0" },
-    { name = "pydantic", specifier = ">=2.13.4" },
-    { name = "rdkit", specifier = ">=2026.3.3" },
-]
-
-[[package]]
 name = "lynceus-dev"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
-    { name = "detect-putative-binding-sites" },
+    { name = "detect-binding-sites" },
     { name = "docking-prep" },
     { name = "docking-run" },
     { name = "generate-pce-manifest" },
-    { name = "lynceus-chem" },
     { name = "lynceus-utils" },
     { name = "physiochemical-filter" },
     { name = "preprocess-candidates" },
@@ -1841,11 +1814,10 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "detect-putative-binding-sites", editable = "modules/local/detect_putative_binding_sites" },
+    { name = "detect-binding-sites", editable = "modules/local/detect_binding_sites" },
     { name = "docking-prep", editable = "modules/local/docking_prep" },
     { name = "docking-run", editable = "modules/local/docking_run" },
     { name = "generate-pce-manifest", editable = "modules/local/generate_pce_manifest" },
-    { name = "lynceus-chem", editable = "libs/lynceus-chem" },
     { name = "lynceus-utils", editable = "libs/lynceus-utils" },
     { name = "physiochemical-filter", editable = "modules/local/physiochemical_filter" },
     { name = "preprocess-candidates", editable = "modules/local/preprocess_candidates" },

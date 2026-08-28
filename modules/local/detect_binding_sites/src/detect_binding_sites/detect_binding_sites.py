@@ -1,4 +1,4 @@
-# modules/local/surface_extract/src/detect_putative_binding_sites/detect_putative_binding_sites.py # noqa: E501
+# modules/local/detect_binding_sites/src/detect_binding_sites/detect_binding_sites.py
 
 import argparse
 import csv
@@ -14,7 +14,6 @@ from pathlib import Path
 
 import click
 import gemmi
-from lynceus_chem.models.binding_site import BindingSite, Sphere
 from pce.ensemble import Ensemble, load_ensemble
 from pce.models import (
     ConformationalState,
@@ -23,6 +22,8 @@ from pce.models import (
     Structure,
     TrajectoryStructure,
 )
+
+from .models import BindingSite, Sphere
 
 logging.basicConfig(
     level=logging.INFO,
@@ -76,14 +77,6 @@ def _structure_to_local_cif(
 
 
 def _run_p2rank(local_input: Path, workdir: Path) -> Path:
-    """Run `prank predict` on a single structure file.
-
-    Uses the explicit `predict` subcommand (rather than relying on any
-    implicit/default command) so behavior doesn't depend on the installed
-    p2rank version's default. Output directory is explicitly pinned via
-    `-o` rather than inferred, since p2rank's default output location
-    convention is not part of the documented contract we want to depend on.
-    """
     out_dir = workdir / "p2rank_out"
 
     subprocess.run(
@@ -102,15 +95,6 @@ def _run_p2rank(local_input: Path, workdir: Path) -> Path:
 
 
 def _parse_predictions_csv(predictions_csv: Path) -> list[dict[str, str]]:
-    """Parse p2rank's `*_predictions.csv` into row dicts.
-
-    Uses csv.DictReader keyed on the actual header row (not positional
-    columns) and explicitly validates the expected columns are present.
-    This is deliberately defensive: p2rank has changed this format across
-    versions before (e.g. residue/probability columns added in 2.x), and a
-    silent positional-index mismatch would produce wrong coordinates rather
-    than an obvious error.
-    """
     with open(predictions_csv, newline="") as _f:
         reader = csv.DictReader(_f, skipinitialspace=True)
         fieldnames = tuple(_f_name.strip() for _f_name in (reader.fieldnames or ()))
@@ -128,10 +112,6 @@ def _parse_predictions_csv(predictions_csv: Path) -> list[dict[str, str]]:
 
 
 def _resolve_atom_coords(structure_path: Path) -> dict[int, tuple[float, float, float]]:
-    """Build a PDB-serial -> (x, y, z) lookup from the exact structure file
-    p2rank was run against, so serial numbers in surf_atom_ids resolve
-    unambiguously.
-    """
     parsed = gemmi.read_structure(str(structure_path))
 
     coords_by_serial: dict[int, tuple[float, float, float]] = {}
@@ -251,11 +231,11 @@ def _pockets_to_binding_sites(
     return binding_sites
 
 
-def _detect_putative_binding_sites(
+def _detect_binding_sites(
     conformational_state: ConformationalState, ensemble_root: Path
 ) -> list[BindingSite]:
     logger.info(
-        "detecting putative sites for conformational state: %s",
+        "detecting sites for conformational state: %s",
         conformational_state.id,
     )
 
@@ -270,7 +250,7 @@ def _detect_putative_binding_sites(
         )
 
 
-def _detect_putative_binding_sites_ensemble(
+def _detect_binding_sites_ensemble(
     ensemble_path: Path, num_workers: int
 ) -> list[BindingSite]:
     ensemble: Ensemble = load_ensemble(ensemble_path)
@@ -280,7 +260,7 @@ def _detect_putative_binding_sites_ensemble(
 
     with ProcessPoolExecutor(max_workers=num_workers) as pool:
         futures = {
-            pool.submit(_detect_putative_binding_sites, _c, ensemble.root): _c
+            pool.submit(_detect_binding_sites, _c, ensemble.root): _c
             for _c in conformational_states
         }
         for future in as_completed(futures):
@@ -297,11 +277,9 @@ def _detect_putative_binding_sites_ensemble(
     return binding_sites
 
 
-def _write_putative_binding_sites(
-    putative_binding_sites: list[BindingSite], output_file: Path
-):
+def _write_binding_sites(binding_sites: list[BindingSite], output_file: Path):
     with open(output_file, "w") as _f:
-        json.dump([_b.to_dict() for _b in putative_binding_sites], _f)
+        json.dump([_b.to_dict() for _b in binding_sites], _f)
 
 
 def _parse_num_workers(value: str) -> int:
@@ -332,9 +310,8 @@ def _parse_num_workers(value: str) -> int:
     type=_parse_num_workers,
     help="Number of parallel p2rank workers, or 'auto' for os.cpu_count()",
 )
-def detect_putative_binding_sites(ensemble: Path | None, out: Path, workers: int | str):
-    putative_binding_sites: list[BindingSite] = _detect_putative_binding_sites_ensemble(
+def detect_binding_sites(ensemble: Path | None, out: Path, workers: int | str):
+    putative_binding_sites: list[BindingSite] = _detect_binding_sites_ensemble(
         ensemble, workers
     )
-
-    _write_putative_binding_sites(putative_binding_sites, out)
+    _write_binding_sites(putative_binding_sites, out)

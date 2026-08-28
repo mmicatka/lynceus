@@ -2,7 +2,7 @@
 
 include { DOCKING_PREP_TARGET } from '../../../modules/local/docking_prep'
 include { DETECT_PUTATIVE_BINDING_SITES } from '../../../modules/local/detect_putative_binding_sites'
-include { DOCKING_RUN_GPU } from '../../../modules/local/docking_run'
+include { DOCKING_RUN } from '../../../modules/local/docking_run'
 
 workflow DOCKING {
     take:
@@ -37,8 +37,8 @@ workflow DOCKING {
         }
     docking_jobs_ch = states_ch.combine(sites_ch, by: 0)
 
-    DOCKING_RUN_GPU(docking_jobs_ch, DOCKING_PREP_CANDIDATE_CONVERT_PDBQT.out.converted)
+    DOCKING_RUN(docking_jobs_ch, candidates)
 
     emit:
-    results = DOCKING_RUN_GPU.out.results
+    results = DOCKING_RUN.out.results
 }
