@@ -1,4 +1,4 @@
-# modules/local/docking_prep/docking-prep/src/docking_prep/prepare_ensemble.py
+# modules/local/prepare_ensemble/src/docking_prep/prepare_ensemble.py
 
 import argparse
 import logging
@@ -11,7 +11,7 @@ import gemmi
 from pce.ensemble import Ensemble, load_ensemble
 from pce.models import ConformationalState
 
-from docking_prep.ensemble.models import (
+from prepare_ensemble.ensemble.models import (
     EnsembleMemberPrepResult,
     EnsemblePrepParams,
     EnsemblePrepResults,

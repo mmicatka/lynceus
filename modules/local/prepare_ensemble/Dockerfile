@@ -1,9 +1,11 @@
-# modules/local/generate_pce_manifest/Dockerfile
+# modules/local/prepare_ensemble/Dockerfile
 
 FROM python:3.12-slim-trixie
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     procps \
+    gcc \
+    build-essential \
     git \
     && rm -rf /var/lib/apt/lists/*
 
@@ -13,12 +15,11 @@ WORKDIR /app
 
 COPY pyproject.toml uv.lock ./
 
-COPY libs/lynceus-utils ./libs/lynceus-utils
 COPY libs/protein-conformational-ensemble ./libs/protein-conformational-ensemble
 
-COPY modules/local/generate_pce_manifest ./modules/local/generate_pce_manifest
+COPY modules/local/prepare_ensemble ./modules/local/prepare_ensemble
 
-WORKDIR /app/modules/local/generate_pce_manifest
+WORKDIR /app/modules/local/prepare_ensemble
 
 RUN uv pip install --system .
 

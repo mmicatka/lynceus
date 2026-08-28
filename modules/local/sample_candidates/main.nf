@@ -7,12 +7,19 @@ process SAMPLE_CANDIDATES {
     val input_path
     val output_path
     val bucket
-    val config
+    val strategy_config
 
     output:
     val true, emit: done
 
     script:
+    def config_json = groovy.json.JsonOutput.toJson(strategy_config)
     """
+    sample-candidates \\
+        --input-path '${input_path}' \\
+        --output-path ${output_path} \\
+        --strategy-config '${config_json}' \\
+        --use-blob-storage \\
+        --bucket ${bucket}
     """
 }

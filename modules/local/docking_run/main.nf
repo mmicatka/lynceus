@@ -11,7 +11,7 @@ process DOCKING_RUN {
 
     input:
     tuple val(conformational_state_id), path(receptor), val(site_id), val(center), val(size)
-    path candidates
+    val candidates_path
 
     output:
     tuple val(conformational_state_id), val(site_id), path("*.parquet"), emit: results
@@ -22,7 +22,7 @@ process DOCKING_RUN {
     """
     docking-run --provider gpu \\
         --receptor ${receptor} \\
-        --ligands-path ${candidates} \\
+        --ligands-path '${candidates_path}' \\
         --center ${cx} ${cy} ${cz} \\
         --size ${sx} ${sy} ${sz} \\
         --out-parquet ${conformational_state_id}.${site_id}.output.parquet \\

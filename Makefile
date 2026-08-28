@@ -12,19 +12,13 @@ NF_DRIVER_DEPLOYMENT ?= nf-driver
 
 .PHONY: build push build-* run-dev run-k8s driver-exec driver-restart clean reset lint
 
-build: build-preprocess-candidates build-rebalance-candidates build-detect-putative-binding-sites build-protein-conformational-ensemble build-docking-prep build-sample-candidates build-physiochemical-filter build-docking-run-gpu build-generate-pce-manifest build-nf-driver
+build: build-preprocess-candidates build-rebalance-candidates build-detect-binding-sites build-docking-prep build-sample-candidates build-physiochemical-filter build-docking-run-gpu build-nf-driver
 
 build-preprocess-candidates:
 	docker buildx build --platform linux/amd64,linux/arm64 --push -f modules/local/preprocess_candidates/Dockerfile -t $(IMAGE_PREFIX)/preprocess-candidates:$(VERSION) .
 
 build-rebalance-candidates:
 	docker buildx build --platform linux/amd64,linux/arm64 --push -f modules/local/rebalance_candidates/Dockerfile -t $(IMAGE_PREFIX)/rebalance-candidates:$(VERSION) .
-
-build-protein-conformational-ensemble:
-	docker buildx build --platform linux/amd64,linux/arm64 --push -t $(IMAGE_PREFIX)/protein-conformational-ensemble:$(VERSION) libs/protein-conformational-ensemble
-
-build-generate-pce-manifest:
-	docker buildx build --platform linux/amd64,linux/arm64 --push -f modules/local/generate_pce_manifest/Dockerfile -t $(IMAGE_PREFIX)/generate-pce-manifest:$(VERSION) .
 
 build-detect-putative-binding-sites:
 	docker buildx build --platform linux/amd64,linux/arm64 --push -f modules/local/detect_putative_binding_sites/Dockerfile -t $(IMAGE_PREFIX)/detect-putative-binding-sites:$(VERSION) .

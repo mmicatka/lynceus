@@ -1,22 +1,16 @@
 // subworkflows/local/docking/main.nf
 
-include { DOCKING_PREP_TARGET } from '../../../modules/local/docking_prep'
-include { DETECT_PUTATIVE_BINDING_SITES } from '../../../modules/local/detect_putative_binding_sites'
 include { DOCKING_RUN } from '../../../modules/local/docking_run'
 
 workflow DOCKING {
     take:
-    target_protein_conformational_ensemble // protein conformational ensemble
-    candidates // path: candidate parquet
+    target_surfaces // tuple: ensemble_id, sites (path), prepped (path)
+    candidates_done // sentinel: val true, emit: done — from SAMPLE_CANDIDATES
+    candidates_path // val: s3://bucket/... path SAMPLE_CANDIDATES wrote to
 
     main:
 
-    // Prep
-    DOCKING_PREP_TARGET(target_protein_conformational_ensemble)
-    DETECT_PUTATIVE_BINDING_SITES(target_protein_conformational_ensemble)
-
-    // Run docking
-    states_ch = DOCKING_PREP_TARGET.out.prepped.flatMap { _ensemble_id, prepped_dir ->
+    states_ch = target_surfaces.flatMap { _ensemble_id, _sites, prepped_dir ->
         prepped_dir
             .listFiles()
             .findAll { file -> file.name.endsWith('.pdbqt') }
@@ -25,7 +19,9 @@ workflow DOCKING {
                 tuple(conformational_state_id, pdbqt)
             }
     }
-    sites_ch = DETECT_PUTATIVE_BINDING_SITES.out.sites
+
+    sites_ch = target_surfaces
+        .flatMap { _ensemble_id, sites_json, _prepped_dir -> sites_json }
         .splitJson()
         .map { site ->
             tuple(
@@ -35,9 +31,12 @@ workflow DOCKING {
                 [site.extent.radius * 2] * 3,
             )
         }
+
     docking_jobs_ch = states_ch.combine(sites_ch, by: 0)
 
-    DOCKING_RUN(docking_jobs_ch, candidates)
+    ch_candidates_path = candidates_done.collect().map { candidates_path }.first()
+
+    DOCKING_RUN(docking_jobs_ch, ch_candidates_path)
 
     emit:
     results = DOCKING_RUN.out.results

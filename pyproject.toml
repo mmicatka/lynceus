@@ -14,12 +14,11 @@ dependencies = [
     "detect-binding-sites",
     "physiochemical-filter",
     "sample-candidates",
-    "docking-prep",
+    "prepare-ensemble",
     "docking-run",
     "surrogate-model",
     "preprocess-candidates",
     "rebalance-candidates",
-    "generate-pce-manifest",
 ]
 
 [tool.uv.workspace]
@@ -31,12 +30,11 @@ members = [
     "modules/local/detect_binding_sites",
     "modules/local/physiochemical_filter",
     "modules/local/sample_candidates",
-    "modules/local/docking_prep",
+    "modules/local/prepare_ensemble",
     "modules/local/docking_run",
     "modules/local/surrogate_model",
     "modules/local/preprocess_candidates",
     "modules/local/rebalance_candidates",
-    "modules/local/generate_pce_manifest",
 ]
 
 [tool.uv.sources]
@@ -46,12 +44,11 @@ sample-candidates = { workspace = true }
 detect-binding-sites = { workspace = true }
 protein-conformational-ensemble = { workspace = true }
 lynceus-utils = { workspace = true }
-docking-prep = { workspace = true }
+prepare-ensemble = { workspace = true }
 docking-run = { workspace = true }
 surrogate-model = { workspace = true }
 preprocess-candidates = { workspace = true }
 rebalance-candidates = { workspace = true }
-generate-pce-manifest = { workspace = true }
 
 [dependency-groups]
 dev = [

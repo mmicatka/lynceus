@@ -16,13 +16,12 @@ surrogate:
     sample:
       seed: 1000
       num_samples: 10000
+      stratify_on: ["scaffold_hash"]
+      num_bins: 50
+      projection:
+        method: "sparse_random"
+        n_components: 32
 
 target:
-  ensemble_id: "T4_lysozyme_L99_static"
-  type: "static"
-  components:
-    - pdb_id: "1L83"
-      weight: 1.0
-
-  capabilities_required:
-    - "standalone_cif"
+  ensemble_id: "T4_lysozyme_L99"
+  bucket: lynceus

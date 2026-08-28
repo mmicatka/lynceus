@@ -1,18 +1,17 @@
-// modules/local/detect_putative_binding_sites/main.nf
+// modules/local/detect_binding_sites/main.nf
 
-process DETECT_PUTATIVE_BINDING_SITES {
-    container "${params.registry}/lynceus/detect-putative-binding-sites:0.1.0"
+process DETECT_BINDING_SITES {
+    container "${params.registry}/lynceus/detect-binding-sites:0.1.0"
 
     input:
-    tuple val(ensemble_id), path(ensemble_dir)
+    tuple val(ensemble_id), path(ensemble_path)
 
     output:
-    path ("${ensemble_id}.sites.json"), emit: sites
+    tuple val(ensemble_id), path("sites.json"), emit: sites
 
     script:
     """
-    detect-putative-binding-sites \\
-        --ensemble ${ensemble_dir} \\
-        --out ${ensemble_id}.sites.json
+    detect-binding-sites \\
+        --ensemble ${ensemble_path}
     """
 }

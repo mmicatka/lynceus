@@ -1,11 +1,12 @@
-# modules/local/generate_pce_manifest/src/generate_pce_manifest/cli.py
+# libs/lynceus-utils/src/lynceus_utils/pce/generate_manifest.py
 
 from pathlib import Path
 
 import click
-from lynceus_utils.storage import get_blob_storage_settings
 from pce.discovery import discover_member_specs
 from pce.generation import generate_ensemble
+
+from lynceus_utils.storage import get_blob_storage_settings
 
 
 def _resolve_package_root(

@@ -14,13 +14,14 @@ workflow LYNCEUS {
 
   _ch_candidate_done = CANDIDATE.out.done.collect().ifEmpty { true }
 
-  TARGET(params.target)
+  ch_target_input = channel.of(tuple(params.target.id, params.target.path))
 
-  _ch_target_done = TARGET.out.done.collect().ifEmpty { true }
+  TARGET(ch_target_input)
 
   SURROGATE_TRAIN(
-    CANDIDATE.out.filtered_candidates,
-    TARGET.out.surfaces,
+    params.candidates.bucket,
+    TARGET.out.target_surfaces,
+    params.surrogate.train.strategy_config,
     params.surrogate.train,
   )
 }

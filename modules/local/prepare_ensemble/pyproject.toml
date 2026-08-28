@@ -1,7 +1,7 @@
-# modules/local/docking_prep/docking-prep/pyproject.toml
+# modules/local/prepare_ensemble/pyproject.toml
 
 [project]
-name = "docking-prep"
+name = "prepare-ensemble"
 version = "0.1.0"
 description = "Add your description here"
 authors = [{ name = "Mike", email = "mike.micatka@gmail.com" }]
@@ -22,7 +22,7 @@ dependencies = [
 ]
 
 [project.scripts]
-docking-prepare-ensemble = "docking_prep.ensemble:prepare_ensemble"
+prepare-ensemble = "prepare_ensemble.ensemble:prepare_ensemble"
 
 [build-system]
 requires = ["uv_build>=0.11.30,<0.12.0"]
