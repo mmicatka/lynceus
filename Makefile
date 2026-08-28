@@ -12,25 +12,25 @@ NF_DRIVER_DEPLOYMENT ?= nf-driver
 
 .PHONY: build push build-* run-dev run-k8s driver-exec driver-restart clean reset lint
 
-build: build-preprocess-candidates build-rebalance-candidates build-detect-binding-sites build-docking-prep build-sample-candidates build-physiochemical-filter build-docking-run-gpu build-nf-driver
+build: build-preprocess-candidates build-physiochemical-filter build-rebalance-candidates build-sample-candidates build-detect-binding-sites build-prepare-ensemble build-docking-run-gpu build-nf-driver
 
 build-preprocess-candidates:
 	docker buildx build --platform linux/amd64,linux/arm64 --push -f modules/local/preprocess_candidates/Dockerfile -t $(IMAGE_PREFIX)/preprocess-candidates:$(VERSION) .
 
+build-physiochemical-filter:
+	docker buildx build --platform linux/amd64,linux/arm64 --push -f modules/local/physiochemical_filter/Dockerfile -t $(IMAGE_PREFIX)/physiochemical-filter:$(VERSION) .
+
 build-rebalance-candidates:
 	docker buildx build --platform linux/amd64,linux/arm64 --push -f modules/local/rebalance_candidates/Dockerfile -t $(IMAGE_PREFIX)/rebalance-candidates:$(VERSION) .
-
-build-detect-putative-binding-sites:
-	docker buildx build --platform linux/amd64,linux/arm64 --push -f modules/local/detect_putative_binding_sites/Dockerfile -t $(IMAGE_PREFIX)/detect-putative-binding-sites:$(VERSION) .
-
-build-docking-prep:
-	docker buildx build --platform linux/amd64,linux/arm64 --push -f modules/local/docking_prep/Dockerfile -t $(IMAGE_PREFIX)/docking-prep:$(VERSION) .
 
 build-sample-candidates:
 	docker buildx build --platform linux/amd64,linux/arm64 --push -t $(IMAGE_PREFIX)/sample-candidates:$(VERSION) modules/local/sample_candidates
 
-build-physiochemical-filter:
-	docker buildx build --platform linux/amd64,linux/arm64 --push -f modules/local/physiochemical_filter/Dockerfile -t $(IMAGE_PREFIX)/physiochemical-filter:$(VERSION) .
+build-detect-binding-sites:
+	docker buildx build --platform linux/amd64,linux/arm64 --push -f modules/local/detect_binding_sites/Dockerfile -t $(IMAGE_PREFIX)/detect-binding-sites:$(VERSION) .
+
+build-prepare-ensemble:
+	docker buildx build --platform linux/amd64,linux/arm64 --push -f modules/local/prepare_ensemble/Dockerfile -t $(IMAGE_PREFIX)/docking-prep:$(VERSION) .
 
 build-docking-run-gpu:
 	docker buildx build --platform linux/amd64 --push --target gpu -t $(IMAGE_PREFIX)/docking-run:gpu-$(VERSION) modules/local/docking_run
