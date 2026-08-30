@@ -8,13 +8,11 @@ requires-python = ">=3.12"
 
 dependencies = [
     # libs
-    "protein-conformational-ensemble",
     "lynceus-utils",
     # utils
     "detect-binding-sites",
     "physiochemical-filter",
     "sample-candidates",
-    "prepare-ensemble",
     "docking-run",
     "surrogate-model",
     "preprocess-candidates",
@@ -24,13 +22,11 @@ dependencies = [
 [tool.uv.workspace]
 members = [
     # libs
-    "libs/protein-conformational-ensemble",
     "libs/lynceus-utils",
     # utils
     "modules/local/detect_binding_sites",
     "modules/local/physiochemical_filter",
     "modules/local/sample_candidates",
-    "modules/local/prepare_ensemble",
     "modules/local/docking_run",
     "modules/local/surrogate_model",
     "modules/local/preprocess_candidates",
@@ -42,9 +38,7 @@ members = [
 physiochemical-filter = { workspace = true }
 sample-candidates = { workspace = true }
 detect-binding-sites = { workspace = true }
-protein-conformational-ensemble = { workspace = true }
 lynceus-utils = { workspace = true }
-prepare-ensemble = { workspace = true }
 docking-run = { workspace = true }
 surrogate-model = { workspace = true }
 preprocess-candidates = { workspace = true }

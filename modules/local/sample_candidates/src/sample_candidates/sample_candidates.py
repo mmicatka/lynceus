@@ -9,7 +9,7 @@ from pathlib import Path
 
 import duckdb
 import polars as pl
-from rdkit import RDLogger
+from rdkit import rdBase
 
 logging.basicConfig(
     level=logging.INFO,
@@ -20,7 +20,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # RDKit's C++ logger is noisy on malformed SMILES
-RDLogger.DisableLog("rdApp.*")
+rdBase.DisableLog("rdApp.*")
 
 
 def _build_reservoir(input_glob: str, reservoir_size: int, seed: int) -> pl.DataFrame:

@@ -21,7 +21,6 @@ WORKDIR /app
 
 COPY pyproject.toml uv.lock ./
 
-COPY libs/protein-conformational-ensemble ./libs/protein-conformational-ensemble
 COPY libs/lynceus-chem ./libs/lynceus-chem
 
 COPY modules/local/detect_putative_binding_sites ./modules/local/detect_putative_binding_sites

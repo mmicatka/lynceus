@@ -1,6 +1,5 @@
 # modules/local/detect_binding_sites/src/detect_binding_sites/detect_binding_sites.py
 
-import argparse
 import csv
 import json
 import logging
@@ -14,14 +13,7 @@ from pathlib import Path
 
 import click
 import gemmi
-from pce.ensemble import Ensemble, load_ensemble
-from pce.models import (
-    ConformationalState,
-    MultiModelStructure,
-    StandaloneStructure,
-    Structure,
-    TrajectoryStructure,
-)
+from protein_ensemble.manifest import Manifest
 
 from .models import BindingSite, Sphere
 
@@ -50,30 +42,11 @@ _P2RANK_PREDICTIONS_HEADER = (
 )
 
 
-def _uri_to_path(uri: str, ensemble_root: Path) -> Path:
-    if uri.startswith("file://"):
-        return Path(uri[len("file://") :])
-    path = Path(uri)
-    return path if path.is_absolute() else ensemble_root / path
-
-
-def _structure_to_local_cif(
-    structure: Structure, ensemble_root: Path, workdir: Path
-) -> Path:
-    if isinstance(structure, (StandaloneStructure, MultiModelStructure)):
-        source_path = _uri_to_path(structure.uri, ensemble_root)
-        local_path = (workdir / source_path.name).with_suffix(".cif")
-        shutil.copy(source_path, local_path)
-        return local_path
-
-    if isinstance(structure, TrajectoryStructure):
-        raise NotImplementedError(
-            "trajectory-backed structures are not yet supported for p2rank "
-            "detection; frame extraction to a standalone structure file is "
-            "unimplemented"
-        )
-
-    raise TypeError(f"unrecognized structure type: {type(structure).__name__}")
+def _member_to_local_cif(manifest: Manifest, member_id: str, workdir: Path) -> Path:
+    source_path = manifest.structure_path(member_id)
+    local_path = (workdir / source_path.name).with_suffix(".cif")
+    shutil.copy(source_path, local_path)
+    return local_path
 
 
 def _run_p2rank(local_input: Path, workdir: Path) -> Path:
@@ -126,7 +99,7 @@ def _resolve_atom_coords(structure_path: Path) -> dict[int, tuple[float, float, 
                     )
         break  # only the first model is relevant; standalone/multi-model
         # structures are already reduced to a single conformation by
-        # _structure_to_local_cif before p2rank ever sees them.
+        # _member_to_local_cif before p2rank ever sees them.
 
     return coords_by_serial
 
@@ -146,7 +119,7 @@ def _radius_of_gyration(
 
 def _pocket_row_to_binding_site(
     row: dict[str, str],
-    conformational_state_id: str,
+    member_id: str,
     coords_by_serial: dict[int, tuple[float, float, float]],
 ) -> BindingSite | None:
     pocket_rank = row["rank"]
@@ -169,7 +142,7 @@ def _pocket_row_to_binding_site(
             "pocket rank %s (%s): %d/%d surf_atom_ids not found in structure; "
             "radius computed from the %d resolved atoms only",
             pocket_rank,
-            conformational_state_id,
+            member_id,
             missing_count,
             len(surf_atom_ids),
             len(points),
@@ -180,7 +153,7 @@ def _pocket_row_to_binding_site(
             "pocket rank %s (%s): no surf_atom_ids resolved to structure "
             "coordinates; skipping (cannot compute a radius)",
             pocket_rank,
-            conformational_state_id,
+            member_id,
         )
         return None
 
@@ -192,8 +165,8 @@ def _pocket_row_to_binding_site(
 
     return BindingSite(
         schema_version="1.0.0",
-        site_id=f"{conformational_state_id}:p2rank:{pocket_rank}",
-        conformational_state_id=conformational_state_id,
+        site_id=f"{member_id}:p2rank:{pocket_rank}",
+        conformational_state_id=member_id,
         center=center,
         extent=Sphere(center=center, radius=radius),
         pocket_score=float(row["score"]),
@@ -208,13 +181,13 @@ def _pocket_row_to_binding_site(
 def _pockets_to_binding_sites(
     predictions_csv: Path,
     structure_path: Path,
-    conformational_state_id: str,
+    member_id: str,
 ) -> list[BindingSite]:
     rows = _parse_predictions_csv(predictions_csv)
     if not rows:
         logger.warning(
-            "p2rank produced no predicted pockets for conformational state: %s",
-            conformational_state_id,
+            "p2rank produced no predicted pockets for member: %s",
+            member_id,
         )
         return []
 
@@ -222,55 +195,44 @@ def _pockets_to_binding_sites(
 
     binding_sites: list[BindingSite] = []
     for row in rows:
-        binding_site = _pocket_row_to_binding_site(
-            row, conformational_state_id, coords_by_serial
-        )
+        binding_site = _pocket_row_to_binding_site(row, member_id, coords_by_serial)
         if binding_site is not None:
             binding_sites.append(binding_site)
 
     return binding_sites
 
 
-def _detect_binding_sites(
-    conformational_state: ConformationalState, ensemble_root: Path
-) -> list[BindingSite]:
-    logger.info(
-        "detecting sites for conformational state: %s",
-        conformational_state.id,
-    )
+def _detect_binding_sites(manifest: Manifest, member_id: str) -> list[BindingSite]:
+    logger.info("detecting sites for member: %s", member_id)
 
     with tempfile.TemporaryDirectory(prefix="p2rank_") as _tmp:
         workdir = Path(_tmp)
-        local_input = _structure_to_local_cif(
-            conformational_state.structure, ensemble_root, workdir
-        )
+        local_input = _member_to_local_cif(manifest, member_id, workdir)
         predictions_csv = _run_p2rank(local_input, workdir)
-        return _pockets_to_binding_sites(
-            predictions_csv, local_input, conformational_state.id
-        )
+        return _pockets_to_binding_sites(predictions_csv, local_input, member_id)
 
 
 def _detect_binding_sites_ensemble(
     ensemble_path: Path, num_workers: int
 ) -> list[BindingSite]:
-    ensemble: Ensemble = load_ensemble(ensemble_path)
-    conformational_states = list(ensemble.manifest.conformational_states)
+    manifest = Manifest.load(str(ensemble_path))
+    member_ids = list(manifest.members)
 
     binding_sites: list[BindingSite] = []
 
     with ProcessPoolExecutor(max_workers=num_workers) as pool:
         futures = {
-            pool.submit(_detect_binding_sites, _c, ensemble.root): _c
-            for _c in conformational_states
+            pool.submit(_detect_binding_sites, manifest, _member_id): _member_id
+            for _member_id in member_ids
         }
         for future in as_completed(futures):
-            conformational_state = futures[future]
+            member_id = futures[future]
             try:
                 binding_sites.extend(future.result())
             except Exception:
                 logger.exception(
-                    "p2rank detection failed for conformational state: %s",
-                    conformational_state.id,
+                    "p2rank detection failed for member: %s",
+                    member_id,
                 )
                 raise
 
@@ -287,13 +249,14 @@ def _parse_num_workers(value: str) -> int:
         return os.cpu_count() or 1
     n = int(value)
     if n < 1:
-        raise argparse.ArgumentTypeError("workers must be >= 1")
+        raise click.BadParameter("workers must be >= 1")
     return n
 
 
 @click.command(help=__doc__)
 @click.option(
     "--ensemble",
+    required=True,
     type=click.Path(exists=True, path_type=Path),
     help="Protein conformational ensemble package directory.",
 )
@@ -307,11 +270,16 @@ def _parse_num_workers(value: str) -> int:
     "--workers",
     default="auto",
     show_default=True,
-    type=_parse_num_workers,
+    type=str,
+    callback=lambda ctx, param, value: _parse_num_workers(value),
     help="Number of parallel p2rank workers, or 'auto' for os.cpu_count()",
 )
-def detect_binding_sites(ensemble: Path | None, out: Path, workers: int | str):
+def detect_binding_sites(ensemble: Path, out: Path, workers: int):
     putative_binding_sites: list[BindingSite] = _detect_binding_sites_ensemble(
         ensemble, workers
     )
     _write_binding_sites(putative_binding_sites, out)
+
+
+if __name__ == "__main__":
+    detect_binding_sites()
