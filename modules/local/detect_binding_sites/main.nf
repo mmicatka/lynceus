@@ -12,6 +12,7 @@ process DETECT_BINDING_SITES {
     script:
     """
     detect-binding-sites \\
-        --ensemble ${ensemble_path}
+    --ensemble ${ensemble_path} \\
+    --out sites.json
     """
 }

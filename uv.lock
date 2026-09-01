@@ -745,6 +745,7 @@ dependencies = [
     { name = "click" },
     { name = "gemmi" },
     { name = "meeko" },
+    { name = "protein-ensemble" },
     { name = "pyarrow" },
     { name = "rdkit" },
     { name = "tqdm" },
@@ -755,6 +756,7 @@ requires-dist = [
     { name = "click", specifier = ">=8.4.2" },
     { name = "gemmi", specifier = ">=0.7.5" },
     { name = "meeko", specifier = ">=0.7.1" },
+    { name = "protein-ensemble", git = "https://github.com/proteinensemble/python-sdk.git" },
     { name = "pyarrow", specifier = ">=24.0.0" },
     { name = "rdkit", specifier = ">=2026.3.4" },
     { name = "tqdm", specifier = ">=4.70.0" },
@@ -1733,11 +1735,11 @@ wheels = [
 
 [[package]]
 name = "meeko"
-version = "0.7.1"
+version = "0.8.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/46/9d/342bc5d09ba070496738e6b7dd37e2918ea8264df3a99bb1ed8a5a464dda/meeko-0.7.1.tar.gz", hash = "sha256:e3f4ca3a66db17a95d75905fa7a1bfb73971d2f16ec52eb68e5226bafe120b2d", size = 1427070, upload-time = "2025-10-23T00:08:06.492Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/75/df/0e5fd5424621b8da07dc3b21036d1ec4063165955594f72ea5b7fd99ba8b/meeko-0.8.0.tar.gz", hash = "sha256:09a892bd796c1e1b72b73305f36b694cad99993d6f96acd85bb8d9341bc149d8", size = 2580006, upload-time = "2026-08-27T23:55:56.089Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/cb/c8/19f80438c2f285a109a42fde50a41ec7c06d7dfd257954da8d9c4e17677d/meeko-0.7.1-py3-none-any.whl", hash = "sha256:e50f5fdb9f94f44e6ee20616936cf033be9c93c7825bd69493a9cd9a3c5dc28d", size = 293954, upload-time = "2025-10-23T00:08:05.168Z" },
+    { url = "https://files.pythonhosted.org/packages/88/a0/4bbe2a480bdc278e9709ba2b536afc63fafd8cf5d51c247decd267c07277/meeko-0.8.0-py3-none-any.whl", hash = "sha256:38e73da7f0b11f7f8f0bfb2c481ccd148b8dfb9957522655b5cb0c4f6d68d1d6", size = 1424010, upload-time = "2026-08-27T23:55:54.7Z" },
 ]
 
 [[package]]

@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Add your description here"
 authors = [{ name = "Mike", email = "mike.micatka@gmail.com" }]
 requires-python = ">=3.12"
+
 dependencies = [
     "click>=8.4.2",
     "gemmi>=0.7.5",
@@ -11,11 +12,15 @@ dependencies = [
     "pyarrow>=24.0.0",
     "rdkit>=2026.3.4",
     "tqdm>=4.70.0",
+    "protein-ensemble",
 ]
-
-[project.scripts]
-docking-run = "docking_run.cli:docking_run"
 
 [build-system]
 requires = ["uv_build>=0.11.32,<0.12.0"]
 build-backend = "uv_build"
+
+[project.scripts]
+docking-run = "docking_run.cli:docking_run"
+
+[tool.uv.sources]
+protein-ensemble = { git = "https://github.com/proteinensemble/python-sdk.git" }

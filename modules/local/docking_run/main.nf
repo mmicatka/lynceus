@@ -10,7 +10,7 @@ process DOCKING_RUN {
     containerOptions '--gpus all'
 
     input:
-    tuple val(conformational_state_id), path(receptor), val(site_id), val(center), val(size)
+    tuple val(conformational_state_id), path(ensemble_path), val(site_id), val(center), val(size)
     val candidates_path
 
     output:
@@ -21,7 +21,8 @@ process DOCKING_RUN {
     def (sx, sy, sz) = size
     """
     docking-run --provider gpu \\
-        --receptor ${receptor} \\
+        --ensemble ${ensemble_path} \\
+        --member-id ${conformational_state_id} \\
         --ligands-path '${candidates_path}' \\
         --center ${cx} ${cy} ${cz} \\
         --size ${sx} ${sy} ${sz} \\

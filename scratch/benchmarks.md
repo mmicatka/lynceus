@@ -2,6 +2,6 @@
 
 ## Preprocessing
 
-| Num Samples | Num CPUs | Duration | CPU Hours | Samples/hr |
+| Num Samples | Num CPUs | Duration | CPU Hours | Samples/cpu hr |
 | - | - | - | - | - |
 | 4560139 | 24 | 6h 49 m | 188.5 | 24192 |
