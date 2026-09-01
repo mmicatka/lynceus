@@ -3070,18 +3070,22 @@ source = { editable = "modules/local/sample_candidates" }
 dependencies = [
     { name = "click" },
     { name = "duckdb" },
-    { name = "polars" },
+    { name = "numpy" },
     { name = "pyarrow" },
-    { name = "rdkit" },
+    { name = "pydantic" },
+    { name = "scikit-learn" },
+    { name = "scipy" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "click", specifier = ">=8.4.2" },
     { name = "duckdb", specifier = ">=1.5.4" },
-    { name = "polars", specifier = ">=1.42.1" },
+    { name = "numpy", specifier = ">=2.5.1" },
     { name = "pyarrow", specifier = ">=24.0.0" },
-    { name = "rdkit", specifier = ">=2026.3.3" },
+    { name = "pydantic", specifier = ">=2.13.4" },
+    { name = "scikit-learn", specifier = ">=1.9.0" },
+    { name = "scipy", specifier = ">=1.18.0" },
 ]
 
 [[package]]

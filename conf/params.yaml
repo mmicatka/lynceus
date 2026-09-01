@@ -15,7 +15,7 @@ surrogate:
   train:
     sample:
       seed: 1000
-      num_samples: 10000
+      num_samples: 100000
       stratify_on: ["scaffold_hash"]
       num_bins: 50
       projection:

@@ -7,14 +7,13 @@ workflow SURROGATE_TRAIN {
     take:
     bucket // bucket
     target_surfaces // tuple: ensemble_id, sites (path), prepped (path) — from TARGET.out.target_surfaces
-    strategy_config // inline map: stratify_sample config
-    _config // training configuration
+    config // training configuration
 
     main:
-    input_path = "s3://${bucket}/candidates"
+    input_path = "s3://${bucket}/candidates/rebalanced"
     output_path = "s3://${bucket}/candidates/sampled"
 
-    SAMPLE_CANDIDATES(input_path, output_path, bucket, strategy_config)
+    SAMPLE_CANDIDATES(input_path, output_path, bucket, config.sample)
     DOCKING(target_surfaces, SAMPLE_CANDIDATES.out.done, output_path)
 
     emit:

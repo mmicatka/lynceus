@@ -21,7 +21,6 @@ workflow LYNCEUS {
   SURROGATE_TRAIN(
     params.candidates.bucket,
     TARGET.out.target_surfaces,
-    params.surrogate.train.strategy_config,
     params.surrogate.train,
   )
 }

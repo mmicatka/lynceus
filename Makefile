@@ -24,7 +24,7 @@ build-rebalance-candidates:
 	docker buildx build --platform linux/amd64,linux/arm64 --push -f modules/local/rebalance_candidates/Dockerfile -t $(IMAGE_PREFIX)/rebalance-candidates:$(VERSION) .
 
 build-sample-candidates:
-	docker buildx build --platform linux/amd64,linux/arm64 --push -t $(IMAGE_PREFIX)/sample-candidates:$(VERSION) modules/local/sample_candidates
+	docker buildx build --platform linux/amd64,linux/arm64 --push -f modules/local/sample_candidates/Dockerfile -t $(IMAGE_PREFIX)/sample-candidates:$(VERSION) .
 
 build-detect-binding-sites:
 	docker buildx build --platform linux/amd64,linux/arm64 --push -f modules/local/detect_binding_sites/Dockerfile -t $(IMAGE_PREFIX)/detect-binding-sites:$(VERSION) .

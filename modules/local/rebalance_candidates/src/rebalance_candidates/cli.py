@@ -9,7 +9,7 @@ import click
 import fsspec
 import pyarrow as pa
 from lynceus_utils.duckdb import export_parquet, file_exists, get_connection
-from lynceus_utils.storage.blob_storage import (
+from lynceus_utils.storage import (
     get_blob_storage_settings,
     get_filesystem,
 )
