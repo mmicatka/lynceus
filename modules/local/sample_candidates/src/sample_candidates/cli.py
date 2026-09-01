@@ -45,7 +45,7 @@ def _require_exists(filesystem: FileSystem, path: str, description: str) -> None
         raise click.ClickException(f"{description} not found: {path}")
 
 
-def _read_table(filesystem: FileSystem, path: str) -> "pq.Table":
+def _read_table(filesystem: FileSystem, path: str) -> pq.Table:
     with filesystem.open_input_stream(path) as f:
         return pq.read_table(f)
 
