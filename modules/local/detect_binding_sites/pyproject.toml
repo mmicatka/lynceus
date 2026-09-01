@@ -10,7 +10,6 @@ dependencies = ["click>=8.4.2", "gemmi>=0.7.5", "protein-ensemble"]
 [project.scripts]
 detect-binding-sites = "detect_binding_sites.detect_binding_sites:detect_binding_sites"
 
-
 [build-system]
 requires = ["uv_build>=0.11.30,<0.12.0"]
 build-backend = "uv_build"

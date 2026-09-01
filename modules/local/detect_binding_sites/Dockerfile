@@ -1,4 +1,4 @@
-# modules/local/detect_putative_binding_sites/Dockerfile
+# modules/local/detect_binding_sites/Dockerfile
 
 FROM python:3.12-slim-trixie
 
@@ -21,11 +21,9 @@ WORKDIR /app
 
 COPY pyproject.toml uv.lock ./
 
-COPY libs/lynceus-chem ./libs/lynceus-chem
+COPY modules/local/detect_binding_sites ./modules/local/detect_binding_sites
 
-COPY modules/local/detect_putative_binding_sites ./modules/local/detect_putative_binding_sites
-
-WORKDIR /app/modules/local/detect_putative_binding_sites
+WORKDIR /app/modules/local/detect_binding_sites
 
 RUN uv pip install --system .
 

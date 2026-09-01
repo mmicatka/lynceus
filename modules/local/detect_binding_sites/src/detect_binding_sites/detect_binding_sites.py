@@ -275,10 +275,8 @@ def _parse_num_workers(value: str) -> int:
     help="Number of parallel p2rank workers, or 'auto' for os.cpu_count()",
 )
 def detect_binding_sites(ensemble: Path, out: Path, workers: int):
-    putative_binding_sites: list[BindingSite] = _detect_binding_sites_ensemble(
-        ensemble, workers
-    )
-    _write_binding_sites(putative_binding_sites, out)
+    binding_sites: list[BindingSite] = _detect_binding_sites_ensemble(ensemble, workers)
+    _write_binding_sites(binding_sites, out)
 
 
 if __name__ == "__main__":
