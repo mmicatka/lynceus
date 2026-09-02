@@ -12,15 +12,20 @@ workflow LYNCEUS {
     params.candidates.filter_config,
   )
 
-  _ch_candidate_done = CANDIDATE.out.done.collect().ifEmpty { true }
+  ch_candidate_done = CANDIDATE.out.done.collect().map { true }.first()
 
-  ch_target_input = channel.of(tuple(params.target.id, params.target.path))
+  ch_target_input = channel.of(tuple(params.target.ensemble_id, params.target.ensemble_path))
+    .ifEmpty { error("params.target.ensemble_id and params.target.ensemble_path must both be set") }
 
   TARGET(ch_target_input)
 
+  ch_target_surfaces_gated = ch_candidate_done
+    .combine(TARGET.out.target_surfaces)
+    .map { _done, ensemble_path, sites_path -> tuple(ensemble_path, sites_path) }
+
   SURROGATE_TRAIN(
     params.candidates.bucket,
-    TARGET.out.target_surfaces,
+    ch_target_surfaces_gated,
     params.surrogate.train,
   )
 }

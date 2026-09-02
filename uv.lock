@@ -2478,7 +2478,7 @@ wheels = [
 [[package]]
 name = "protein-ensemble"
 version = "0.1.0"
-source = { git = "https://github.com/proteinensemble/python-sdk.git#33b44048f23d63a744bb1ae186b0587191728cf8" }
+source = { git = "https://github.com/proteinensemble/python-sdk.git#c4af15765834ee6f5f3649595c3e345947118940" }
 dependencies = [
     { name = "blake3" },
     { name = "fsspec" },

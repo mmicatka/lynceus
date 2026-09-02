@@ -24,7 +24,7 @@ def _resolve_path(
 
 @click.command()
 @click.option(
-    "--input-glob",
+    "--input-path",
     required=True,
     help="Parquet glob (local path or S3 prefix) of raw candidate shards"
     " to sample from.",

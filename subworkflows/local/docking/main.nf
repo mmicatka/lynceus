@@ -23,7 +23,7 @@ workflow DOCKING {
         }
     }
 
-    ch_candidates_path = candidates_done.collect().map { candidates_path }.first()
+    ch_candidates_path = candidates_done.collect().map { candidates_path }
 
     DOCKING_RUN(docking_jobs_ch, ch_candidates_path)
 
