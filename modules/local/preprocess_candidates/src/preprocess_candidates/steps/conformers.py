@@ -17,10 +17,16 @@ class ConformersStep:
         ph_min: float = 6.4,
         ph_max: float = 8.4,
         seed: int = 42,
+        optimize_max_iters: int = 50,
+        embed_max_iters: int = 50,
     ) -> None:
         self._ph_min = ph_min
         self._ph_max = ph_max
-        self._seed = seed
+        self._optimize_max_iters = optimize_max_iters
+
+        self._embed_params = AllChem.ETKDGv3()
+        self._embed_params.randomSeed = seed
+        self._embed_params.maxIterations = embed_max_iters
 
     def init_worker(self) -> None:
         pass
@@ -28,19 +34,20 @@ class ConformersStep:
     def compute(self, mol: Mol) -> dict[str, Any]:
         smiles = Chem.MolToSmiles(mol)
         prot_smiles = self._select_protonation_state(smiles)
-
         embed_mol = Chem.MolFromSmiles(prot_smiles)
+
         if embed_mol is None:
             raise ValueError(f"Failed to reparse protonated SMILES: {prot_smiles!r}")
 
         embed_mol = Chem.AddHs(embed_mol)
-        params = AllChem.ETKDGv3()
-        params.randomSeed = self._seed
 
-        if AllChem.EmbedMolecule(embed_mol, params) != 0:
+        if AllChem.EmbedMolecule(embed_mol, self._embed_params) != 0:
             raise ValueError("Conformer embedding failed")
 
-        if AllChem.MMFFOptimizeMolecule(embed_mol) == -1:
+        if (
+            AllChem.MMFFOptimizeMolecule(embed_mol, maxIters=self._optimize_max_iters)
+            == -1
+        ):
             raise ValueError("MMFF94 minimization failed")
 
         sdf = Chem.MolToMolBlock(embed_mol)

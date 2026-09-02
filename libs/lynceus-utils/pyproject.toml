@@ -9,6 +9,7 @@ dependencies = [
     "fsspec>=2026.6.0",
     "pyarrow>=24.0.0",
     "pydantic>=2.13.4",
+    "pydantic-settings>=2.15.0",
 ]
 
 [project.optional-dependencies]

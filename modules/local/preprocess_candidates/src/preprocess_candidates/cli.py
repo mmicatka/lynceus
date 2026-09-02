@@ -6,6 +6,7 @@ import gzip
 import logging
 import os
 import sys
+import time
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 from typing import Any, Iterator
@@ -37,8 +38,7 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
-_LOG_INTERVAL = 1_000
-_BATCH_SIZE = 1_000
+_LOG_INTERVAL = 1000
 
 _worker_steps: list[Step] = []
 
@@ -113,6 +113,7 @@ def _batch(iterator: Iterator, size: int) -> Iterator[list]:
 def _process_batch(batch: list[tuple[str, str]]) -> list[dict[str, Any]]:
     """Worker function to process a batch of molecules."""
     results = []
+
     for smiles, catalog_id in batch:
         row = {
             "catalog_id": catalog_id,
@@ -142,16 +143,20 @@ def _process_batch(batch: list[tuple[str, str]]) -> list[dict[str, Any]]:
                     row.update(step.failure_result())
 
         results.append(row)
+
     return results
 
 
 def _preprocess(
     input_path: Path,
     num_workers: int,
+    batch_size: int,
     steps: list[Step],
     target_path: str,
     filesystem: Any,
 ) -> None:
+    start_time = time.perf_counter()
+
     input_path = Path(input_path)
 
     logger.info("Counting total molecules in %s...", input_path.name)
@@ -179,7 +184,7 @@ def _preprocess(
             max_workers=num_workers, initializer=_init_worker, initargs=(steps,)
         ) as executor:
             iterator = _iter_smiles(input_path)
-            batches = _batch(iterator, _BATCH_SIZE)
+            batches = _batch(iterator, batch_size)
 
             for results in executor.map(_process_batch, batches):
                 batch_data = _results_to_batch(results, schema)
@@ -206,6 +211,16 @@ def _preprocess(
     filesystem.move(temp_path, target_path)
 
     logger.info("Rename complete.")
+
+    elapsed_time = time.perf_counter() - start_time
+    mols_per_sec = total_processed / elapsed_time if elapsed_time > 0 else 0
+
+    logger.info(
+        "Processed %d molecules in %.2f seconds (%.2f mol/s)",
+        total_processed,
+        elapsed_time,
+        mols_per_sec,
+    )
 
 
 def _build_pipeline(morgan_radius: int, morgan_n_bits: int, seed: int) -> list[Step]:
@@ -260,6 +275,7 @@ NUM_WORKERS = NumWorkersType()
     show_default=True,
     help="Number of parallel workers (integer >= 1 or 'auto').",
 )
+@click.option("--batch-size", default=50, type=int, help="Batch size")
 @click.option(
     "--seed",
     default=1000,
@@ -272,7 +288,7 @@ NUM_WORKERS = NumWorkersType()
     is_flag=True,
     help="Output Parquet file to blob storage.",
 )
-@click.option("--bucket", type=str, default="lynceus", help="Output bucket name")
+@click.option("--bucket", default="lynceus", type=str, help="Output bucket name")
 @click.option(
     "--skip-if-exists",
     is_flag=True,
@@ -286,6 +302,7 @@ def preprocess(
     use_blob_storage: bool,
     bucket: str,
     skip_if_exists: bool,
+    batch_size: int,
 ):
     if use_blob_storage:
         blob_settings = get_blob_storage_settings()
@@ -312,6 +329,7 @@ def preprocess(
     _preprocess(
         input_path=Path(input_path),
         num_workers=num_workers,
+        batch_size=batch_size,
         steps=steps,
         target_path=target_path,
         filesystem=filesystem,

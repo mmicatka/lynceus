@@ -7,7 +7,7 @@ from sample_candidates.config import StratificationConfig
 
 
 def build_capped_sample_query(
-    parquet_glob: str,
+    source_sql: str,
     binner: QuantileBinner,
     config: StratificationConfig,
 ) -> str:
@@ -18,7 +18,7 @@ def build_capped_sample_query(
         WITH projected AS (
             SELECT *,
     {bucket_columns}
-            FROM read_parquet('{parquet_glob}')
+            FROM {source_sql}
         ),
         with_stratum AS (
             SELECT *,

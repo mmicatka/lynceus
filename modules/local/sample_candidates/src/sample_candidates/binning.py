@@ -49,7 +49,7 @@ class QuantileBinner:
 
 
 def fit_quantile_bins(
-    parquet_glob: str,
+    source_sql: str,
     config: StratificationConfig,
     connection: duckdb.DuckDBPyConnection | None = None,
 ) -> QuantileBinner:
@@ -66,14 +66,14 @@ def fit_quantile_bins(
 
     query = f"""
         SELECT {dim_select}
-        FROM read_parquet('{parquet_glob}')
+        FROM {source_sql}
     """
 
     result = conn.execute(query).fetchone()
     if result is None:
         raise ValueError(
-            f"No rows returned computing quantile edges from '{parquet_glob}'; "
-            "check the glob pattern and that projection has already run."
+            f"No rows returned computing quantile edges from '{source_sql}'; "
+            "check the source and that projection has already run."
         )
 
     dim_edges = tuple(tuple(edges) for edges in result)
