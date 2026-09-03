@@ -2,14 +2,47 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field, field_validator
+from enum import Enum
+
+from pydantic import BaseModel, Field, field_validator, model_validator
+
+
+class FeatureKind(str, Enum):
+    ARRAY = "array"
+    SCALAR = "scalar"
+
+
+class FeatureSpec(BaseModel, frozen=True):
+    name: str
+    kind: FeatureKind
+    reduced_dims: int | None = Field(
+        default=None,
+        description="Target dimensionality after TruncatedSVD reduction. "
+        "Required for array features, must be omitted for scalar features.",
+    )
+
+    @model_validator(mode="after")
+    def _reduced_dims_matches_kind(self) -> "FeatureSpec":
+        if self.kind is FeatureKind.ARRAY and self.reduced_dims is None:
+            raise ValueError(
+                f"Feature '{self.name}' is kind=array but reduced_dims "
+                "was not provided."
+            )
+        if self.kind is FeatureKind.SCALAR and self.reduced_dims is not None:
+            raise ValueError(
+                f"Feature '{self.name}' is kind=scalar but reduced_dims="
+                f"{self.reduced_dims} was provided; scalar features are not reduced."
+            )
+        if self.reduced_dims is not None and self.reduced_dims < 1:
+            raise ValueError(
+                f"Feature '{self.name}' reduced_dims must be >= 1, "
+                f"got {self.reduced_dims}."
+            )
+        return self
 
 
 class StratificationConfig(BaseModel):
-    fingerprint_field: str = "morgan_fp"
-    fingerprint_n_bits: int = 1024
-
-    property_fields: tuple[str, ...] = ("mw", "logp", "tpsa")
+    features: tuple[FeatureSpec, ...]
 
     n_projected_dims: int = Field(default=8, ge=1)
     projection_density: float = Field(
@@ -31,13 +64,27 @@ class StratificationConfig(BaseModel):
         "stratum rather than sampled individually.",
     )
 
-    @field_validator("property_fields")
+    @field_validator("features")
     @classmethod
-    def _non_empty_property_fields(cls, v: tuple[str, ...]) -> tuple[str, ...]:
+    def _non_empty_unique_features(
+        cls, v: tuple[FeatureSpec, ...]
+    ) -> tuple[FeatureSpec, ...]:
         if len(v) == 0:
-            raise ValueError("property_fields must not be empty")
+            raise ValueError("features must not be empty")
+        names = [f.name for f in v]
+        if len(names) != len(set(names)):
+            raise ValueError(f"Duplicate feature names in features: {names}")
         return v
 
     @property
+    def array_features(self) -> tuple[FeatureSpec, ...]:
+        return tuple(f for f in self.features if f.kind is FeatureKind.ARRAY)
+
+    @property
+    def scalar_features(self) -> tuple[FeatureSpec, ...]:
+        return tuple(f for f in self.features if f.kind is FeatureKind.SCALAR)
+
+    @property
     def combined_feature_dim(self) -> int:
-        return self.fingerprint_n_bits + len(self.property_fields)
+        array_dims = sum(f.reduced_dims or 0 for f in self.array_features)
+        return array_dims + len(self.scalar_features)
