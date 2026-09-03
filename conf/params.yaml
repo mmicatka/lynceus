@@ -9,7 +9,13 @@ candidates:
   num_per_shard: 1000000
   bucket: lynceus
 
-  filter_config: "/app/lynceus/work/conf/examples/physiochemical_filter.yaml"
+  filter_config:
+    pains:
+      enabled: true
+
+    cns_mpo:
+      enabled: true
+      min_score: 4.0
 
 surrogate:
   train:

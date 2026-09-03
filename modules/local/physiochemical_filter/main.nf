@@ -22,9 +22,9 @@ process PHYSIOCHEMICAL_FILTER {
     """
     physiochemical-filter \\
         --input ${candidate} \\
-        --config ${filter_config} \\
         --output candidates/filtered/${prefix}.parquet \\
         --use-blob-storage \\
         --bucket ${bucket} \\
+
     """
 }
