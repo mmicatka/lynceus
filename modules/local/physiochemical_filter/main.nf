@@ -8,7 +8,7 @@ process PHYSIOCHEMICAL_FILTER {
 
     input:
     path candidate
-    path filter_config
+    val filter_config
     val bucket
 
     output:
@@ -19,12 +19,23 @@ process PHYSIOCHEMICAL_FILTER {
 
     script:
     def prefix = candidate.simpleName
+    def mw_min    = filter_config?.molecular_weight?.min != null ? "--mol-weight-min ${filter_config.molecular_weight.min}" : ""
+    def mw_max    = filter_config?.molecular_weight?.max != null ? "--mol-weight-max ${filter_config.molecular_weight.max}" : ""
+    def ha_min    = filter_config?.heavy_atom?.min != null       ? "--heavy-atom-min ${filter_config.heavy_atom.min}" : ""
+    def ha_max    = filter_config?.heavy_atom?.max != null       ? "--heavy-atom-max ${filter_config.heavy_atom.max}" : ""
+    def cns_mpo   = (filter_config?.cns_mpo?.enabled && filter_config?.cns_mpo?.min_score != null) ? "--cns-mpo ${filter_config.cns_mpo.min_score}" : ""
+    def use_pains = filter_config?.pains?.enabled ? "--use-pains" : ""
     """
     physiochemical-filter \\
         --input ${candidate} \\
         --output candidates/filtered/${prefix}.parquet \\
         --use-blob-storage \\
         --bucket ${bucket} \\
-
+        ${mw_min} \\
+        ${mw_max} \\
+        ${ha_min} \\
+        ${ha_max} \\
+        ${cns_mpo} \\
+        ${use_pains}
     """
 }

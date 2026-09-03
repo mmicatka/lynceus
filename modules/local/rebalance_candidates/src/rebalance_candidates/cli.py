@@ -239,8 +239,8 @@ def _rebalance_glob(
 
 
 @click.command()
-@click.option("--input-path", type=str, required=True, help="Input path (glob).")
-@click.option("--output-path", type=str, required=True, help="Output path.")
+@click.option("--input", type=str, required=True, help="Input path (glob).")
+@click.option("--output", type=str, required=True, help="Output path.")
 @click.option(
     "--num-per-shard",
     default=10000,
@@ -262,8 +262,8 @@ def _rebalance_glob(
 )
 @click.option("--bucket", type=str, default="lynceus", help="Output bucket name")
 def rebalance_candidates(
-    input_path: str,
-    output_path: str,
+    input: str,
+    output: str,
     num_per_shard: int,
     skip_col_val: list[tuple[str, str]],
     use_blob_storage: bool,
@@ -273,28 +273,28 @@ def rebalance_candidates(
 
     if use_blob_storage:
         blob_storage_settings = get_blob_storage_settings()
-        target_dir = f"s3://{bucket}/{output_path.lstrip('/')}"
+        target_dir = f"s3://{bucket}/{output.lstrip('/')}"
     else:
-        target_dir = output_path.rstrip("/")
+        target_dir = output.rstrip("/")
 
     conn = get_connection(blob_storage_settings)
-    fs = get_filesystem(target_dir, blob_storage_settings)
+    fs = get_filesystem(blob_storage_settings)
 
     manifest_path = _manifest_path(target_dir)
     manifest = _load_manifest(fs, manifest_path)
 
-    matched_files = _matched_input_files(conn, input_path)
+    matched_files = _matched_input_files(conn, input)
     if not matched_files:
         raise RuntimeError(
-            f"Glob '{input_path}' matched no files — refusing to write an "
+            f"Glob '{input}' matched no files — refusing to write an "
             f"empty manifest entry."
         )
 
-    existing_entry = manifest["globs"].get(input_path)
+    existing_entry = manifest["globs"].get(input)
     if existing_entry is not None:
         _existing_entry_is_valid(conn, existing_entry, target_dir, matched_files)
         logger.info(
-            f"Skipping '{input_path}': already rebalanced "
+            f"Skipping '{input}': already rebalanced "
             f"({existing_entry['shard_count']} shards verified present, "
             f"{len(matched_files)} matched files unchanged)"
         )
@@ -303,13 +303,13 @@ def rebalance_candidates(
     shard_counter_start = _next_shard_counter(fs, target_dir, manifest)
 
     logger.info(
-        f"Reading from '{input_path}' ({len(matched_files)} files matched) "
+        f"Reading from '{input}' ({len(matched_files)} files matched) "
         f"with {num_per_shard} rows per file, starting at shard_{shard_counter_start}"
     )
 
     entry = _rebalance_glob(
         conn,
-        input_path,
+        input,
         matched_files,
         target_dir,
         num_per_shard,
@@ -317,7 +317,7 @@ def rebalance_candidates(
         shard_counter_start,
     )
 
-    manifest["globs"][input_path] = entry
+    manifest["globs"][input] = entry
     _write_manifest(fs, manifest_path, manifest)
 
     logger.info(

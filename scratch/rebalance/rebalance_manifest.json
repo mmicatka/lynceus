@@ -1,0 +1,18 @@
+{
+  "globs": {
+    "preprocessing/output.parquet": {
+      "input_glob": "preprocessing/output.parquet",
+      "matched_files": [
+        "preprocessing/output.parquet"
+      ],
+      "shard_count": 5,
+      "shard_files": [
+        "shard_0.parquet",
+        "shard_1.parquet",
+        "shard_2.parquet",
+        "shard_3.parquet",
+        "shard_4.parquet"
+      ]
+    }
+  }
+}
