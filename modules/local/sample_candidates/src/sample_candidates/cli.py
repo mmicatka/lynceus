@@ -24,14 +24,14 @@ def _resolve_path(
 
 @click.command()
 @click.option(
-    "--input-path",
+    "--input",
     required=True,
     help="Parquet glob (local path or S3 prefix) of raw candidate shards"
     " to sample from.",
 )
 @click.option(
     "--output",
-    "output_path",
+    "output",
     required=True,
     type=str,
     help="Path to write the capped stratified sample (Parquet) to.",
@@ -111,8 +111,8 @@ def _resolve_path(
     help="Blob storage bucket name (used only with --use-blob-storage).",
 )
 def sample_candidates(
-    input_glob: str,
-    output_path: str,
+    input: str,
+    output: str,
     fingerprint_field: str,
     fingerprint_n_bits: int,
     property_fields: tuple[str, ...],
@@ -139,12 +139,6 @@ def sample_candidates(
 
     blob_storage_settings = get_blob_storage_settings() if use_blob_storage else None
     conn = get_connection(blob_storage_settings)
-
-    target_glob = _resolve_path(input_glob, blob_storage_settings, bucket)
-    target_output = _resolve_path(output_path, blob_storage_settings, bucket)
-
-    if not file_exists(conn, target_glob):
-        raise click.ClickException(f"Input Parquet not found: {target_glob}")
 
     raw_table = conn.execute(
         f"SELECT * FROM read_parquet('{target_glob}')"

@@ -13,7 +13,7 @@ from pathlib import Path
 
 import click
 import gemmi
-from protein_ensemble.manifest import Manifest
+from protein_ensemble import Manifest
 
 from .models import BindingSite, Sphere
 

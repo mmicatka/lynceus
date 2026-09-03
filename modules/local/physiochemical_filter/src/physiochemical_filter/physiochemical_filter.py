@@ -76,14 +76,12 @@ def _apply_all_filters(rel: duckdb.DuckDBPyRelation, config: dict) -> pa.Table:
 @click.command()
 @click.option(
     "--input",
-    "input_path",
     required=True,
     type=str,
     help="Input .parquet file",
 )
 @click.option(
     "--config",
-    "config_path",
     required=True,
     type=str,
     help="YAML filter configuration",
@@ -102,19 +100,22 @@ def _apply_all_filters(rel: duckdb.DuckDBPyRelation, config: dict) -> pa.Table:
 )
 @click.option("--bucket", type=str, default="lynceus", help="Output bucket name")
 def physiochemical_filter(
-    input_path: Path,
-    config_path: Path,
-    output: Path,
+    input: str,
+    config: str,
+    output: str,
     use_blob_storage: bool,
     bucket: str,
 ) -> None:
+
+    blob_storage_settings = None
+
     if use_blob_storage:
         blob_storage_settings = get_blob_storage_settings()
         output = f"s3://{bucket}/{output.lstrip('/')}"
 
     conn = get_connection(blob_storage_settings)
 
-    config = load_config(config_path)
+    config = load_config(config)
 
     con = get_connection()
     rel = con.read_parquet(str(input_path))
