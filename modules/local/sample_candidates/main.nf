@@ -13,12 +13,20 @@ process SAMPLE_CANDIDATES {
     val true, emit: done
 
     script:
-    def config_json = groovy.json.JsonOutput.toJson(strategy_config)
+    def field_args = [
+        '--field morgan_fingerprint:array:32',
+        '--field molecular_weight:scalar',
+        '--field calculated_distribution_coefficient:scalar',
+        '--field topological_polar_surface_area:scalar',
+    ].join(' ')
+
     """
     sample-candidates \\
-        --input-path '${input_path}' \\
-        --output-path ${output_path} \\
-        --strategy-config '${config_json}' \\
+        --input '${input_path}' \\
+        --output ${output_path} \\
+        ${field_args} \\
+        --random-seed ${strategy_config.seed} \\
+        --target-total-samples ${strategy_config.num_samples} \\
         --use-blob-storage \\
         --bucket ${bucket}
     """

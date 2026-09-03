@@ -56,7 +56,19 @@ class StratificationConfig(BaseModel):
 
     n_quantiles_per_dim: int = Field(default=10, ge=2)
 
-    cap_per_stratum: int = Field(default=500, ge=1)
+    cap_per_stratum: int | None = Field(
+        default=None,
+        ge=1,
+        description="Maximum number of rows drawn from any single stratum. "
+        "Mutually exclusive with target_total_samples.",
+    )
+    target_total_samples: int | None = Field(
+        default=None,
+        ge=1,
+        description="Target total output row count. cap_per_stratum is derived "
+        "at runtime as ceil(target_total_samples / n_strata). Mutually "
+        "exclusive with cap_per_stratum.",
+    )
     min_stratum_size_for_cap: int = Field(
         default=1,
         ge=1,
@@ -75,6 +87,14 @@ class StratificationConfig(BaseModel):
         if len(names) != len(set(names)):
             raise ValueError(f"Duplicate feature names in features: {names}")
         return v
+
+    @model_validator(mode="after")
+    def _exactly_one_cap_strategy(self) -> "StratificationConfig":
+        if (self.cap_per_stratum is None) == (self.target_total_samples is None):
+            raise ValueError(
+                "Exactly one of cap_per_stratum or target_total_samples must be set."
+            )
+        return self
 
     @property
     def array_features(self) -> tuple[FeatureSpec, ...]:

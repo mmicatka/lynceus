@@ -22,12 +22,16 @@ surrogate:
     sample:
       seed: 1000
       num_samples: 100000
-      stratify_on: ["scaffold_hash"]
-      num_bins: 50
-      projection:
-        method: "sparse_random"
-        n_components: 32
-
+      fields:
+        - name: morgan_fingerprint
+          kind: array
+          reduced_dims: 32
+        - name: molecular_weight
+          kind: scalar
+        - name: calculated_distribution_coefficient
+          kind: scalar
+        - name: topological_polar_surface_area
+          kind: scalar
 target:
   ensemble_id: "T4_lysozyme_L99"
   ensemble_path: "targets/protein_ensembles/T4_lysozyme_L99"

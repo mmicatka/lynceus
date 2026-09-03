@@ -12,7 +12,10 @@ from lynceus_utils.storage import BlobStorageSettings, get_blob_storage_settings
 from sample_candidates.binning import fit_quantile_bins
 from sample_candidates.config import FeatureKind, FeatureSpec, StratificationConfig
 from sample_candidates.projection import fit_projection, project_batch
-from sample_candidates.sampling import build_capped_sample_query
+from sample_candidates.sampling import (
+    build_capped_sample_query,
+    resolve_cap_per_stratum,
+)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -142,10 +145,19 @@ def _resolve_path(
 )
 @click.option(
     "--cap-per-stratum",
-    default=500,
-    show_default=True,
+    default=None,
     type=int,
-    help="Maximum number of rows drawn from any single stratum.",
+    help="Maximum number of rows drawn from any single stratum. Mutually "
+    "exclusive with --target-total-samples; if neither is given, "
+    "defaults to --cap-per-stratum 500.",
+)
+@click.option(
+    "--target-total-samples",
+    default=None,
+    type=int,
+    help="Target total output row count; cap_per_stratum is derived at "
+    "runtime from the actual number of strata produced. Mutually "
+    "exclusive with --cap-per-stratum.",
 )
 @click.option(
     "--min-stratum-size-for-cap",
@@ -173,11 +185,15 @@ def sample_candidates(
     projection_density: float,
     random_seed: int,
     n_quantiles_per_dim: int,
-    cap_per_stratum: int,
+    cap_per_stratum: int | None,
+    target_total_samples: int | None,
     min_stratum_size_for_cap: int,
     use_blob_storage: bool,
     bucket: str,
 ) -> None:
+    if cap_per_stratum is None and target_total_samples is None:
+        cap_per_stratum = 500
+
     config = StratificationConfig(
         features=features,
         n_projected_dims=n_projected_dims,
@@ -185,6 +201,7 @@ def sample_candidates(
         random_seed=random_seed,
         n_quantiles_per_dim=n_quantiles_per_dim,
         cap_per_stratum=cap_per_stratum,
+        target_total_samples=target_total_samples,
         min_stratum_size_for_cap=min_stratum_size_for_cap,
     )
 
@@ -206,7 +223,12 @@ def sample_candidates(
     conn.register("projected_table", projected_table)
     binner = fit_quantile_bins("projected_table", config, connection=conn)
 
-    query = build_capped_sample_query("projected_table", binner, config)
+    n_strata = conn.execute(binner.count_strata_query("projected_table")).fetchone()[0]
+
+    cap_per_stratum = resolve_cap_per_stratum(config, n_strata)
+    query = build_capped_sample_query(
+        "projected_table", binner, config, cap_per_stratum
+    )
 
     conn.execute(f"COPY (SELECT * FROM ({query})) TO '{output_path}' (FORMAT PARQUET)")
 
@@ -232,6 +254,6 @@ def sample_candidates(
         "Sampled %d rows across %d strata (cap=%d) -> %s",
         row_count,
         n_strata,
-        config.cap_per_stratum,
+        cap_per_stratum,
         output_path,
     )

@@ -43,9 +43,24 @@ class QuantileBinner:
             ELSE {len(edges)}
         END"""
 
-    def stratum_id_expr(self) -> str:
+    def stratum_id_column_expr(self) -> str:
         bucket_cols = ", ".join(f"bucket_dim_{i}" for i in range(self.n_projected_dims))
-        return f"concat_ws('_', {bucket_cols}) AS stratum_id"
+        return f"concat_ws('_', {bucket_cols})"
+
+    def stratum_id_expr(self) -> str:
+        return f"{self.stratum_id_column_expr()} AS stratum_id"
+
+    def count_strata_query(self, source_sql: str) -> str:
+        bucket_columns = self.stratum_column_expr()
+        stratum_id_column = self.stratum_id_column_expr()
+        return f"""
+            WITH projected AS (
+                SELECT *, {bucket_columns}
+                FROM {source_sql}
+            )
+            SELECT COUNT(DISTINCT {stratum_id_column})
+            FROM projected
+        """
 
 
 def fit_quantile_bins(

@@ -2,14 +2,34 @@
 
 from __future__ import annotations
 
+import math
+
 from sample_candidates.binning import QuantileBinner
 from sample_candidates.config import StratificationConfig
+
+
+def resolve_cap_per_stratum(config: StratificationConfig, n_strata: int) -> int:
+    if config.cap_per_stratum is not None:
+        return config.cap_per_stratum
+
+    if config.target_total_samples is None:
+        raise ValueError(
+            "Neither cap_per_stratum nor target_total_samples is set; "
+            "StratificationConfig validation should have prevented this."
+        )
+    if n_strata <= 0:
+        raise ValueError(
+            f"Cannot derive cap_per_stratum from target_total_samples with "
+            f"n_strata={n_strata}."
+        )
+    return math.ceil(config.target_total_samples / n_strata)
 
 
 def build_capped_sample_query(
     source_sql: str,
     binner: QuantileBinner,
     config: StratificationConfig,
+    cap_per_stratum: int,
 ) -> str:
     bucket_columns = binner.stratum_column_expr()
     stratum_id = binner.stratum_id_expr()
@@ -51,5 +71,5 @@ def build_capped_sample_query(
         )
         SELECT *
         FROM ranked
-        WHERE stratum_rank <= {config.cap_per_stratum}
+        WHERE stratum_rank <= {cap_per_stratum}
     """
