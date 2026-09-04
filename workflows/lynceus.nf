@@ -12,9 +12,25 @@ workflow LYNCEUS {
 
   ch_candidate_done = CANDIDATE.out.done.collect().map { true }
 
-  ch_target_input = channel.of(params.target.ensemble_id)
-    .map { id -> tuple(id, file("${params.target.ensemble_path}/*")) }
-    .ifEmpty { error("params.target.ensemble_id and params.target.ensemble_path must both be set") }
+  if (!params.target?.ensemble_id) {
+    error("params.target.ensemble_id must be set")
+  }
+  if (!params.target?.ensemble_path) {
+    error("params.target.ensemble_path must be set")
+  }
+
+  ch_target_input = channel.of(tuple(params.target.ensemble_id, params.target.ensemble_path))
+    .map { id, ensemble_path ->
+      def manifest = file("${ensemble_path}/manifest.json")
+      if (!manifest.exists()) {
+        error("manifest.json not found at ${ensemble_path} for ensemble ${id}")
+      }
+      def members = files("${ensemble_path}/members/*")
+      if (members.isEmpty()) {
+        error("No member structure files found under ${ensemble_path}/members for ensemble ${id}")
+      }
+      tuple(id, manifest, members)
+    }
 
   TARGET(ch_target_input)
 

@@ -215,7 +215,7 @@ def _detect_binding_sites(manifest: Manifest, member_id: str) -> list[BindingSit
 def _detect_binding_sites_ensemble(
     ensemble_path: Path, num_workers: int
 ) -> list[BindingSite]:
-    manifest = Manifest.load(str(ensemble_path))
+    manifest = Manifest.load(str(ensemble_path / "manifest.json"))
     member_ids = list(manifest.members)
 
     binding_sites: list[BindingSite] = []
