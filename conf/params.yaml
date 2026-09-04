@@ -6,8 +6,11 @@ s3_region: garage
 s3_url_style: path
 
 candidates:
-  num_per_shard: 1000000
   bucket: lynceus
+  tranches:
+    - TEST
+
+  num_per_shard: 1000000
 
   filter_config:
     pains:

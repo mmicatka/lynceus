@@ -7,9 +7,7 @@ include { DOCKING } from '../subworkflows/local/docking'
 
 workflow LYNCEUS {
   CANDIDATE(
-    params.candidates.bucket,
-    params.candidates.num_per_shard,
-    params.candidates.filter_config,
+    params.candidates
   )
 
   ch_candidate_done = CANDIDATE.out.done.collect().map { true }.first()
