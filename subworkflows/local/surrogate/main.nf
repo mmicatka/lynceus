@@ -10,7 +10,7 @@ workflow SURROGATE_TRAIN {
     config
 
     main:
-    input_path = "candidates/rebalanced/*"
+    input_path = "candidates/rebalanced/**/*.parquet"
     output_path = "candidates/sampled"
 
     ch_candidate_done = target_surfaces.map { done, _ensemble_path, _sites_path -> done }.first()
