@@ -38,7 +38,9 @@ workflow CANDIDATE {
     config.num_per_shard,
   )
 
-  ch_rebalanced = REBALANCE_CANDIDATES.out.done.flatMap { file("${directory}/rebalanced/*.parquet") }
+  ch_rebalanced = REBALANCE_CANDIDATES.out.done
+    .flatMap { files("${directory}/rebalanced/*.parquet") }
+    .map { f -> "${directory}/rebalanced/${f.name}" }
 
   PHYSIOCHEMICAL_FILTER(ch_rebalanced, config.filter_config, config.bucket)
 

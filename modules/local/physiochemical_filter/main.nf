@@ -26,7 +26,7 @@ process PHYSIOCHEMICAL_FILTER {
     def use_pains = filter_config?.pains?.enabled ? "--use-pains" : ""
     """
     physiochemical-filter \\
-        --input ${candidate} \\
+        --input candidates/rebalanced/${candidate} \\
         --output candidates/filtered/${prefix}.parquet \\
         --use-blob-storage \\
         --bucket ${bucket} \\

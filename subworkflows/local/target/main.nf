@@ -11,7 +11,7 @@ workflow TARGET {
 
   ch_target_surfaces = DETECT_BINDING_SITES.out.sites
     .join(ch_ensemble)
-    .map { _ensemble_id, sites_path, manifest, members -> tuple(manifest, sites_path) }
+    .map { _ensemble_id, sites_path, manifest, _members -> tuple(manifest, sites_path) }
 
   emit:
   target_surfaces = ch_target_surfaces // tuple(path(ensemble_dir), path(sites_path))
