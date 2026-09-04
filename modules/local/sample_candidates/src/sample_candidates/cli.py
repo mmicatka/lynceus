@@ -7,7 +7,7 @@ from pathlib import Path
 
 import click
 from lynceus_utils.duckdb import file_exists, get_connection
-from lynceus_utils.storage import BlobStorageSettings, get_blob_storage_settings
+from lynceus_utils.storage import get_blob_storage_settings
 
 from sample_candidates.binning import fit_quantile_bins
 from sample_candidates.config import FeatureKind, FeatureSpec, StratificationConfig
@@ -44,7 +44,10 @@ class FeatureSpecParamType(click.ParamType):
         except ValueError:
             valid = ", ".join(k.value for k in FeatureKind)
             self.fail(
-                f"'{kind_str}' is not a valid kind in '{value}'; expected one of: {valid}",
+                (
+                    f"'{kind_str}' is not a valid kind in '{value}';"
+                    f" expected one of: {valid}"
+                ),
                 param,
                 ctx,
             )
@@ -76,25 +79,15 @@ class FeatureSpecParamType(click.ParamType):
 FEATURE_SPEC = FeatureSpecParamType()
 
 
-def _resolve_path(
-    path: str, blob_storage_settings: BlobStorageSettings | None, bucket: str
-) -> str:
-    if blob_storage_settings is None:
-        return path
-    return f"s3://{bucket}/{path.lstrip('/')}"
-
-
 @click.command()
 @click.option(
     "--input",
-    "input_path",
     required=True,
     help="Parquet glob (local path or S3 prefix) of raw candidate shards"
     " to sample from.",
 )
 @click.option(
     "--output",
-    "output_path",
     required=True,
     type=str,
     help="Path to write the capped stratified sample (Parquet) to.",
@@ -178,8 +171,8 @@ def _resolve_path(
     help="Blob storage bucket name (used only with --use-blob-storage).",
 )
 def sample_candidates(
-    input_path: str,
-    output_path: str,
+    input: str,
+    output: str,
     features: tuple[FeatureSpec, ...],
     n_projected_dims: int,
     projection_density: float,
@@ -208,46 +201,49 @@ def sample_candidates(
     if use_blob_storage:
         blob_storage_settings = get_blob_storage_settings()
         conn = get_connection(blob_storage_settings)
-        input_path = f"s3://{bucket}/{input_path.lstrip('/')}"
-        output_path = f"s3://{bucket}/{output_path.lstrip('/')}"
+        input = f"s3://{bucket}/{input.lstrip('/')}"
+        output = f"s3://{bucket}/{output.lstrip('/')}"
     else:
         blob_storage_settings = None
         conn = get_connection()
 
-    raw_table = conn.execute(
-        f"SELECT * FROM read_parquet('{input_path}')"
-    ).to_arrow_table()
+    raw_table = conn.execute(f"SELECT * FROM read_parquet('{input}')").to_arrow_table()
     model = fit_projection(raw_table, config)
     projected_table = project_batch(raw_table, model)
 
     conn.register("projected_table", projected_table)
     binner = fit_quantile_bins("projected_table", config, connection=conn)
 
-    n_strata = conn.execute(binner.count_strata_query("projected_table")).fetchone()[0]
+    n_strata = conn.execute(binner.count_strata_query("projected_table")).fetchone()
+
+    if not n_strata:
+        raise click.ClickException(f"No strata available from '{input}'.")
+    else:
+        n_strata = n_strata[0]
 
     cap_per_stratum = resolve_cap_per_stratum(config, n_strata)
     query = build_capped_sample_query(
         "projected_table", binner, config, cap_per_stratum
     )
 
-    conn.execute(f"COPY (SELECT * FROM ({query})) TO '{output_path}' (FORMAT PARQUET)")
+    conn.execute(f"COPY (SELECT * FROM ({query})) TO '{output}' (FORMAT PARQUET)")
 
-    if not file_exists(conn, output_path):
+    if not file_exists(conn, output):
         raise click.ClickException(
-            f"COPY reported success but {output_path} is not readable back "
+            f"COPY reported success but {output} is not readable back "
             "via read_parquet — write did not land"
         )
 
     row_count, n_strata = conn.execute(
         f"SELECT COUNT(*), COUNT(DISTINCT resolved_stratum_id) "
-        f"FROM read_parquet('{output_path}')"
+        f"FROM read_parquet('{output}')"
     ).fetchall()[0]
 
     if row_count == 0:
         if blob_storage_settings is None:
-            Path(output_path).unlink(missing_ok=True)
+            Path(output).unlink(missing_ok=True)
         raise click.ClickException(
-            f"No rows sampled from '{input_path}'; refusing to leave an empty output."
+            f"No rows sampled from '{input}'; refusing to leave an empty output."
         )
 
     logger.info(
@@ -255,5 +251,5 @@ def sample_candidates(
         row_count,
         n_strata,
         cap_per_stratum,
-        output_path,
+        output,
     )

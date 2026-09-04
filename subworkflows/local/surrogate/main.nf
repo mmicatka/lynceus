@@ -10,8 +10,8 @@ workflow SURROGATE_TRAIN {
     config // training configuration
 
     main:
-    input_path = "s3://${bucket}/candidates/rebalanced"
-    output_path = "s3://${bucket}/candidates/sampled"
+    input_path = "candidates/rebalanced"
+    output_path = "candidates/sampled"
 
     SAMPLE_CANDIDATES(input_path, output_path, bucket, config.sample)
     DOCKING(target_surfaces, SAMPLE_CANDIDATES.out.done, output_path)

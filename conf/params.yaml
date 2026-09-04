@@ -37,5 +37,5 @@ surrogate:
           kind: scalar
 target:
   ensemble_id: "T4_lysozyme_L99"
-  ensemble_path: "targets/protein_ensembles/T4_lysozyme_L99"
+  ensemble_path: "s3://targets/protein_ensembles/T4_lysozyme_L99"
   bucket: lynceus

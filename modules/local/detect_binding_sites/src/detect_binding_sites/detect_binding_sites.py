@@ -277,7 +277,3 @@ def _parse_num_workers(value: str) -> int:
 def detect_binding_sites(ensemble: Path, out: Path, workers: int):
     binding_sites: list[BindingSite] = _detect_binding_sites_ensemble(ensemble, workers)
     _write_binding_sites(binding_sites, out)
-
-
-if __name__ == "__main__":
-    detect_binding_sites()

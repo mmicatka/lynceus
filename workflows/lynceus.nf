@@ -10,8 +10,7 @@ workflow LYNCEUS {
     params.candidates
   )
 
-  ch_candidate_done = CANDIDATE.out.done.collect().map { true }.first()
-
+  ch_candidate_done = CANDIDATE.out.done.collect().map { true }
   ch_target_input = channel.of(tuple(params.target.ensemble_id, params.target.ensemble_path))
     .ifEmpty { error("params.target.ensemble_id and params.target.ensemble_path must both be set") }
 
