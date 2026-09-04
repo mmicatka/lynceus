@@ -25,6 +25,8 @@ def get_connection(
         con.execute("SET s3_access_key_id = ?", [blob_storage_settings.access_key_id])
         con.execute("SET s3_secret_access_key = ?", [blob_storage_settings.access_key])
 
+    con.execute("SET arrow_large_buffer_size=true")
+
     return con
 
 

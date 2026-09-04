@@ -5,16 +5,23 @@ include { DOCKING } from '../docking'
 
 workflow SURROGATE_TRAIN {
     take:
-    bucket // bucket
-    target_surfaces // tuple: ensemble_id, sites (path), prepped (path) — from TARGET.out.target_surfaces
-    config // training configuration
+    bucket
+    target_surfaces // tuple: candidate_done, ensemble_id, sites (path), prepped (path)
+    config
 
     main:
-    input_path = "candidates/rebalanced"
+    input_path = "candidates/rebalanced/*"
     output_path = "candidates/sampled"
 
-    SAMPLE_CANDIDATES(input_path, output_path, bucket, config.sample)
-    DOCKING(target_surfaces, SAMPLE_CANDIDATES.out.done, output_path)
+    ch_candidate_done = target_surfaces.map { done, _ensemble_path, _sites_path -> done }.first()
+    ch_target_surfaces = target_surfaces.map { _done, ensemble_path, sites_path -> tuple(ensemble_path, sites_path) }
+
+    ch_gated_input_path = ch_candidate_done
+        .combine(channel.of(input_path))
+        .map { _done, path -> path }
+
+    SAMPLE_CANDIDATES(ch_gated_input_path, output_path, bucket, config.sample)
+    DOCKING(ch_target_surfaces, SAMPLE_CANDIDATES.out.done, output_path)
 
     emit:
     sampled_candidates_path = output_path

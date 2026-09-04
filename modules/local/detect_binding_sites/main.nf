@@ -4,7 +4,7 @@ process DETECT_BINDING_SITES {
     container "${params.registry}/lynceus/detect-binding-sites:0.1.0"
 
     input:
-    tuple val(ensemble_id), path(ensemble_path)
+    tuple val(ensemble_id), path(ensemble_files, stageAs: 'ensemble/*')
 
     output:
     tuple val(ensemble_id), path("sites.json"), emit: sites
@@ -12,7 +12,7 @@ process DETECT_BINDING_SITES {
     script:
     """
     detect-binding-sites \\
-    --ensemble ${ensemble_path} \\
+    --ensemble ensemble \\
     --out sites.json
     """
 }

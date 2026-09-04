@@ -22,6 +22,7 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
+_ROWS_PER_BATCH = 100_000
 MANIFEST_FILENAME = "rebalance_manifest.json"
 SHARD_FILENAME_RE = re.compile(r"^shard_(\d+)\.parquet$")
 
@@ -34,7 +35,7 @@ def _parse_bool_skip_val(col: str, val: str) -> bool:
         return False
     raise ValueError(
         f"--skip-col-val {col} {val!r}: value must be 'True' or 'False' "
-        f"(case-insensitive) — skip-col-val only supports boolean columns"
+        f"(case-insensitive) - skip-col-val only supports boolean columns"
     )
 
 
@@ -211,7 +212,7 @@ def _rebalance_glob(
     shard_counter_start: int,
 ) -> dict:
     query = _build_filtered_query(input_path, skip_col_val)
-    reader = con.execute(query).fetch_record_batch()
+    reader = con.execute(query).fetch_record_batch(rows_per_batch=_ROWS_PER_BATCH)
 
     shard_files: list[str] = []
     shard_idx = shard_counter_start

@@ -198,14 +198,14 @@ def sample_candidates(
         min_stratum_size_for_cap=min_stratum_size_for_cap,
     )
 
+    blob_storage_settings = None
+    conn = get_connection()
+
     if use_blob_storage:
         blob_storage_settings = get_blob_storage_settings()
         conn = get_connection(blob_storage_settings)
         input = f"s3://{bucket}/{input.lstrip('/')}"
         output = f"s3://{bucket}/{output.lstrip('/')}"
-    else:
-        blob_storage_settings = None
-        conn = get_connection()
 
     raw_table = conn.execute(f"SELECT * FROM read_parquet('{input}')").to_arrow_table()
     model = fit_projection(raw_table, config)
