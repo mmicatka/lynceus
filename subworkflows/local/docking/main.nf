@@ -1,47 +1,32 @@
 // subworkflows/local/docking/main.nf
-
-include { DOCKING_PREP_TARGET ; DOCKING_PREP_CANDIDATE_CONFORMER_GENERATE ; DOCKING_PREP_CANDIDATE_CONVERT_PDBQT } from '../../../modules/local/docking_prep'
-include { DETECT_PUTATIVE_BINDING_SITES } from '../../../modules/local/detect_putative_binding_sites'
-include { DOCKING_RUN_GPU } from '../../../modules/local/docking_run'
+include { DOCKING_RUN } from '../../../modules/local/docking_run'
 
 workflow DOCKING {
     take:
-    target_protein_conformational_ensemble // protein conformational ensemble
-    candidates // path: candidate parquet
+    target_surfaces // tuple: manifest (path), members (path), sites (path) — from TARGET.out.target_surfaces
+    candidates_done // sentinel: val true, emit: done — from SAMPLE_CANDIDATES
+    candidates_path // val: s3://bucket/... path SAMPLE_CANDIDATES wrote to
 
     main:
 
-    // Prep
-    DOCKING_PREP_TARGET(target_protein_conformational_ensemble)
-    DETECT_PUTATIVE_BINDING_SITES(target_protein_conformational_ensemble)
-
-    DOCKING_PREP_CANDIDATE_CONFORMER_GENERATE(candidates)
-    DOCKING_PREP_CANDIDATE_CONVERT_PDBQT(DOCKING_PREP_CANDIDATE_CONFORMER_GENERATE.out.conformers)
-
-    // Run docking
-    states_ch = DOCKING_PREP_TARGET.out.prepped.flatMap { _ensemble_id, prepped_dir ->
-        prepped_dir
-            .listFiles()
-            .findAll { file -> file.name.endsWith('.pdbqt') }
-            .collect { pdbqt ->
-                def conformational_state_id = pdbqt.name.replaceAll(/\.pdbqt$/, '')
-                tuple(conformational_state_id, pdbqt)
-            }
-    }
-    sites_ch = DETECT_PUTATIVE_BINDING_SITES.out.sites
-        .splitJson()
-        .map { site ->
+    docking_jobs_ch = target_surfaces.flatMap { manifest, members, sites_json ->
+        def sites = new groovy.json.JsonSlurper().parse(sites_json.toFile())
+        sites.collect { site ->
             tuple(
                 site.conformational_state_id,
+                manifest,
+                members,
                 site.site_id,
                 site.center,
                 [site.extent.radius * 2] * 3,
             )
         }
-    docking_jobs_ch = states_ch.combine(sites_ch, by: 0)
+    }
 
-    DOCKING_RUN_GPU(docking_jobs_ch, DOCKING_PREP_CANDIDATE_CONVERT_PDBQT.out.converted)
+    ch_candidates_path = candidates_done.collect().map { file(candidates_path) }
+
+    DOCKING_RUN(docking_jobs_ch, ch_candidates_path)
 
     emit:
-    results = DOCKING_RUN_GPU.out.results
+    results = DOCKING_RUN.out.results
 }

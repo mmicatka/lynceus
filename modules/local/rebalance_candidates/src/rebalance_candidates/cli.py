@@ -3,15 +3,15 @@
 import json
 import logging
 import re
-from typing import Iterator, Optional, Sequence
+from typing import Iterator, Sequence
 
 import click
 import fsspec
 import pyarrow as pa
 from lynceus_utils.duckdb import export_parquet, file_exists, get_connection
-from lynceus_utils.storage.blob_storage import (
-    BlobStorageSettings,
+from lynceus_utils.storage import (
     get_blob_storage_settings,
+    get_filesystem,
 )
 
 logging.basicConfig(
@@ -22,6 +22,7 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
+_ROWS_PER_BATCH = 100_000
 MANIFEST_FILENAME = "rebalance_manifest.json"
 SHARD_FILENAME_RE = re.compile(r"^shard_(\d+)\.parquet$")
 
@@ -34,7 +35,7 @@ def _parse_bool_skip_val(col: str, val: str) -> bool:
         return False
     raise ValueError(
         f"--skip-col-val {col} {val!r}: value must be 'True' or 'False' "
-        f"(case-insensitive) — skip-col-val only supports boolean columns"
+        f"(case-insensitive) - skip-col-val only supports boolean columns"
     )
 
 
@@ -87,42 +88,6 @@ def _generate_sharded_tables(
 
     if current_rows > 0:
         yield pa.Table.from_batches(current_batches)
-
-
-def _fsspec_storage_options(
-    blob_storage_settings: Optional[BlobStorageSettings],
-) -> dict:
-    if blob_storage_settings is None:
-        return {}
-
-    scheme = "https" if blob_storage_settings.use_ssl else "http"
-    endpoint = str(blob_storage_settings.endpoint)
-    if not endpoint.startswith(("http://", "https://")):
-        endpoint = f"{scheme}://{endpoint}"
-
-    return {
-        "key": blob_storage_settings.access_key_id,
-        "secret": blob_storage_settings.access_key,
-        "client_kwargs": {
-            "endpoint_url": endpoint,
-            "region_name": blob_storage_settings.region,
-        },
-        "config_kwargs": {
-            "s3": {
-                "addressing_style": (
-                    "path" if blob_storage_settings.url_style == "path" else "virtual"
-                )
-            }
-        },
-    }
-
-
-def _get_fs(
-    target_dir: str, blob_storage_settings: Optional[BlobStorageSettings]
-) -> fsspec.AbstractFileSystem:
-    if target_dir.startswith("s3://"):
-        return fsspec.filesystem("s3", **_fsspec_storage_options(blob_storage_settings))
-    return fsspec.filesystem("file")
 
 
 def _manifest_path(target_dir: str) -> str:
@@ -247,7 +212,7 @@ def _rebalance_glob(
     shard_counter_start: int,
 ) -> dict:
     query = _build_filtered_query(input_path, skip_col_val)
-    reader = con.execute(query).fetch_record_batch()
+    reader = con.execute(query).fetch_record_batch(rows_per_batch=_ROWS_PER_BATCH)
 
     shard_files: list[str] = []
     shard_idx = shard_counter_start
@@ -275,8 +240,8 @@ def _rebalance_glob(
 
 
 @click.command()
-@click.option("--input-path", type=str, required=True, help="Input path (glob).")
-@click.option("--output-path", type=str, required=True, help="Output path.")
+@click.option("--input", type=str, required=True, help="Input path (glob).")
+@click.option("--output", type=str, required=True, help="Output path.")
 @click.option(
     "--num-per-shard",
     default=10000,
@@ -298,8 +263,8 @@ def _rebalance_glob(
 )
 @click.option("--bucket", type=str, default="lynceus", help="Output bucket name")
 def rebalance_candidates(
-    input_path: str,
-    output_path: str,
+    input: str,
+    output: str,
     num_per_shard: int,
     skip_col_val: list[tuple[str, str]],
     use_blob_storage: bool,
@@ -309,28 +274,28 @@ def rebalance_candidates(
 
     if use_blob_storage:
         blob_storage_settings = get_blob_storage_settings()
-        target_dir = f"s3://{bucket}/{output_path.lstrip('/')}"
+        target_dir = f"s3://{bucket}/{output.lstrip('/')}"
     else:
-        target_dir = output_path.rstrip("/")
+        target_dir = output.rstrip("/")
 
     conn = get_connection(blob_storage_settings)
-    fs = _get_fs(target_dir, blob_storage_settings)
+    fs = get_filesystem(blob_storage_settings)
 
     manifest_path = _manifest_path(target_dir)
     manifest = _load_manifest(fs, manifest_path)
 
-    matched_files = _matched_input_files(conn, input_path)
+    matched_files = _matched_input_files(conn, input)
     if not matched_files:
         raise RuntimeError(
-            f"Glob '{input_path}' matched no files — refusing to write an "
+            f"Glob '{input}' matched no files — refusing to write an "
             f"empty manifest entry."
         )
 
-    existing_entry = manifest["globs"].get(input_path)
+    existing_entry = manifest["globs"].get(input)
     if existing_entry is not None:
         _existing_entry_is_valid(conn, existing_entry, target_dir, matched_files)
         logger.info(
-            f"Skipping '{input_path}': already rebalanced "
+            f"Skipping '{input}': already rebalanced "
             f"({existing_entry['shard_count']} shards verified present, "
             f"{len(matched_files)} matched files unchanged)"
         )
@@ -339,13 +304,13 @@ def rebalance_candidates(
     shard_counter_start = _next_shard_counter(fs, target_dir, manifest)
 
     logger.info(
-        f"Reading from '{input_path}' ({len(matched_files)} files matched) "
+        f"Reading from '{input}' ({len(matched_files)} files matched) "
         f"with {num_per_shard} rows per file, starting at shard_{shard_counter_start}"
     )
 
     entry = _rebalance_glob(
         conn,
-        input_path,
+        input,
         matched_files,
         target_dir,
         num_per_shard,
@@ -353,14 +318,10 @@ def rebalance_candidates(
         shard_counter_start,
     )
 
-    manifest["globs"][input_path] = entry
+    manifest["globs"][input] = entry
     _write_manifest(fs, manifest_path, manifest)
 
     logger.info(
         f"Successfully wrote {entry['shard_count']} shards to {target_dir} "
         f"and updated manifest at {manifest_path}"
     )
-
-
-if __name__ == "__main__":
-    rebalance_candidates()

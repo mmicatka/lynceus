@@ -1,12 +1,9 @@
 # libs/lynceus-utils/src/lynceus_utils/duckdb.py
 
-import os
-import tempfile
 from typing import Optional
 
 import duckdb
 import pyarrow as pa
-import pyarrow.parquet as pq
 
 from .storage import BlobStorageSettings
 
@@ -28,33 +25,27 @@ def get_connection(
         con.execute("SET s3_access_key_id = ?", [blob_storage_settings.access_key_id])
         con.execute("SET s3_secret_access_key = ?", [blob_storage_settings.access_key])
 
+    con.execute("SET arrow_large_buffer_size=true")
+
     return con
 
 
 def export_parquet(
     con: duckdb.DuckDBPyConnection,
-    table: pa.Table,
+    data: pa.Table | pa.RecordBatch | duckdb.DuckDBPyRelation,
     file_path: str,
 ):
-    with tempfile.NamedTemporaryFile(suffix=".parquet", delete=False) as tmp:
-        tmp_path = tmp.name
-
+    con.register("_tmp_export_view", data)
     try:
-        pq.write_table(table, tmp_path)
-        con.execute(
-            (
-                f"COPY (SELECT * FROM read_parquet('{tmp_path}')) TO '{file_path}'"
-                " (FORMAT PARQUET)"
-            )
-        )
-        if not file_exists(con, file_path):
-            raise RuntimeError(
-                f"export_parquet: COPY reported success but {file_path} "
-                "is not readable back via read_parquet — write did not land"
-            )
+        con.execute(f"COPY _tmp_export_view TO '{file_path}' (FORMAT PARQUET)")
     finally:
-        if os.path.exists(tmp_path):
-            os.remove(tmp_path)
+        con.unregister("_tmp_export_view")
+
+    if not file_exists(con, file_path):
+        raise RuntimeError(
+            f"export_parquet: COPY reported success but {file_path} "
+            "is not readable back via read_parquet — write did not land"
+        )
 
 
 def file_exists(con: duckdb.DuckDBPyConnection, file_path: str) -> bool:

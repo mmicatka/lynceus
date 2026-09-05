@@ -19,7 +19,7 @@ flowchart TD
   subgraph Target
     RetrieveTargets[/"Retrieve Target(s)"/] --> Targets@{ shape: st-rect, label: "Targets" }
     Targets --> EnsembleGeneration{{"Target Ensemble Generation"}}
-    EnsembleGeneration --> PutativeBindingSites@{shape: st-rect, label: "Putative Binding Sites"}
+    EnsembleGeneration --> BindingSites@{shape: st-rect, label: "Binding Sites"}
   end
 
   subgraph Candidate
@@ -35,7 +35,7 @@ flowchart TD
     FilteredCandidates -- "sample" --> TrainingCandidates@{ shape: st-rect, label: "Training Candidates" }
 
     TrainingCandidates --> ModelComplexGeneration["Complex Generation"]
-    PutativeBindingSites --> ModelComplexGeneration
+    BindingSites --> ModelComplexGeneration
 
     ModelComplexGeneration --> TrainingComplexes@{shape: st-rect, label: "Training Complexes"}
 
@@ -54,7 +54,7 @@ flowchart TD
     SurrogateFilteredCandidateConformerGeneration --> CandidateConformers@{ shape: st-rect, label: "Candidate Conformers"}
 
     CandidateConformers --> ComplexGeneration["Complex Generation"]
-    PutativeBindingSites --> ComplexGeneration
+    BindingSites --> ComplexGeneration
 
     ComplexGeneration --> Complexes@{shape: st-rect, label: "Complexes"}
   end

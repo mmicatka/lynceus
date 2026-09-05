@@ -1,6 +1,6 @@
 // modules/local/docking_run/main.nf
 
-process DOCKING_RUN_GPU {
+process DOCKING_RUN {
     tag "${conformational_state_id}:${site_id}"
 
     label 'gpu'
@@ -10,8 +10,8 @@ process DOCKING_RUN_GPU {
     containerOptions '--gpus all'
 
     input:
-    tuple val(conformational_state_id), path(receptor), val(site_id), val(center), val(size)
-    path candidates
+    tuple val(conformational_state_id), path(manifest, stageAs: 'ensemble/manifest.json'), path(members, stageAs: 'ensemble/members/*'), val(site_id), val(center), val(size)
+    path candidates_path
 
     output:
     tuple val(conformational_state_id), val(site_id), path("*.parquet"), emit: results
@@ -20,9 +20,10 @@ process DOCKING_RUN_GPU {
     def (cx, cy, cz) = center
     def (sx, sy, sz) = size
     """
-    docking-run --provider gpu \\
-        --receptor ${receptor} \\
-        --ligands-path ${candidates} \\
+    docking-run \\
+        --ensemble ensemble \\
+        --member-id ${conformational_state_id} \\
+        --ligands-path '${candidates_path}' \\
         --center ${cx} ${cy} ${cz} \\
         --size ${sx} ${sy} ${sz} \\
         --out-parquet ${conformational_state_id}.${site_id}.output.parquet \\
