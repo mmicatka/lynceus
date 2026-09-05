@@ -10,8 +10,8 @@ process DOCKING_RUN {
     containerOptions '--gpus all'
 
     input:
-    tuple val(conformational_state_id), path(ensemble_path), val(site_id), val(center), val(size)
-    val candidates_path
+    tuple val(conformational_state_id), path(manifest, stageAs: 'ensemble/manifest.json'), path(members, stageAs: 'ensemble/members/*'), val(site_id), val(center), val(size)
+    path candidates_path
 
     output:
     tuple val(conformational_state_id), val(site_id), path("*.parquet"), emit: results
@@ -20,8 +20,8 @@ process DOCKING_RUN {
     def (cx, cy, cz) = center
     def (sx, sy, sz) = size
     """
-    docking-run --provider gpu \\
-        --ensemble ${ensemble_path} \\
+    docking-run \\
+        --ensemble ensemble \\
         --member-id ${conformational_state_id} \\
         --ligands-path '${candidates_path}' \\
         --center ${cx} ${cy} ${cz} \\

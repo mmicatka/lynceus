@@ -36,7 +36,7 @@ workflow LYNCEUS {
 
   ch_target_surfaces_gated = ch_candidate_done
     .combine(TARGET.out.target_surfaces)
-    .map { done, ensemble_dir, sites_path -> tuple(done, ensemble_dir, sites_path) }
+    .map { done, manifest, members, sites_path -> tuple(done, manifest, members, sites_path) }
 
   SURROGATE_TRAIN(
     params.candidates.bucket,

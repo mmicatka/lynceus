@@ -6,15 +6,15 @@ include { DOCKING } from '../docking'
 workflow SURROGATE_TRAIN {
     take:
     bucket
-    target_surfaces // tuple: candidate_done, ensemble_id, sites (path), prepped (path)
+    target_surfaces // tuple: candidate_done, manifest (path), members (path), sites (path)
     config
 
     main:
     input_path = "candidates/rebalanced/**/*.parquet"
-    output_path = "candidates/sampled"
+    output_path = "s3://lynceus/candidates/sampled.parquet"
 
-    ch_candidate_done = target_surfaces.map { done, _ensemble_path, _sites_path -> done }.first()
-    ch_target_surfaces = target_surfaces.map { _done, ensemble_path, sites_path -> tuple(ensemble_path, sites_path) }
+    ch_candidate_done = target_surfaces.map { done, _manifest, _members, _sites_path -> done }.first()
+    ch_target_surfaces = target_surfaces.map { _done, manifest, members, sites_path -> tuple(manifest, members, sites_path) }
 
     ch_gated_input_path = ch_candidate_done
         .combine(channel.of(input_path))

@@ -35,6 +35,7 @@ surrogate:
           kind: scalar
         - name: topological_polar_surface_area
           kind: scalar
+
 target:
   ensemble_id: "T4_lysozyme_L99"
   ensemble_path: "s3://lynceus/targets/protein_ensembles/T4_lysozyme_L99"
