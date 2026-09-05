@@ -5,6 +5,7 @@ process DOCKING_RUN {
 
     label 'gpu'
     label 'pvc_io_retry'
+    label 'scratch'
 
     container "${params.registry}/lynceus/docking-run:gpu-0.1.0"
     containerOptions '--gpus all'
@@ -26,6 +27,7 @@ process DOCKING_RUN {
         --ligands-path '${candidates_path}' \\
         --center ${cx} ${cy} ${cz} \\
         --size ${sx} ${sy} ${sz} \\
+        --out-dir \$PWD/unidock_gpu_out \\
         --out-parquet ${conformational_state_id}.${site_id}.output.parquet \\
         --conformational-state-id ${conformational_state_id} \\
         --num-modes 1 \\
