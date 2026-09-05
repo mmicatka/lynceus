@@ -10,7 +10,7 @@ process DOCKING_RUN {
     containerOptions '--gpus all'
 
     input:
-    tuple val(conformational_state_id), path(manifest, stageAs: 'ensemble/manifest.json'), path(members, stageAs: 'ensemble/members/*'), val(site_id), val(center), val(size)
+    tuple val(conformational_state_id), path(ensemble_manifest, stageAs: 'ensemble/manifest.json'), path(ensemble_members, stageAs: 'ensemble/members/*'), val(site_id), val(center), val(size)
     path candidates_path
 
     output:

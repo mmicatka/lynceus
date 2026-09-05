@@ -3,19 +3,24 @@
 import logging
 import sys
 import tempfile
+import warnings
 from pathlib import Path
 
 import click
 from protein_ensemble.accessors.pdbqt import member_to_pdbqt
 from protein_ensemble.manifest import Manifest
 
-from .io import (
+from docking_run.io import (
     DEFAULT_STREAM_BATCH_ROWS,
+    count_ligand_rows,
     iter_ligand_records,
     write_docking_results_parquet,
 )
+
 from .providers import ProviderNotAvailableError, get_provider
 from .types import DockingError, SearchBox
+
+warnings.filterwarnings("ignore", category=SyntaxWarning)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -169,6 +174,8 @@ def docking_run(
     except ProviderNotAvailableError as exc:
         raise click.ClickException(str(exc))
 
+    logger.info("preparing %d ligands...", count_ligand_rows(ligands_path))
+
     ligands = list(iter_ligand_records(ligands_path))
     if not ligands:
         raise click.ClickException(f"No ligand records found in {ligands_path}")
@@ -176,7 +183,7 @@ def docking_run(
     box = SearchBox(center=center, size=size)
 
     logger.info("preparing receptor for member: %s", member_id)
-    manifest = Manifest.load(str(ensemble))
+    manifest = Manifest.load(str(ensemble / "manifest.json"))
     member = manifest.get_member(member_id)
     structure_path = manifest.structure_path(member_id)
 

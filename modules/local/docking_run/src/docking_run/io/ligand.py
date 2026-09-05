@@ -20,6 +20,10 @@ class LigandRecordReadError(DockingError):
     contains rows that fail to parse as valid RDKit Mols."""
 
 
+def count_ligand_rows(parquet_path: Path) -> int:
+    return pq.ParquetFile(parquet_path).metadata.num_rows
+
+
 def _mol_from_molblock(molblock: str) -> Chem.Mol:
     mol = Chem.MolFromMolBlock(molblock, removeHs=False)
     if mol is None:

@@ -252,17 +252,16 @@ class UnidockGPUProvider(DockingProvider):
         scoring_mode: str,
         chunk_out_dir: Path,
     ) -> subprocess.CompletedProcess:
-        chunk_out_dir.mkdir(parents=True, exist_ok=True)
-
-        ligand_index_path = chunk_out_dir / "ligand_index.txt"
-        ligand_index_path.write_text("\n".join(str(p) for p in paths_by_id.values()))
+        if chunk_out_dir.exists():
+            shutil.rmtree(chunk_out_dir)
+        chunk_out_dir.mkdir(parents=True)
 
         cmd = [
             _UNIDOCK_BINARY,
             "--receptor",
             str(receptor_path),
-            "--ligand_index",
-            str(ligand_index_path),
+            "--gpu_batch",
+            *[str(p) for p in paths_by_id.values()],
             "--search_mode",
             self.search_mode,
             "--scoring",
@@ -350,11 +349,14 @@ class UnidockGPUProvider(DockingProvider):
                     candidates[0],
                 )
 
-    def _chunk_out_dir(self, paths_by_id: dict[str, Path]) -> Path:
+    def _chunk_out_dir(
+        self, paths_by_id: dict[str, Path], *, retries_used: int = 0
+    ) -> Path:
         if not paths_by_id:
             return self.out_dir / "chunk_empty"
         ids = list(paths_by_id.keys())
-        return self.out_dir / f"chunk_{ids[0]}_{ids[-1]}_{len(ids)}"
+        suffix = f"_r{retries_used}" if retries_used else ""
+        return self.out_dir / f"chunk_{ids[0]}_{ids[-1]}_{len(ids)}{suffix}"
 
 
 class _UnidockCrash(Exception):
