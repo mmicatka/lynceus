@@ -9,6 +9,7 @@ import click
 from lynceus_utils.duckdb import file_exists, get_connection
 from lynceus_utils.storage import get_blob_storage_settings, get_filesystem
 
+from sample_candidates.autotune import suggest_stratification_shape
 from sample_candidates.binning import fit_quantile_bins
 from sample_candidates.config import FeatureKind, FeatureSpec, StratificationConfig
 from sample_candidates.manifest import (
@@ -95,6 +96,62 @@ def _matched_input_files(con, input_path: str) -> list[str]:
     return sorted(row[0] for row in rows)
 
 
+def _count_rows(con, input_path: str) -> int:
+    result = con.execute(
+        f"SELECT COUNT(*) FROM read_parquet('{input_path}')"
+    ).fetchone()
+    if result is None:
+        raise click.ClickException(f"Could not count rows for '{input_path}'.")
+    return result[0]
+
+
+def _resolve_stratification_shape(
+    con,
+    input_path: str,
+    *,
+    n_projected_dims: int | None,
+    n_quantiles_per_dim: int | None,
+    target_total_samples: int | None,
+    desired_cap_per_stratum: int,
+) -> tuple[int, int]:
+    if n_projected_dims is not None and n_quantiles_per_dim is not None:
+        return n_projected_dims, n_quantiles_per_dim
+
+    if target_total_samples is None:
+        raise click.ClickException(
+            "--n-projected-dims and --n-quantiles-per-dim must both be "
+            "provided explicitly when using --cap-per-stratum; autotuning "
+            "is only supported with --target-total-samples."
+        )
+
+    n_input_rows = _count_rows(con, input_path)
+    shape = suggest_stratification_shape(
+        n_input_rows=n_input_rows,
+        target_total_samples=target_total_samples,
+        n_quantiles_per_dim=n_quantiles_per_dim
+        if n_quantiles_per_dim is not None
+        else 10,
+        desired_cap_per_stratum=desired_cap_per_stratum,
+    )
+    resolved_dims = (
+        n_projected_dims if n_projected_dims is not None else shape.n_projected_dims
+    )
+    resolved_quantiles = (
+        n_quantiles_per_dim
+        if n_quantiles_per_dim is not None
+        else shape.n_quantiles_per_dim
+    )
+    logger.info(
+        "Autotuned stratification shape from %d input rows: "
+        "n_projected_dims=%d n_quantiles_per_dim=%d (max n_strata=%d)",
+        n_input_rows,
+        resolved_dims,
+        resolved_quantiles,
+        shape.n_strata,
+    )
+    return resolved_dims, resolved_quantiles
+
+
 @click.command()
 @click.option(
     "--input",
@@ -126,10 +183,11 @@ def _matched_input_files(con, input_path: str) -> list[str]:
 )
 @click.option(
     "--n-projected-dims",
-    default=8,
-    show_default=True,
+    default=None,
     type=int,
-    help="Number of dimensions to random-project the combined feature vector into.",
+    help="Number of dimensions to random-project the combined feature vector into. "
+    "If omitted and --target-total-samples is given, this is autotuned from "
+    "the input row count.",
 )
 @click.option(
     "--projection-density",
@@ -147,10 +205,20 @@ def _matched_input_files(con, input_path: str) -> list[str]:
 )
 @click.option(
     "--n-quantiles-per-dim",
-    default=10,
+    default=None,
+    type=int,
+    help="Number of quantile bins per projected dimension. If omitted and "
+    "--target-total-samples is given, this is autotuned from the input "
+    "row count.",
+)
+@click.option(
+    "--desired-cap-per-stratum",
+    default=20,
     show_default=True,
     type=int,
-    help="Number of quantile bins per projected dimension.",
+    help="Only used when autotuning (--n-projected-dims/--n-quantiles-per-dim "
+    "omitted with --target-total-samples): target average rows-per-stratum "
+    "after capping, used to pick a stratification shape.",
 )
 @click.option(
     "--cap-per-stratum",
@@ -190,10 +258,11 @@ def sample_candidates(
     input: str,
     output: str,
     features: tuple[FeatureSpec, ...],
-    n_projected_dims: int,
+    n_projected_dims: int | None,
     projection_density: float,
     random_seed: int,
-    n_quantiles_per_dim: int,
+    n_quantiles_per_dim: int | None,
+    desired_cap_per_stratum: int,
     cap_per_stratum: int | None,
     target_total_samples: int | None,
     min_stratum_size_for_cap: int,
@@ -202,17 +271,6 @@ def sample_candidates(
 ) -> None:
     if cap_per_stratum is None and target_total_samples is None:
         cap_per_stratum = 500
-
-    config = StratificationConfig(
-        features=features,
-        n_projected_dims=n_projected_dims,
-        projection_density=projection_density,
-        random_seed=random_seed,
-        n_quantiles_per_dim=n_quantiles_per_dim,
-        cap_per_stratum=cap_per_stratum,
-        target_total_samples=target_total_samples,
-        min_stratum_size_for_cap=min_stratum_size_for_cap,
-    )
 
     blob_storage_settings = None
     conn = get_connection()
@@ -225,9 +283,6 @@ def sample_candidates(
 
     fs = get_filesystem(blob_storage_settings)
 
-    manifest_file_path = manifest_path(output)
-    manifest = load_manifest(fs, manifest_file_path)
-
     matched_files = _matched_input_files(conn, input)
     if not matched_files:
         raise click.ClickException(
@@ -235,9 +290,35 @@ def sample_candidates(
             f"empty manifest entry."
         )
 
+    resolved_n_projected_dims, resolved_n_quantiles_per_dim = (
+        _resolve_stratification_shape(
+            conn,
+            input,
+            n_projected_dims=n_projected_dims,
+            n_quantiles_per_dim=n_quantiles_per_dim,
+            target_total_samples=target_total_samples,
+            desired_cap_per_stratum=desired_cap_per_stratum,
+        )
+    )
+
+    config = StratificationConfig(
+        features=features,
+        n_projected_dims=resolved_n_projected_dims,
+        projection_density=projection_density,
+        random_seed=random_seed,
+        n_quantiles_per_dim=resolved_n_quantiles_per_dim,
+        cap_per_stratum=cap_per_stratum,
+        target_total_samples=target_total_samples,
+        min_stratum_size_for_cap=min_stratum_size_for_cap,
+    )
+
+    manifest_file_path = manifest_path(output)
+    manifest = load_manifest(fs, manifest_file_path)
+
     # cap_per_stratum is only known after n_strata is computed, so it is
     # excluded here; requested_params otherwise reflects every input that
-    # can change sampling output.
+    # can change sampling output, including the (possibly autotuned)
+    # n_projected_dims/n_quantiles_per_dim actually used.
     requested_params = serialize_params(config, cap_per_stratum=None)
 
     existing_entry = manifest["globs"].get(input)
@@ -271,12 +352,12 @@ def sample_candidates(
     conn.register("projected_table", projected_table)
     binner = fit_quantile_bins("projected_table", config, connection=conn)
 
-    n_strata = conn.execute(binner.count_strata_query("projected_table")).fetchone()
+    res = conn.execute(binner.count_strata_query("projected_table")).fetchone()
 
-    if not n_strata:
-        raise click.ClickException(f"No strata available from '{input}'.")
+    if res:
+        n_strata = res[0]
     else:
-        n_strata = n_strata[0]
+        raise click.ClickException(f"No strata available from '{input}'.")
 
     resolved_cap_per_stratum = resolve_cap_per_stratum(config, n_strata)
     query = build_capped_sample_query(

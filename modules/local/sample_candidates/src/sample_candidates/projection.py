@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import io
 import json
+import logging
+import time
 from dataclasses import dataclass
 from typing import cast
 
@@ -14,6 +16,8 @@ from sklearn.decomposition import TruncatedSVD
 from sklearn.random_projection import SparseRandomProjection
 
 from sample_candidates.config import FeatureSpec, StratificationConfig
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -313,6 +317,7 @@ def _combined_feature_matrix(
 
 
 def fit_projection(table: pa.Table, config: StratificationConfig) -> ProjectionModel:
+    time_start = time.perf_counter()
     combined, scalar_normalizers, array_reducers = _combined_feature_matrix(
         table, config, scalar_normalizers=None, array_reducers=None
     )
@@ -324,6 +329,8 @@ def fit_projection(table: pa.Table, config: StratificationConfig) -> ProjectionM
     )
     transformer.fit(combined)
 
+    logger.info("fit_projection: %f", time.perf_counter() - time_start)
+
     return ProjectionModel(
         config=config,
         transformer=transformer,
@@ -333,6 +340,7 @@ def fit_projection(table: pa.Table, config: StratificationConfig) -> ProjectionM
 
 
 def project_batch(table: pa.Table, model: ProjectionModel) -> pa.Table:
+    time_start = time.perf_counter()
     combined, _, _ = _combined_feature_matrix(
         table,
         model.config,
@@ -352,5 +360,7 @@ def project_batch(table: pa.Table, model: ProjectionModel) -> pa.Table:
     result = table
     for name, arr in projected_columns.items():
         result = result.append_column(name, arr)
+
+    logger.info("project_batch: %f", time.perf_counter() - time_start)
 
     return result
