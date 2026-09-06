@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Iterable, Iterator
+from typing import Iterable, Iterator, Optional
 
+import fsspec
 import pyarrow as pa
 import pyarrow.parquet as pq
 
@@ -139,29 +140,48 @@ def docking_results_to_table(
     return pa.Table.from_batches(batches, schema=DOCKING_RESULTS_SCHEMA)
 
 
-def write_docking_results_parquet(
+def _write_batches(
+    writer: pq.ParquetWriter,
+    results_iter: Iterable[tuple[str, list[DockingResult]]],
+    *,
+    conformational_state_id: str,
+    site_id: str,
+    batch_rows: int,
+) -> int:
+    row_count = 0
+    for batch in iter_docking_result_batches(
+        results_iter,
+        conformational_state_id=conformational_state_id,
+        site_id=site_id,
+        batch_rows=batch_rows,
+    ):
+        writer.write_batch(batch)
+        row_count += batch.num_rows
+
+    if row_count == 0:
+        # No poses at all (e.g. every ligand failed to dock): still emit
+        # a valid, empty Parquet file matching the schema rather than
+        # leaving no file or an unopened one.
+        writer.write_batch(_rows_to_record_batch([]))
+
+    return row_count
+
+
+def _write_docking_results_parquet_local(
     results_iter: Iterable[tuple[str, list[DockingResult]]],
     out_path: Path,
     *,
     conformational_state_id: str,
     site_id: str,
-    compression: str = "zstd",
-    batch_rows: int = DEFAULT_STREAM_BATCH_ROWS,
-) -> None:
-    """Stream docking results to `out_path` as a single Parquet file.
+    compression: str,
+    batch_rows: int,
+) -> int:
+    """Stream results to a local `out_path`, atomically.
 
-    `results_iter` yields (ligand_id, results) pairs — typically a
-    DockingProvider.dock_batch() generator, consumed incrementally rather
-    than materialized up front. Rows are flattened and written in
-    `batch_rows`-sized RecordBatches via a single open ParquetWriter, so
-    peak memory during the write is bounded by `batch_rows` rather than
-    the total pose count.
-
-    Writes go to a temp path first and are atomically renamed to
-    `out_path` only once every batch has been written successfully. If
-    `results_iter` raises partway through (e.g. a DockingError surfaced
-    mid-docking by the provider), the partial temp file is removed and
-    the exception re-raised — `out_path` is left untouched, never a
+    Writes go to a temp path first and are renamed to `out_path` only
+    once every batch has been written successfully. If `results_iter`
+    raises partway through, the partial temp file is removed and the
+    exception re-raised — `out_path` is left untouched, never a
     truncated file, on any failure.
     """
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -171,23 +191,98 @@ def write_docking_results_parquet(
         with pq.ParquetWriter(
             tmp_path, DOCKING_RESULTS_SCHEMA, compression=compression
         ) as writer:
-            wrote_any = False
-            for batch in iter_docking_result_batches(
+            row_count = _write_batches(
+                writer,
                 results_iter,
                 conformational_state_id=conformational_state_id,
                 site_id=site_id,
                 batch_rows=batch_rows,
-            ):
-                writer.write_batch(batch)
-                wrote_any = True
-
-            if not wrote_any:
-                # No poses at all (e.g. every ligand failed to dock):
-                # still emit a valid, empty Parquet file matching the
-                # schema rather than leaving no file or an unopened one.
-                writer.write_batch(_rows_to_record_batch([]))
+            )
     except BaseException:
         tmp_path.unlink(missing_ok=True)
         raise
 
     os.replace(tmp_path, out_path)
+    return row_count
+
+
+def _write_docking_results_parquet_remote(
+    results_iter: Iterable[tuple[str, list[DockingResult]]],
+    out_path: str,
+    *,
+    filesystem: fsspec.AbstractFileSystem,
+    conformational_state_id: str,
+    site_id: str,
+    compression: str,
+    batch_rows: int,
+) -> int:
+    """Stream results to `out_path` on `filesystem` (e.g. S3/Garage).
+
+    `pq.ParquetWriter` buffers the file and only issues the underlying
+    PUT on close, so a single write to `out_path` is already atomic at
+    the object level — there is no local-disk-style partial-write window
+    to guard against, and no temp-path/rename step is needed. If
+    `results_iter` raises partway through, no object is ever written to
+    `out_path`, since `close()` (and therefore the PUT) never runs.
+    """
+    with filesystem.open(out_path, "wb") as fh:
+        with pq.ParquetWriter(
+            fh, DOCKING_RESULTS_SCHEMA, compression=compression
+        ) as writer:
+            row_count = _write_batches(
+                writer,
+                results_iter,
+                conformational_state_id=conformational_state_id,
+                site_id=site_id,
+                batch_rows=batch_rows,
+            )
+
+    return row_count
+
+
+def write_docking_results_parquet(
+    results_iter: Iterable[tuple[str, list[DockingResult]]],
+    out_path: Path | str,
+    *,
+    conformational_state_id: str,
+    site_id: str,
+    compression: str = "zstd",
+    batch_rows: int = DEFAULT_STREAM_BATCH_ROWS,
+    filesystem: Optional[fsspec.AbstractFileSystem] = None,
+) -> int:
+    """Stream docking results to `out_path` as a single Parquet file.
+
+    `results_iter` yields (ligand_id, results) pairs — typically a
+    DockingProvider.dock_batch() generator, consumed incrementally rather
+    than materialized up front. Rows are flattened and written in
+    `batch_rows`-sized RecordBatches via a single open ParquetWriter, so
+    peak memory during the write is bounded by `batch_rows` rather than
+    the total pose count.
+
+    When `filesystem` is None, `out_path` is treated as a local path and
+    written atomically via a temp-path-and-rename. When `filesystem` is
+    provided (e.g. from `lynceus_utils.storage.filesystem.get_filesystem`
+    for S3/Garage), `out_path` is treated as a key on that filesystem and
+    written directly, since the underlying PUT is already atomic.
+
+    Returns the total number of pose-rows written.
+    """
+    if filesystem is None:
+        return _write_docking_results_parquet_local(
+            results_iter,
+            Path(out_path),
+            conformational_state_id=conformational_state_id,
+            site_id=site_id,
+            compression=compression,
+            batch_rows=batch_rows,
+        )
+    else:
+        return _write_docking_results_parquet_remote(
+            results_iter,
+            str(out_path),
+            filesystem=filesystem,
+            conformational_state_id=conformational_state_id,
+            site_id=site_id,
+            compression=compression,
+            batch_rows=batch_rows,
+        )

@@ -13,7 +13,7 @@ dependencies = [
     "pydantic>=2.13.4",
     "scikit-learn>=1.9.0",
     "scipy>=1.18.0",
-    "lynceus-utils",
+    "lynceus-utils[s3]",
 ]
 
 [project.scripts]

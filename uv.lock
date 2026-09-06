@@ -785,6 +785,7 @@ source = { editable = "modules/local/docking_run" }
 dependencies = [
     { name = "click" },
     { name = "gemmi" },
+    { name = "lynceus-utils", extra = ["s3"] },
     { name = "meeko" },
     { name = "prody" },
     { name = "protein-ensemble" },
@@ -797,6 +798,7 @@ dependencies = [
 requires-dist = [
     { name = "click", specifier = ">=8.4.2" },
     { name = "gemmi", specifier = ">=0.7.5" },
+    { name = "lynceus-utils", extras = ["s3"], editable = "libs/lynceus-utils" },
     { name = "meeko", specifier = ">=0.7.1" },
     { name = "prody", specifier = ">=2.6.1" },
     { name = "protein-ensemble", git = "https://github.com/proteinensemble/python-sdk.git" },
@@ -3163,7 +3165,7 @@ source = { editable = "modules/local/sample_candidates" }
 dependencies = [
     { name = "click" },
     { name = "duckdb" },
-    { name = "lynceus-utils" },
+    { name = "lynceus-utils", extra = ["s3"] },
     { name = "numpy" },
     { name = "pyarrow" },
     { name = "pydantic" },
@@ -3175,7 +3177,7 @@ dependencies = [
 requires-dist = [
     { name = "click", specifier = ">=8.4.2" },
     { name = "duckdb", specifier = ">=1.5.4" },
-    { name = "lynceus-utils", editable = "libs/lynceus-utils" },
+    { name = "lynceus-utils", extras = ["s3"], editable = "libs/lynceus-utils" },
     { name = "numpy", specifier = ">=2.5.1" },
     { name = "pyarrow", specifier = ">=24.0.0" },
     { name = "pydantic", specifier = ">=2.13.4" },

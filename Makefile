@@ -30,7 +30,7 @@ build-detect-binding-sites:
 	docker buildx build --platform linux/amd64,linux/arm64 --push -f modules/local/detect_binding_sites/Dockerfile -t $(IMAGE_PREFIX)/detect-binding-sites:$(VERSION) .
 
 build-docking-run-gpu:
-	docker buildx build --platform linux/amd64 --push --target gpu -t $(IMAGE_PREFIX)/docking-run:gpu-$(VERSION) modules/local/docking_run
+	docker buildx build --platform linux/amd64 --push --target gpu -f modules/local/docking_run/Dockerfile -t $(IMAGE_PREFIX)/docking-run:gpu-$(VERSION) .
 
 build-nf-driver:
 	docker buildx build --platform linux/amd64 --push -f driver.Dockerfile -t $(IMAGE_PREFIX)/nf-driver:$(VERSION) .

@@ -7,6 +7,8 @@ import warnings
 from pathlib import Path
 
 import click
+from lynceus_utils.storage.blob_storage import get_blob_storage_settings
+from lynceus_utils.storage.filesystem import get_filesystem
 from protein_ensemble.accessors.pdbqt import member_to_pdbqt
 from protein_ensemble.manifest import Manifest
 
@@ -15,6 +17,14 @@ from docking_run.io import (
     count_ligand_rows,
     iter_ligand_records,
     write_docking_results_parquet,
+)
+from docking_run.manifest import (
+    build_entry,
+    existing_entry_is_valid,
+    load_manifest,
+    manifest_path,
+    run_key,
+    write_manifest,
 )
 
 from .providers import ProviderNotAvailableError, get_provider
@@ -40,7 +50,7 @@ logger = logging.getLogger(__name__)
     "--ensemble",
     type=click.Path(exists=True, path_type=Path),
     required=True,
-    help="Protein conformational ensemble package directory.",
+    help="Protein conformational ensemble package directory (local path).",
 )
 @click.option(
     "--member-id",
@@ -50,9 +60,9 @@ logger = logging.getLogger(__name__)
 )
 @click.option(
     "--ligands-path",
-    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    type=str,
     required=True,
-    help="Parquet file of candidate conformers (ligand_id, mol_bytes columns).",
+    help="Parquet file of candidate conformers (catalog_id, conformer_sdf columns).",
 )
 @click.option(
     "--center",
@@ -116,7 +126,7 @@ logger = logging.getLogger(__name__)
 )
 @click.option(
     "--out-parquet",
-    type=click.Path(path_type=Path),
+    type=str,
     required=True,
     help=(
         "Path to write docking results as a row-per-pose Parquet "
@@ -146,10 +156,18 @@ logger = logging.getLogger(__name__)
     is_flag=True,
     help="Drop residues that fail template matching instead of raising.",
 )
+@click.option(
+    "--use-blob-storage",
+    is_flag=True,
+    help="Treat --ligands-path and --out-parquet as blob storage keys.",
+)
+@click.option(
+    "--bucket", type=str, default="lynceus", help="S3-compatible bucket name."
+)
 def docking_run(
     ensemble: Path,
     member_id: str,
-    ligands_path: Path,
+    ligands_path: str,
     center: tuple[float, float, float],
     size: tuple[float, float, float],
     conformational_state_id: str,
@@ -158,11 +176,46 @@ def docking_run(
     num_modes: int,
     batch_size: int | None,
     out_dir: Path | None,
-    out_parquet: Path,
+    out_parquet: str,
     parquet_batch_rows: int,
     default_altloc: str,
     allow_bad_residues: bool,
+    use_blob_storage: bool,
+    bucket: str,
 ) -> None:
+    if use_blob_storage:
+        blob_storage_settings = get_blob_storage_settings()
+        filesystem = get_filesystem(blob_storage_settings)
+        ligands_path = f"{bucket}/{ligands_path.lstrip('/')}"
+        out_parquet = f"{bucket}/{out_parquet.lstrip('/')}"
+    else:
+        filesystem = None
+
+    manifest_filesystem = filesystem or get_filesystem(None)
+
+    ligand_row_count = count_ligand_rows(ligands_path, filesystem=filesystem)
+    logger.info("preparing %d ligands...", ligand_row_count)
+
+    manifest_file_path = manifest_path(out_parquet)
+    manifest = load_manifest(manifest_filesystem, manifest_file_path)
+    key = run_key(member_id, site_id)
+
+    existing_entry = manifest["runs"].get(key)
+    if existing_entry is not None:
+        existing_entry_is_valid(
+            manifest_filesystem, existing_entry, ligands_path, ligand_row_count
+        )
+        logger.info(
+            "Skipping member=%s site=%s: already docked "
+            "(%d poses, %d ligand rows unchanged) -> %s",
+            member_id,
+            site_id,
+            existing_entry["pose_row_count"],
+            ligand_row_count,
+            existing_entry["out_parquet"],
+        )
+        return
+
     provider_kwargs = {"search_mode": search_mode, "num_modes": num_modes}
     if out_dir:
         provider_kwargs["out_dir"] = out_dir
@@ -174,18 +227,16 @@ def docking_run(
     except ProviderNotAvailableError as exc:
         raise click.ClickException(str(exc))
 
-    logger.info("preparing %d ligands...", count_ligand_rows(ligands_path))
-
-    ligands = list(iter_ligand_records(ligands_path))
+    ligands = list(iter_ligand_records(ligands_path, filesystem=filesystem))
     if not ligands:
         raise click.ClickException(f"No ligand records found in {ligands_path}")
 
     box = SearchBox(center=center, size=size)
 
     logger.info("preparing receptor for member: %s", member_id)
-    manifest = Manifest.load(str(ensemble / "manifest.json"))
-    member = manifest.get_member(member_id)
-    structure_path = manifest.structure_path(member_id)
+    ensemble_manifest = Manifest.load(str(ensemble / "manifest.json"))
+    member = ensemble_manifest.get_member(member_id)
+    structure_path = ensemble_manifest.structure_path(member_id)
 
     try:
         pdbqt_string = member_to_pdbqt(
@@ -211,14 +262,30 @@ def docking_run(
         )
 
         try:
-            write_docking_results_parquet(
+            pose_row_count = write_docking_results_parquet(
                 results_iter,
                 out_parquet,
                 conformational_state_id=conformational_state_id,
                 site_id=site_id,
                 batch_rows=parquet_batch_rows,
+                filesystem=filesystem,
             )
         except DockingError as exc:
             raise click.ClickException(str(exc))
 
-    logger.info("Wrote docking results to %s", out_parquet)
+    entry = build_entry(
+        member_id,
+        site_id,
+        ligands_path,
+        ligand_row_count,
+        out_parquet,
+        pose_row_count,
+    )
+    manifest["runs"][key] = entry
+    write_manifest(manifest_filesystem, manifest_file_path, manifest)
+
+    logger.info(
+        "Wrote docking results to %s, updated manifest at %s",
+        out_parquet,
+        manifest_file_path,
+    )

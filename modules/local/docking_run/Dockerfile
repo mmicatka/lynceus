@@ -29,7 +29,10 @@ ENV PATH=/opt/micromamba/envs/unidock/bin:$PATH
 WORKDIR /app
 
 COPY pyproject.toml ./
-COPY src ./src
+COPY libs/lynceus-utils ./libs/lynceus-utils
+
+COPY modules/local/docking_run ./modules/local/docking_run
+WORKDIR /app/modules/local/docking_run
 
 RUN uv pip install --system .
 

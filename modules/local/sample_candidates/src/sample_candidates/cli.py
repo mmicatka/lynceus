@@ -7,10 +7,18 @@ from pathlib import Path
 
 import click
 from lynceus_utils.duckdb import file_exists, get_connection
-from lynceus_utils.storage import get_blob_storage_settings
+from lynceus_utils.storage import get_blob_storage_settings, get_filesystem
 
 from sample_candidates.binning import fit_quantile_bins
 from sample_candidates.config import FeatureKind, FeatureSpec, StratificationConfig
+from sample_candidates.manifest import (
+    build_entry,
+    existing_entry_is_valid,
+    load_manifest,
+    manifest_path,
+    serialize_params,
+    write_manifest,
+)
 from sample_candidates.projection import fit_projection, project_batch
 from sample_candidates.sampling import (
     build_capped_sample_query,
@@ -77,6 +85,14 @@ class FeatureSpecParamType(click.ParamType):
 
 
 FEATURE_SPEC = FeatureSpecParamType()
+
+
+def _matched_input_files(con, input_path: str) -> list[str]:
+    rows = con.execute(
+        "SELECT DISTINCT filename FROM read_parquet(?, filename=true)",
+        [input_path],
+    ).fetchall()
+    return sorted(row[0] for row in rows)
 
 
 @click.command()
@@ -207,6 +223,47 @@ def sample_candidates(
         input = f"s3://{bucket}/{input.lstrip('/')}"
         output = f"s3://{bucket}/{output.lstrip('/')}"
 
+    fs = get_filesystem(blob_storage_settings)
+
+    manifest_file_path = manifest_path(output)
+    manifest = load_manifest(fs, manifest_file_path)
+
+    matched_files = _matched_input_files(conn, input)
+    if not matched_files:
+        raise click.ClickException(
+            f"Glob '{input}' matched no files — refusing to write an "
+            f"empty manifest entry."
+        )
+
+    # cap_per_stratum is only known after n_strata is computed, so it is
+    # excluded here; requested_params otherwise reflects every input that
+    # can change sampling output.
+    requested_params = serialize_params(config, cap_per_stratum=None)
+
+    existing_entry = manifest["globs"].get(input)
+    if existing_entry is not None:
+        recorded_params = dict(existing_entry.get("params") or {})
+        recorded_cap = recorded_params.pop("cap_per_stratum", None)
+        if recorded_params == requested_params:
+            reconstructed_params = {**requested_params, "cap_per_stratum": recorded_cap}
+            existing_entry_is_valid(
+                conn, existing_entry, matched_files, reconstructed_params
+            )
+            logger.info(
+                "Skipping '%s': already sampled (%d rows, %d strata, "
+                "%d matched files unchanged) -> %s",
+                input,
+                existing_entry["row_count"],
+                existing_entry["n_strata"],
+                len(matched_files),
+                existing_entry["output"],
+            )
+            return
+
+    logger.info(
+        "Sampling '%s' (%d files matched) -> %s", input, len(matched_files), output
+    )
+
     raw_table = conn.execute(f"SELECT * FROM read_parquet('{input}')").to_arrow_table()
     model = fit_projection(raw_table, config)
     projected_table = project_batch(raw_table, model)
@@ -221,9 +278,9 @@ def sample_candidates(
     else:
         n_strata = n_strata[0]
 
-    cap_per_stratum = resolve_cap_per_stratum(config, n_strata)
+    resolved_cap_per_stratum = resolve_cap_per_stratum(config, n_strata)
     query = build_capped_sample_query(
-        "projected_table", binner, config, cap_per_stratum
+        "projected_table", binner, config, resolved_cap_per_stratum
     )
 
     conn.execute(f"COPY (SELECT * FROM ({query})) TO '{output}' (FORMAT PARQUET)")
@@ -246,10 +303,16 @@ def sample_candidates(
             f"No rows sampled from '{input}'; refusing to leave an empty output."
         )
 
+    params = serialize_params(config, cap_per_stratum=resolved_cap_per_stratum)
+    entry = build_entry(input, matched_files, output, params, row_count, n_strata)
+    manifest["globs"][input] = entry
+    write_manifest(fs, manifest_file_path, manifest)
+
     logger.info(
-        "Sampled %d rows across %d strata (cap=%d) -> %s",
+        "Sampled %d rows across %d strata (cap=%d) -> %s, updated manifest at %s",
         row_count,
         n_strata,
-        cap_per_stratum,
+        resolved_cap_per_stratum,
         output,
+        manifest_file_path,
     )

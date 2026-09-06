@@ -1,9 +1,9 @@
 # modules/local/docking_run/src/docking_run/io/ligand.py
 
 import logging
-from pathlib import Path
-from typing import Iterator
+from typing import Iterator, Optional
 
+import fsspec
 import pyarrow.parquet as pq
 from rdkit import Chem
 
@@ -20,8 +20,11 @@ class LigandRecordReadError(DockingError):
     contains rows that fail to parse as valid RDKit Mols."""
 
 
-def count_ligand_rows(parquet_path: Path) -> int:
-    return pq.ParquetFile(parquet_path).metadata.num_rows
+def count_ligand_rows(
+    parquet_path: str,
+    filesystem: Optional[fsspec.AbstractFileSystem] = None,
+) -> int:
+    return pq.ParquetFile(parquet_path, filesystem=filesystem).metadata.num_rows
 
 
 def _mol_from_molblock(molblock: str) -> Chem.Mol:
@@ -32,11 +35,14 @@ def _mol_from_molblock(molblock: str) -> Chem.Mol:
 
 
 def iter_ligand_records(
-    parquet_path: Path,
+    parquet_path: str,
     id_col: str = _ID_COL,
     sdf_col: str = _SDF_COL,
+    filesystem: Optional[fsspec.AbstractFileSystem] = None,
 ) -> Iterator[LigandRecord]:
-    table = pq.read_table(parquet_path, columns=[id_col, sdf_col])
+    table = pq.read_table(
+        parquet_path, columns=[id_col, sdf_col], filesystem=filesystem
+    )
 
     n_skipped_error = 0
     n_skipped_empty = 0

@@ -14,6 +14,7 @@ dependencies = [
     "tqdm>=4.70.0",
     "protein-ensemble",
     "prody>=2.6.1",
+    "lynceus-utils[s3]",
 ]
 
 [build-system]
@@ -25,3 +26,4 @@ docking-run = "docking_run.cli:docking_run"
 
 [tool.uv.sources]
 protein-ensemble = { git = "https://github.com/proteinensemble/python-sdk.git" }
+lynceus-utils = { workspace = true }

@@ -11,7 +11,7 @@ workflow SURROGATE_TRAIN {
 
     main:
     input_path = "candidates/rebalanced/**/*.parquet"
-    output_path = "s3://lynceus/candidates/sampled.parquet"
+    output_path = "candidates/sampled/sampled.parquet"
 
     ch_candidate_done = target_surfaces.map { done, _manifest, _members, _sites_path -> done }.first()
     ch_target_surfaces = target_surfaces.map { _done, manifest, members, sites_path -> tuple(manifest, members, sites_path) }
