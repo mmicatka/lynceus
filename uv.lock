@@ -784,6 +784,7 @@ version = "0.1.0"
 source = { editable = "modules/local/docking_run" }
 dependencies = [
     { name = "click" },
+    { name = "duckdb" },
     { name = "gemmi" },
     { name = "lynceus-utils", extra = ["s3"] },
     { name = "meeko" },
@@ -797,6 +798,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "click", specifier = ">=8.4.2" },
+    { name = "duckdb", specifier = ">=1.5.4" },
     { name = "gemmi", specifier = ">=0.7.5" },
     { name = "lynceus-utils", extras = ["s3"], editable = "libs/lynceus-utils" },
     { name = "meeko", specifier = ">=0.7.1" },

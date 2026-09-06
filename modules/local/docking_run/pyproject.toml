@@ -15,6 +15,7 @@ dependencies = [
     "protein-ensemble",
     "prody>=2.6.1",
     "lynceus-utils[s3]",
+    "duckdb>=1.5.4",
 ]
 
 [build-system]

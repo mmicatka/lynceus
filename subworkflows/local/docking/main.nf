@@ -1,11 +1,12 @@
 // subworkflows/local/docking/main.nf
+
 include { DOCKING_RUN } from '../../../modules/local/docking_run'
 
 workflow DOCKING {
     take:
     target_surfaces // tuple: manifest (path), members (path), sites (path) — from TARGET.out.target_surfaces
     candidates_done // sentinel: val true, emit: done — from SAMPLE_CANDIDATES
-    candidates_path // val: s3://bucket/... path SAMPLE_CANDIDATES wrote to
+    candidates_key // val: S3 key of the sampled candidates parquet
 
     main:
 
@@ -18,14 +19,13 @@ workflow DOCKING {
                 members,
                 site.site_id,
                 site.center,
-                [site.extent.radius * 2] * 3,
             )
         }
     }
 
-    ch_candidates_path = candidates_done.collect().map { file(candidates_path) }
+    ch_candidates_key = candidates_done.collect().map { true }.first().map { candidates_key }
 
-    DOCKING_RUN(docking_jobs_ch, ch_candidates_path)
+    DOCKING_RUN(docking_jobs_ch, "lynceus", ch_candidates_key)
 
     emit:
     results = DOCKING_RUN.out.results

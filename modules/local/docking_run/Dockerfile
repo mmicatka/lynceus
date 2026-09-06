@@ -35,5 +35,6 @@ COPY modules/local/docking_run ./modules/local/docking_run
 WORKDIR /app/modules/local/docking_run
 
 RUN uv pip install --system .
+RUN python -c "import duckdb; duckdb.execute('INSTALL httpfs')"
 
 ENTRYPOINT []

@@ -7,6 +7,7 @@ import warnings
 from pathlib import Path
 
 import click
+from lynceus_utils.duckdb import get_connection
 from lynceus_utils.storage.blob_storage import get_blob_storage_settings
 from lynceus_utils.storage.filesystem import get_filesystem
 from protein_ensemble.accessors.pdbqt import member_to_pdbqt
@@ -73,7 +74,7 @@ logger = logging.getLogger(__name__)
 @click.option(
     "--size",
     type=(float, float, float),
-    required=True,
+    default=(25.0, 25.0, 25.0),
     help="Search box size, Angstroms (X Y Z).",
 )
 @click.option(
@@ -185,26 +186,26 @@ def docking_run(
 ) -> None:
     if use_blob_storage:
         blob_storage_settings = get_blob_storage_settings()
-        filesystem = get_filesystem(blob_storage_settings)
-        ligands_path = f"{bucket}/{ligands_path.lstrip('/')}"
-        out_parquet = f"{bucket}/{out_parquet.lstrip('/')}"
+        conn = get_connection(blob_storage_settings)
+        fs = get_filesystem(blob_storage_settings)
+        ligands_path = f"s3://{bucket}/{ligands_path.lstrip('/')}"
+        out_parquet = f"s3://{bucket}/{out_parquet.lstrip('/')}"
     else:
-        filesystem = None
+        conn = get_connection()
+        fs = get_filesystem(None)
 
-    manifest_filesystem = filesystem or get_filesystem(None)
+    logger.info("ligands_path: %s", ligands_path)
 
-    ligand_row_count = count_ligand_rows(ligands_path, filesystem=filesystem)
+    ligand_row_count = count_ligand_rows(ligands_path, conn=conn)
     logger.info("preparing %d ligands...", ligand_row_count)
 
     manifest_file_path = manifest_path(out_parquet)
-    manifest = load_manifest(manifest_filesystem, manifest_file_path)
+    manifest = load_manifest(fs, manifest_file_path)
     key = run_key(member_id, site_id)
 
     existing_entry = manifest["runs"].get(key)
     if existing_entry is not None:
-        existing_entry_is_valid(
-            manifest_filesystem, existing_entry, ligands_path, ligand_row_count
-        )
+        existing_entry_is_valid(fs, existing_entry, ligands_path, ligand_row_count)
         logger.info(
             "Skipping member=%s site=%s: already docked "
             "(%d poses, %d ligand rows unchanged) -> %s",
@@ -227,7 +228,7 @@ def docking_run(
     except ProviderNotAvailableError as exc:
         raise click.ClickException(str(exc))
 
-    ligands = list(iter_ligand_records(ligands_path, filesystem=filesystem))
+    ligands = list(iter_ligand_records(ligands_path, conn=conn))
     if not ligands:
         raise click.ClickException(f"No ligand records found in {ligands_path}")
 
@@ -268,7 +269,7 @@ def docking_run(
                 conformational_state_id=conformational_state_id,
                 site_id=site_id,
                 batch_rows=parquet_batch_rows,
-                filesystem=filesystem,
+                conn=conn,
             )
         except DockingError as exc:
             raise click.ClickException(str(exc))
@@ -282,7 +283,7 @@ def docking_run(
         pose_row_count,
     )
     manifest["runs"][key] = entry
-    write_manifest(manifest_filesystem, manifest_file_path, manifest)
+    write_manifest(fs, manifest_file_path, manifest)
 
     logger.info(
         "Wrote docking results to %s, updated manifest at %s",

@@ -3,8 +3,7 @@
 import logging
 from typing import Iterator, Optional
 
-import fsspec
-import pyarrow.parquet as pq
+import duckdb
 from rdkit import Chem
 
 from docking_run.types import DockingError, LigandRecord
@@ -22,9 +21,15 @@ class LigandRecordReadError(DockingError):
 
 def count_ligand_rows(
     parquet_path: str,
-    filesystem: Optional[fsspec.AbstractFileSystem] = None,
+    conn: Optional[duckdb.DuckDBPyConnection] = None,
 ) -> int:
-    return pq.ParquetFile(parquet_path, filesystem=filesystem).metadata.num_rows
+    connection = conn or duckdb.connect()
+    res = connection.sql(
+        f"SELECT COUNT(*) FROM read_parquet('{parquet_path}')"
+    ).fetchone()
+    if res is None:
+        raise RuntimeError(f"DuckDB query returned no relation for {parquet_path}")
+    return res[0]
 
 
 def _mol_from_molblock(molblock: str) -> Chem.Mol:
@@ -38,19 +43,17 @@ def iter_ligand_records(
     parquet_path: str,
     id_col: str = _ID_COL,
     sdf_col: str = _SDF_COL,
-    filesystem: Optional[fsspec.AbstractFileSystem] = None,
+    conn: Optional[duckdb.DuckDBPyConnection] = None,
 ) -> Iterator[LigandRecord]:
-    table = pq.read_table(
-        parquet_path, columns=[id_col, sdf_col], filesystem=filesystem
+    connection = conn or duckdb.connect()
+    rel = connection.sql(
+        f"SELECT {id_col}, {sdf_col} FROM read_parquet($path)",
+        params={"path": parquet_path},
     )
 
-    n_skipped_error = 0
     n_skipped_empty = 0
 
-    ids = table[id_col].to_pylist()
-    sdfs = table[sdf_col].to_pylist()
-
-    for catalog_id, molblock in zip(ids, sdfs):
+    for catalog_id, molblock in rel.fetchall():
         if not molblock:
             n_skipped_empty += 1
             logger.warning(
@@ -64,7 +67,7 @@ def iter_ligand_records(
         mol = _mol_from_molblock(molblock)
         yield LigandRecord(ligand_id=catalog_id, mol_bytes=mol.ToBinary())
 
-    if n_skipped_error or n_skipped_empty:
+    if n_skipped_empty:
         raise LigandRecordReadError(
             f"{n_skipped_empty} row(s) skipped due to empty {sdf_col} with no "
             f"error_reason -- refusing to proceed with a partial ligand set. "
