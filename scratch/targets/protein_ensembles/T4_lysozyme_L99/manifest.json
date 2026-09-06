@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "0.1.0",
+  "id": "T4_lysozyme_L99",
+  "contentHash": "blake3:c974764573faffd87c10ce5ddf253d188f0d0baac6bb2be2bc1d295452c71fba",
+  "members": {
+    "1L83": {
+      "structure": {
+        "uri": "members/1L83.cif"
+      },
+      "structureHash": "blake3:9d3911c640f17c0e8ddb06d7ade90f4383c9e1c1c7949960f8897497a0cc1a1e"
+    }
+  }
+}

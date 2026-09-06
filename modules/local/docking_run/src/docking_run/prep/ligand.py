@@ -47,7 +47,7 @@ def materialize_ligands(
 ) -> Generator[dict[str, Path], None, None]:
     """Write each LigandRecord to a temp PDBQT file. Yields ligand_id -> Path.
     Cleans up the temp directory on context exit."""
-    with TemporaryDirectory(prefix="docking_ligands_") as tmp:
+    with TemporaryDirectory(prefix="docking_ligands_", delete=False) as tmp:
         tmp_path = Path(tmp)
         paths: dict[str, Path] = {}
         for ligand in ligands:

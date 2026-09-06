@@ -1,0 +1,12 @@
+{
+  "runs": {
+    "1L83::1L83:p2rank:1": {
+      "ligand_row_count": 3583,
+      "ligands_path": "sample/shard_0.parquet",
+      "member_id": "1L83",
+      "out_parquet": "docking_run/output.1.parquet",
+      "pose_row_count": 3569,
+      "site_id": "1L83:p2rank:1"
+    }
+  }
+}

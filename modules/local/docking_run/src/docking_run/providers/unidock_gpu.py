@@ -20,6 +20,8 @@ _DEFAULT_BATCH_SIZE = 1000
 _DEFAULT_SEARCH_MODE = "balance"
 _DEFAULT_NUM_MODES = 9
 
+_MIN_BOX_SIZE = 25.0
+
 _UNIDOCK_BINARY = "unidock"
 _SCORING_MODE_VINA = "vina"
 
@@ -273,11 +275,11 @@ class UnidockGPUProvider(DockingProvider):
             "--center_z",
             str(box.center[2]),
             "--size_x",
-            str(box.size[0]),
+            str(max(_MIN_BOX_SIZE, box.size[0])),
             "--size_y",
-            str(box.size[1]),
+            str(max(_MIN_BOX_SIZE, box.size[1])),
             "--size_z",
-            str(box.size[2]),
+            str(max(_MIN_BOX_SIZE, box.size[2])),
             "--num_modes",
             str(self.num_modes),
             "--dir",
