@@ -1,9 +1,12 @@
 # modules/local/preprocess_candidates/src/preprocess_candidates/preprocess.py
 
+# modules/local/preprocess_candidates/src/preprocess_candidates/preprocess.py
+
 import gzip
 import logging
 import os
 import sys
+import time
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 from typing import Any, Iterator
@@ -11,9 +14,9 @@ from typing import Any, Iterator
 import click
 import pyarrow as pa
 import pyarrow.parquet as pq
-from lynceus_utils.duckdb import export_parquet, file_exists, get_connection
 from lynceus_utils.storage.blob_storage import get_blob_storage_settings
-from rdkit import Chem, RDLogger
+from pyarrow.fs import FileType, LocalFileSystem, S3FileSystem
+from rdkit import Chem, rdBase
 
 from .steps import (
     ConformersStep,
@@ -25,7 +28,7 @@ from .steps import (
 
 # RDKit prints a lot of low-level parsing warnings to stderr by default;
 # we handle/report parse failures ourselves, so silence RDKit's own logger.
-RDLogger.DisableLog("rdApp.*")
+rdBase.DisableLog("rdApp.*")
 
 logging.basicConfig(
     level=logging.INFO,
@@ -35,8 +38,7 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
-_LOG_INTERVAL = 1_000
-_BATCH_SIZE = 1_000
+_LOG_INTERVAL = 1000
 
 _worker_steps: list[Step] = []
 
@@ -111,6 +113,7 @@ def _batch(iterator: Iterator, size: int) -> Iterator[list]:
 def _process_batch(batch: list[tuple[str, str]]) -> list[dict[str, Any]]:
     """Worker function to process a batch of molecules."""
     results = []
+
     for smiles, catalog_id in batch:
         row = {
             "catalog_id": catalog_id,
@@ -140,14 +143,20 @@ def _process_batch(batch: list[tuple[str, str]]) -> list[dict[str, Any]]:
                     row.update(step.failure_result())
 
         results.append(row)
+
     return results
 
 
 def _preprocess(
     input_path: Path,
     num_workers: int,
+    batch_size: int,
     steps: list[Step],
-) -> pa.Table:
+    target_path: str,
+    filesystem: Any,
+) -> None:
+    start_time = time.perf_counter()
+
     input_path = Path(input_path)
 
     logger.info("Counting total molecules in %s...", input_path.name)
@@ -164,25 +173,31 @@ def _preprocess(
 
     total_processed = 0
     next_log_at = _LOG_INTERVAL
-    record_batches: list[pa.RecordBatch] = []
 
-    with ProcessPoolExecutor(
-        max_workers=num_workers, initializer=_init_worker, initargs=(steps,)
-    ) as executor:
-        iterator = _iter_smiles(input_path)
-        batches = _batch(iterator, _BATCH_SIZE)
+    path_obj = Path(target_path)
+    temp_path = str(path_obj.with_name(f".{path_obj.name}"))
 
-        for results in executor.map(_process_batch, batches):
-            record_batches.append(_results_to_batch(results, schema))
+    logger.info("Streaming directly to temporary path: %s", temp_path)
 
-            total_processed += len(results)
-            if total_processed >= next_log_at:
-                logger.info(
-                    "Processed %d of %d molecules...",
-                    total_processed,
-                    total_molecules,
-                )
-                next_log_at = total_processed + _LOG_INTERVAL
+    with pq.ParquetWriter(temp_path, schema, filesystem=filesystem) as writer:
+        with ProcessPoolExecutor(
+            max_workers=num_workers, initializer=_init_worker, initargs=(steps,)
+        ) as executor:
+            iterator = _iter_smiles(input_path)
+            batches = _batch(iterator, batch_size)
+
+            for results in executor.map(_process_batch, batches):
+                batch_data = _results_to_batch(results, schema)
+                writer.write_batch(batch_data)
+
+                total_processed += len(results)
+                if total_processed >= next_log_at:
+                    logger.info(
+                        "Processed %d of %d molecules...",
+                        total_processed,
+                        total_molecules,
+                    )
+                    next_log_at = total_processed + _LOG_INTERVAL
 
     if total_processed == 0:
         logger.error(
@@ -191,13 +206,21 @@ def _preprocess(
         )
         sys.exit(1)
 
-    logger.info(
-        "Finished preprocessing. Processed %d of %d molecules.",
-        total_processed,
-        total_molecules,
-    )
+    logger.info("Finished processing. Renaming %s -> %s", temp_path, target_path)
 
-    return pa.Table.from_batches(record_batches, schema=schema)
+    filesystem.move(temp_path, target_path)
+
+    logger.info("Rename complete.")
+
+    elapsed_time = time.perf_counter() - start_time
+    mols_per_sec = total_processed / elapsed_time if elapsed_time > 0 else 0
+
+    logger.info(
+        "Processed %d molecules in %.2f seconds (%.2f mol/s)",
+        total_processed,
+        elapsed_time,
+        mols_per_sec,
+    )
 
 
 def _build_pipeline(morgan_radius: int, morgan_n_bits: int, seed: int) -> list[Step]:
@@ -207,10 +230,6 @@ def _build_pipeline(morgan_radius: int, morgan_n_bits: int, seed: int) -> list[S
         MorganFingerprintStep(morgan_radius, morgan_n_bits),
         ConformersStep(seed=seed),
     ]
-
-
-def _write_local_parquet(table: pa.Table, output: str):
-    pq.write_table(table, output)
 
 
 class NumWorkersType(click.ParamType):
@@ -256,6 +275,7 @@ NUM_WORKERS = NumWorkersType()
     show_default=True,
     help="Number of parallel workers (integer >= 1 or 'auto').",
 )
+@click.option("--batch-size", default=50, type=int, help="Batch size")
 @click.option(
     "--seed",
     default=1000,
@@ -268,7 +288,7 @@ NUM_WORKERS = NumWorkersType()
     is_flag=True,
     help="Output Parquet file to blob storage.",
 )
-@click.option("--bucket", type=str, default="lynceus", help="Output bucket name")
+@click.option("--bucket", default="lynceus", type=str, help="Output bucket name")
 @click.option(
     "--skip-if-exists",
     is_flag=True,
@@ -282,26 +302,35 @@ def preprocess(
     use_blob_storage: bool,
     bucket: str,
     skip_if_exists: bool,
+    batch_size: int,
 ):
     if use_blob_storage:
-        blob_storage_settings = get_blob_storage_settings()
-        output = f"s3://{bucket}/{output.lstrip('/')}"
+        blob_settings = get_blob_storage_settings()
+        target_path = f"{bucket}/{output.lstrip('/')}"
+        filesystem = S3FileSystem(
+            access_key=blob_settings.access_key_id,
+            secret_key=blob_settings.access_key,
+            endpoint_override=blob_settings.endpoint,
+            region=blob_settings.region,
+            scheme="https" if blob_settings.use_ssl else "http",
+        )
     else:
-        blob_storage_settings = None
-
-    conn = get_connection(blob_storage_settings)
+        target_path = output
+        filesystem = LocalFileSystem()
 
     if skip_if_exists:
-        if file_exists(conn, output):
-            logger.info(f"{output} already exists. Skipping.")
+        file_info = filesystem.get_file_info(target_path)
+        if file_info.type != FileType.NotFound:
+            logger.info("%s already exists. Skipping.", target_path)
             return
 
     steps = _build_pipeline(2, 1024, seed)
 
-    table: pa.Table = _preprocess(
-        input_path=input_path,
+    _preprocess(
+        input_path=Path(input_path),
         num_workers=num_workers,
+        batch_size=batch_size,
         steps=steps,
+        target_path=target_path,
+        filesystem=filesystem,
     )
-
-    export_parquet(conn, table, output)

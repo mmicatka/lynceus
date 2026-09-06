@@ -6,14 +6,12 @@ include { REBALANCE_CANDIDATES } from '../../../modules/local/rebalance_candidat
 
 workflow CANDIDATE {
   take:
-  bucket
-  num_per_shard
-  filter_config
+  config
 
   main:
-  directory = "s3://${bucket}/candidates"
+  directory = "s3://${config.bucket}/candidates"
 
-  tranches = ["TEST"]
+  tranches = config.tranches
 
   def pattern = tranches.size() == 1
     ? "${directory}/raw/${tranches[0]}/*.smi.gz"
@@ -26,9 +24,8 @@ workflow CANDIDATE {
       def expected = file("${directory}/preprocessed/${tranche}/${stem}.parquet")
       !expected.exists()
     }
-    .view()
 
-  PREPROCESS_CANDIDATES(ch_smi_gz, bucket)
+  PREPROCESS_CANDIDATES(ch_smi_gz, config.bucket)
 
   _ch_preprocess_done = PREPROCESS_CANDIDATES.out.done
     .collect()
@@ -37,11 +34,16 @@ workflow CANDIDATE {
   REBALANCE_CANDIDATES(
     _ch_preprocess_done.map { "${directory}/preprocessed/**/*.parquet" },
     "candidates/rebalanced",
-    bucket,
-    num_per_shard,
+    config.bucket,
+    config.num_per_shard,
   )
 
-  ch_rebalanced = REBALANCE_CANDIDATES.out.done.flatMap { file("${directory}/rebalanced/*.parquet") }.ifEmpty { true }
+  ch_rebalanced = REBALANCE_CANDIDATES.out.done
+    .flatMap { files("${directory}/rebalanced/*.parquet") }
+    .map { f -> "${directory}/rebalanced/${f.name}" }
 
-  PHYSIOCHEMICAL_FILTER(ch_rebalanced, filter_config, bucket)
+  PHYSIOCHEMICAL_FILTER(ch_rebalanced, config.filter_config, config.bucket)
+
+  emit:
+  done = PHYSIOCHEMICAL_FILTER.out.done
 }

@@ -6,23 +6,37 @@ s3_region: garage
 s3_url_style: path
 
 candidates:
-  num_per_shard: 1000000
   bucket: lynceus
+  tranches:
+    - TEST
 
-  filter_config: "/app/lynceus/work/conf/examples/physiochemical_filter.yaml"
+  num_per_shard: 1000000
 
-surrogate_model:
-  training:
-    seed: 1000
-    num_samples: 10000
+  filter_config:
+    pains:
+      enabled: true
+
+    cns_mpo:
+      enabled: true
+      min_score: 4.0
+
+surrogate:
+  train:
+    sample:
+      seed: 1000
+      num_samples: 100000
+      fields:
+        - name: morgan_fingerprint
+          kind: array
+          reduced_dims: 32
+        - name: molecular_weight
+          kind: scalar
+        - name: calculated_distribution_coefficient
+          kind: scalar
+        - name: topological_polar_surface_area
+          kind: scalar
 
 target:
-  ensemble:
-    ensemble_id: "T4_lysozyme_L99_static"
-    type: "static"
-    components:
-      - pdb_id: "1L83"
-        weight: 1.0
-
-    capabilities_required:
-      - "standalone_cif"
+  ensemble_id: "T4_lysozyme_L99"
+  ensemble_path: "s3://lynceus/targets/protein_ensembles/T4_lysozyme_L99"
+  bucket: lynceus

@@ -1,22 +1,19 @@
 // subworkflows/target/main.nf
 
-include { RETRIEVE_PDB } from '../../../modules/local/retrieve_pdb'
-include { GENERATE_MANIFEST } from '../../../modules/local/generate_manifest'
+include { DETECT_BINDING_SITES } from '../../../modules/local/detect_binding_sites'
 
 workflow TARGET {
   take:
-  config
+  ch_ensemble // tuple(val(ensemble_id), path(manifest), path(members))
 
   main:
-  def pdb_ids = config.components.collect { component -> component.pdb_id }
+  DETECT_BINDING_SITES(ch_ensemble)
 
-  ch_retrieve_input = channel.of(
-    tuple(config.ensemble_id, pdb_ids)
-  )
-
-  RETRIEVE_PDB(ch_retrieve_input)
-  GENERATE_MANIFEST(RETRIEVE_PDB.out.structure_dir)
+  ch_target_surfaces = DETECT_BINDING_SITES.out.sites
+    .join(ch_ensemble)
+    .map { _ensemble_id, sites_path, manifest, members -> tuple(manifest, members, sites_path) }
 
   emit:
-  protein_conformational_ensemble = GENERATE_MANIFEST.out.protein_conformational_ensemble
+  target_surfaces = ch_target_surfaces // tuple(path(manifest), path(members), path(sites_path))
+  ensemble = ch_ensemble // tuple(val(ensemble_id), path(manifest), path(members))
 }

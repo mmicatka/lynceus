@@ -22,6 +22,7 @@ process PREPROCESS_CANDIDATES {
         --use-blob-storage \\
         --bucket ${bucket} \\
         --num-workers ${task.cpus} \\
+        --batch-size 25 \\
         --skip-if-exists
     """
 }

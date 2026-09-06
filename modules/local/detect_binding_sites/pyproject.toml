@@ -1,0 +1,19 @@
+# modules/local/detect_binding_sites/pyproject.toml
+
+[project]
+name = "detect-binding-sites"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.12"
+dependencies = ["click>=8.4.2", "gemmi>=0.7.5", "protein-ensemble"]
+
+[project.scripts]
+detect-binding-sites = "detect_binding_sites.detect_binding_sites:detect_binding_sites"
+
+[build-system]
+requires = ["uv_build>=0.11.30,<0.12.0"]
+build-backend = "uv_build"
+
+
+[tool.uv.sources]
+protein-ensemble = { git = "https://github.com/proteinensemble/python-sdk.git" }
