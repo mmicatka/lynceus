@@ -19,14 +19,13 @@ process DOCKING_RUN {
 
     script:
     def (cx, cy, cz) = center
-    def (sx, sy, sz) = size
     """
     docking-run \\
         --ensemble ensemble \\
         --member-id ${conformational_state_id} \\
         --ligands-path '${candidates_path}' \\
         --center ${cx} ${cy} ${cz} \\
-        --size ${sx} ${sy} ${sz} \\
+        --size 25.0 25.0 25.0 \\
         --out-dir \$PWD/unidock_gpu_out \\
         --out-parquet ${conformational_state_id}.${site_id}.output.parquet \\
         --conformational-state-id ${conformational_state_id} \\
