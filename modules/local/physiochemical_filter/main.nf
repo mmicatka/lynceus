@@ -6,18 +6,18 @@ process PHYSIOCHEMICAL_FILTER {
     label 'pvc_io_retry'
 
     input:
-    path candidate
+    val candidate
     val filter_config
     val bucket
 
     output:
-    val (candidate), emit: done
+    val candidate, emit: done
 
     when:
     task.ext.when == null || task.ext.when
 
     script:
-    def prefix = candidate.simpleName
+    def prefix = candidate.replaceAll(/\.parquet$/, '')
     def mw_min = filter_config?.molecular_weight?.min != null ? "--mol-weight-min ${filter_config.molecular_weight.min}" : ""
     def mw_max = filter_config?.molecular_weight?.max != null ? "--mol-weight-max ${filter_config.molecular_weight.max}" : ""
     def ha_min = filter_config?.heavy_atom?.min != null ? "--heavy-atom-min ${filter_config.heavy_atom.min}" : ""

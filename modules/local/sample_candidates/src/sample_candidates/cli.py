@@ -285,10 +285,7 @@ def sample_candidates(
 
     matched_files = _matched_input_files(conn, input)
     if not matched_files:
-        raise click.ClickException(
-            f"Glob '{input}' matched no files — refusing to write an "
-            f"empty manifest entry."
-        )
+        raise click.ClickException(f"Glob '{input}' matched no files")
 
     resolved_n_projected_dims, resolved_n_quantiles_per_dim = (
         _resolve_stratification_shape(
@@ -368,8 +365,7 @@ def sample_candidates(
 
     if not file_exists(conn, output):
         raise click.ClickException(
-            f"COPY reported success but {output} is not readable back "
-            "via read_parquet — write did not land"
+            f"COPY reported success but {output} is not readable back via read_parquet"
         )
 
     row_count, n_strata = conn.execute(

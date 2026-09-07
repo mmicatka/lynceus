@@ -48,7 +48,7 @@ def _apply_property_filters(
             continue
         if name not in columns:
             logger.warning(
-                "Configured property filter %r not found in input columns — skipping",
+                "Configured property filter %r not found in input columns",
                 name,
             )
             continue

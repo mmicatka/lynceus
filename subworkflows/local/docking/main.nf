@@ -4,8 +4,8 @@ include { DOCKING_RUN } from '../../../modules/local/docking_run'
 
 workflow DOCKING {
     take:
-    target_surfaces // tuple: manifest (path), members (path), sites (path) — from TARGET.out.target_surfaces
-    candidates_done // sentinel: val true, emit: done — from SAMPLE_CANDIDATES
+    target_surfaces // tuple: manifest (path), members (path), sites (path)
+    candidates_done // sentinel: val true, emit: done
     candidates_key // val: S3 key of the sampled candidates parquet
 
     main:
