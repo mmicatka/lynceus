@@ -4,8 +4,7 @@ from __future__ import annotations
 
 import io
 import json
-import logging
-import time
+import os
 from dataclasses import dataclass
 from typing import cast
 
@@ -16,8 +15,6 @@ from sklearn.decomposition import TruncatedSVD
 from sklearn.random_projection import SparseRandomProjection
 
 from sample_candidates.config import FeatureSpec, StratificationConfig
-
-logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -80,33 +77,50 @@ def _fit_array_reducer(
 
 
 def _stack_array_column(arr_column: pa.ChunkedArray, field: str) -> sparse.csr_matrix:
-    arr_lists = arr_column.to_pylist()
+    if not pa.types.is_list(arr_column.type) and not pa.types.is_large_list(
+        arr_column.type
+    ):
+        raise ValueError(
+            f"Fingerprint field '{field}' must be a list-typed column, "
+            f"got {arr_column.type}."
+        )
 
-    n_rows = len(arr_lists)
+    n_rows = len(arr_column)
     if n_rows == 0:
         raise ValueError(f"Fingerprint field '{field}' has no rows.")
 
-    first_non_null = next((bits for bits in arr_lists if bits is not None), None)
-    if first_non_null is None:
-        raise ValueError(f"Fingerprint field '{field}' is entirely null.")
-    n_bits = len(first_non_null)
+    if arr_column.null_count > 0:
+        null_indices = [
+            i for i, valid in enumerate(arr_column.is_valid().to_pylist()) if not valid
+        ]
+        raise ValueError(
+            f"Null array value(s) at row(s) {null_indices[:5]}"
+            f"{'...' if len(null_indices) > 5 else ''} in field '{field}'; "
+            "array feature step must run and succeed before stratification."
+        )
 
-    dense = np.zeros((n_rows, n_bits), dtype=np.float32)
+    combined = arr_column.combine_chunks()
+    offsets = combined.offsets.to_numpy(zero_copy_only=False)
+    row_lengths = np.diff(offsets)
 
-    for row_idx, bits in enumerate(arr_lists):
-        if bits is None:
-            raise ValueError(
-                f"Null array value at row {row_idx} in field '{field}'; "
-                "array feature step must run and succeed before stratification."
-            )
-        if len(bits) != n_bits:
-            raise ValueError(
-                f"Fingerprint at row {row_idx} in field '{field}' has length "
-                f"{len(bits)}, expected {n_bits}."
-            )
-        dense[row_idx] = bits
+    n_bits = int(row_lengths[0])
+    if not np.all(row_lengths == n_bits):
+        bad_row = int(np.flatnonzero(row_lengths != n_bits)[0])
+        raise ValueError(
+            f"Fingerprint at row {bad_row} in field '{field}' has length "
+            f"{int(row_lengths[bad_row])}, expected {n_bits}."
+        )
 
-    return sparse.csr_matrix(dense)
+    values = combined.values.to_numpy(zero_copy_only=False).astype(np.float32)
+    nonzero_mask = values != 0.0
+
+    row_ids = np.repeat(np.arange(n_rows), row_lengths)
+    col_ids = np.arange(len(values)) - np.repeat(offsets[:-1], row_lengths)
+
+    return sparse.csr_matrix(
+        (values[nonzero_mask], (row_ids[nonzero_mask], col_ids[nonzero_mask])),
+        shape=(n_rows, n_bits),
+    )
 
 
 def _build_scalar_matrix(
@@ -317,7 +331,6 @@ def _combined_feature_matrix(
 
 
 def fit_projection(table: pa.Table, config: StratificationConfig) -> ProjectionModel:
-    time_start = time.perf_counter()
     combined, scalar_normalizers, array_reducers = _combined_feature_matrix(
         table, config, scalar_normalizers=None, array_reducers=None
     )
@@ -329,8 +342,6 @@ def fit_projection(table: pa.Table, config: StratificationConfig) -> ProjectionM
     )
     transformer.fit(combined)
 
-    logger.info("fit_projection: %f", time.perf_counter() - time_start)
-
     return ProjectionModel(
         config=config,
         transformer=transformer,
@@ -340,7 +351,6 @@ def fit_projection(table: pa.Table, config: StratificationConfig) -> ProjectionM
 
 
 def project_batch(table: pa.Table, model: ProjectionModel) -> pa.Table:
-    time_start = time.perf_counter()
     combined, _, _ = _combined_feature_matrix(
         table,
         model.config,
@@ -361,6 +371,18 @@ def project_batch(table: pa.Table, model: ProjectionModel) -> pa.Table:
     for name, arr in projected_columns.items():
         result = result.append_column(name, arr)
 
-    logger.info("project_batch: %f", time.perf_counter() - time_start)
-
     return result
+
+
+def _pin_blas_to_single_thread() -> None:
+    os.environ["OPENBLAS_NUM_THREADS"] = "1"
+    os.environ["OMP_NUM_THREADS"] = "1"
+    os.environ["MKL_NUM_THREADS"] = "1"
+
+
+def _project_batch_worker(
+    batch: pa.RecordBatch, model: ProjectionModel
+) -> pa.RecordBatch:
+    _pin_blas_to_single_thread()
+    projected_table = project_batch(pa.Table.from_batches([batch]), model)
+    return projected_table.to_batches()[0]

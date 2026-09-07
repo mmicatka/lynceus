@@ -10,6 +10,7 @@ from lynceus_utils.duckdb import file_exists, get_connection
 from lynceus_utils.storage import get_blob_storage_settings, get_filesystem
 
 from sample_candidates.autotune import suggest_stratification_shape
+from sample_candidates.batch_projection import project_all_batches
 from sample_candidates.binning import fit_quantile_bins
 from sample_candidates.config import FeatureKind, FeatureSpec, StratificationConfig
 from sample_candidates.manifest import (
@@ -20,7 +21,7 @@ from sample_candidates.manifest import (
     serialize_params,
     write_manifest,
 )
-from sample_candidates.projection import fit_projection, project_batch
+from sample_candidates.projection import fit_projection
 from sample_candidates.sampling import (
     build_capped_sample_query,
     resolve_cap_per_stratum,
@@ -244,6 +245,29 @@ def _resolve_stratification_shape(
     help="Strata smaller than this are pooled into an overflow stratum.",
 )
 @click.option(
+    "--fit-sample-size",
+    default=2_000_000,
+    show_default=True,
+    type=int,
+    help="Maximum number of rows to sample for fitting the projection/SVD "
+    "models. If the input has fewer rows than this, all rows are used.",
+)
+@click.option(
+    "--projection-batch-size",
+    default=50_000,
+    show_default=True,
+    type=int,
+    help="Number of rows per batch when applying the fitted projection "
+    "across the full input.",
+)
+@click.option(
+    "--projection-workers",
+    default=None,
+    type=int,
+    help="Number of worker processes for parallel batch projection. "
+    "Defaults to (CPU count - 1).",
+)
+@click.option(
     "--use-blob-storage",
     is_flag=True,
     help="Read/write Parquet via blob storage instead of the local filesystem.",
@@ -266,6 +290,9 @@ def sample_candidates(
     cap_per_stratum: int | None,
     target_total_samples: int | None,
     min_stratum_size_for_cap: int,
+    fit_sample_size: int,
+    projection_batch_size: int,
+    projection_workers: int | None,
     use_blob_storage: bool,
     bucket: str,
 ) -> None:
@@ -285,7 +312,10 @@ def sample_candidates(
 
     matched_files = _matched_input_files(conn, input)
     if not matched_files:
-        raise click.ClickException(f"Glob '{input}' matched no files")
+        raise click.ClickException(
+            f"Glob '{input}' matched no files — refusing to write an "
+            f"empty manifest entry."
+        )
 
     resolved_n_projected_dims, resolved_n_quantiles_per_dim = (
         _resolve_stratification_shape(
@@ -338,34 +368,64 @@ def sample_candidates(
             )
             return
 
+    if use_blob_storage:
+        raise click.ClickException(
+            "--use-blob-storage is not yet supported with batched projection; "
+            "batch_projection reads local Parquet files via pyarrow.parquet. "
+            "FIXME: add fsspec-backed batch reading for S3 inputs."
+        )
+
     logger.info(
         "Sampling '%s' (%d files matched) -> %s", input, len(matched_files), output
     )
 
-    raw_table = conn.execute(f"SELECT * FROM read_parquet('{input}')").to_arrow_table()
-    model = fit_projection(raw_table, config)
-    projected_table = project_batch(raw_table, model)
+    fit_table = conn.execute(
+        f"SELECT * FROM read_parquet('{input}') USING SAMPLE {fit_sample_size} ROWS"
+    ).to_arrow_table()
+    logger.info("Fitting projection on %d sampled rows...", fit_table.num_rows)
+    model = fit_projection(fit_table, config)
 
-    conn.register("projected_table", projected_table)
-    binner = fit_quantile_bins("projected_table", config, connection=conn)
-
-    res = conn.execute(binner.count_strata_query("projected_table")).fetchone()
-
-    if res:
-        n_strata = res[0]
-    else:
-        raise click.ClickException(f"No strata available from '{input}'.")
-
-    resolved_cap_per_stratum = resolve_cap_per_stratum(config, n_strata)
-    query = build_capped_sample_query(
-        "projected_table", binner, config, resolved_cap_per_stratum
+    projected_output_path = f"{output}.projected.parquet"
+    logger.info(
+        "Projecting full input in batches (batch_size=%d, workers=%s)...",
+        projection_batch_size,
+        projection_workers if projection_workers is not None else "auto",
     )
+    try:
+        project_all_batches(
+            input_path=input,
+            output_path=projected_output_path,
+            model=model,
+            batch_size=projection_batch_size,
+            n_workers=projection_workers,
+        )
 
-    conn.execute(f"COPY (SELECT * FROM ({query})) TO '{output}' (FORMAT PARQUET)")
+        conn.execute(
+            f"CREATE OR REPLACE VIEW projected_table AS "
+            f"SELECT * FROM read_parquet('{projected_output_path}')"
+        )
+        binner = fit_quantile_bins("projected_table", config, connection=conn)
+
+        res = conn.execute(binner.count_strata_query("projected_table")).fetchone()
+
+        if res:
+            n_strata = res[0]
+        else:
+            raise click.ClickException(f"No strata available from '{input}'.")
+
+        resolved_cap_per_stratum = resolve_cap_per_stratum(config, n_strata)
+        query = build_capped_sample_query(
+            "projected_table", binner, config, resolved_cap_per_stratum
+        )
+
+        conn.execute(f"COPY (SELECT * FROM ({query})) TO '{output}' (FORMAT PARQUET)")
+    finally:
+        Path(projected_output_path).unlink(missing_ok=True)
 
     if not file_exists(conn, output):
         raise click.ClickException(
-            f"COPY reported success but {output} is not readable back via read_parquet"
+            f"COPY reported success but {output} is not readable back "
+            "via read_parquet — write did not land"
         )
 
     row_count, n_strata = conn.execute(

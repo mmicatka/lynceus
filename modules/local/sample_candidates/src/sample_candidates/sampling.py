@@ -30,18 +30,23 @@ def build_capped_sample_query(
     binner: QuantileBinner,
     config: StratificationConfig,
     cap_per_stratum: int,
+    row_id_expr: str = "row_number() OVER ()",
 ) -> str:
     bucket_columns = binner.stratum_column_expr()
     stratum_id = binner.stratum_id_expr()
 
     return f"""
-        WITH projected AS (
-            SELECT *,
-    {bucket_columns}
+        WITH source AS (
+            SELECT *, {row_id_expr} AS __row_id
             FROM {source_sql}
         ),
+        projected AS (
+            SELECT __row_id,
+    {bucket_columns}
+            FROM source
+        ),
         with_stratum AS (
-            SELECT *,
+            SELECT __row_id,
                 {stratum_id}
             FROM projected
         ),
@@ -52,7 +57,8 @@ def build_capped_sample_query(
         ),
         resolved_stratum AS (
             SELECT
-                w.*,
+                w.__row_id,
+                w.stratum_id,
                 CASE
                     WHEN s.stratum_size < {config.min_stratum_size_for_cap}
                         THEN '__overflow__'
@@ -62,14 +68,17 @@ def build_capped_sample_query(
             JOIN stratum_sizes s USING (stratum_id)
         ),
         ranked AS (
-            SELECT *,
+            SELECT
+                __row_id,
+                resolved_stratum_id,
                 row_number() OVER (
                     PARTITION BY resolved_stratum_id
                     ORDER BY random()
                 ) AS stratum_rank
             FROM resolved_stratum
+            QUALIFY stratum_rank <= {cap_per_stratum}
         )
-        SELECT *
-        FROM ranked
-        WHERE stratum_rank <= {cap_per_stratum}
+        SELECT source.* EXCLUDE (__row_id), ranked.resolved_stratum_id
+        FROM source
+        JOIN ranked ON source.__row_id = ranked.__row_id
     """
