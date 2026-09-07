@@ -21,6 +21,7 @@ from sample_candidates.manifest import (
     serialize_params,
     write_manifest,
 )
+from sample_candidates.metrics import timed_stage
 from sample_candidates.projection import fit_projection
 from sample_candidates.sampling import (
     build_capped_sample_query,
@@ -125,7 +126,9 @@ def _resolve_stratification_shape(
             "is only supported with --target-total-samples."
         )
 
-    n_input_rows = _count_rows(con, input_path)
+    with timed_stage("count_input_rows"):
+        n_input_rows = _count_rows(con, input_path)
+
     shape = suggest_stratification_shape(
         n_input_rows=n_input_rows,
         target_total_samples=target_total_samples,
@@ -307,7 +310,6 @@ def sample_candidates(
         conn = get_connection(blob_storage_settings)
         input = f"s3://{bucket}/{input.lstrip('/')}"
         output = f"s3://{bucket}/{output.lstrip('/')}"
-
     fs = get_filesystem(blob_storage_settings)
 
     matched_files = _matched_input_files(conn, input)
@@ -327,7 +329,6 @@ def sample_candidates(
             desired_cap_per_stratum=desired_cap_per_stratum,
         )
     )
-
     config = StratificationConfig(
         features=features,
         n_projected_dims=resolved_n_projected_dims,
@@ -368,13 +369,6 @@ def sample_candidates(
             )
             return
 
-    if use_blob_storage:
-        raise click.ClickException(
-            "--use-blob-storage is not yet supported with batched projection; "
-            "batch_projection reads local Parquet files via pyarrow.parquet. "
-            "FIXME: add fsspec-backed batch reading for S3 inputs."
-        )
-
     logger.info(
         "Sampling '%s' (%d files matched) -> %s", input, len(matched_files), output
     )
@@ -383,7 +377,8 @@ def sample_candidates(
         f"SELECT * FROM read_parquet('{input}') USING SAMPLE {fit_sample_size} ROWS"
     ).to_arrow_table()
     logger.info("Fitting projection on %d sampled rows...", fit_table.num_rows)
-    model = fit_projection(fit_table, config)
+    with timed_stage("fit_projection", n_fit_rows=fit_table.num_rows):
+        model = fit_projection(fit_table, config)
 
     projected_output_path = f"{output}.projected.parquet"
     logger.info(
@@ -391,47 +386,69 @@ def sample_candidates(
         projection_batch_size,
         projection_workers if projection_workers is not None else "auto",
     )
-    try:
-        project_all_batches(
+    with timed_stage(
+        "project_all_batches",
+        batch_size=projection_batch_size,
+        n_workers=projection_workers if projection_workers is not None else "auto",
+    ) as timing:
+        projection_result = project_all_batches(
+            connection=conn,
             input_path=input,
-            output_path=projected_output_path,
+            output_path=projected_output_path.removeprefix("s3://"),
             model=model,
             batch_size=projection_batch_size,
             n_workers=projection_workers,
+            filesystem=fs if blob_storage_settings is not None else None,
         )
+    rows_per_second = (
+        projection_result.n_rows / timing.elapsed_seconds
+        if timing.elapsed_seconds > 0
+        else 0.0
+    )
+    logger.info(
+        "METRIC stage=project_all_batches n_rows=%d n_batches=%d rows_per_second=%.1f",
+        projection_result.n_rows,
+        projection_result.n_batches,
+        rows_per_second,
+    )
 
-        conn.execute(
-            f"CREATE OR REPLACE VIEW projected_table AS "
-            f"SELECT * FROM read_parquet('{projected_output_path}')"
-        )
+    conn.execute(
+        f"CREATE OR REPLACE VIEW projected_table AS "
+        f"SELECT * FROM read_parquet('{projected_output_path}')"
+    )
+    with timed_stage("fit_quantile_bins"):
         binner = fit_quantile_bins("projected_table", config, connection=conn)
 
+    with timed_stage("count_strata"):
         res = conn.execute(binner.count_strata_query("projected_table")).fetchone()
 
-        if res:
-            n_strata = res[0]
-        else:
-            raise click.ClickException(f"No strata available from '{input}'.")
+    if res:
+        n_strata = res[0]
+    else:
+        raise click.ClickException(f"No strata available from '{input}'.")
 
-        resolved_cap_per_stratum = resolve_cap_per_stratum(config, n_strata)
-        query = build_capped_sample_query(
-            "projected_table", binner, config, resolved_cap_per_stratum
-        )
+    resolved_cap_per_stratum = resolve_cap_per_stratum(config, n_strata)
+    query = build_capped_sample_query(
+        "projected_table", binner, config, resolved_cap_per_stratum
+    )
 
+    with timed_stage(
+        "rank_and_sample", n_strata=n_strata, cap=resolved_cap_per_stratum
+    ):
         conn.execute(f"COPY (SELECT * FROM ({query})) TO '{output}' (FORMAT PARQUET)")
-    finally:
-        Path(projected_output_path).unlink(missing_ok=True)
+    conn.execute("DROP VIEW IF EXISTS projected_table")
 
-    if not file_exists(conn, output):
-        raise click.ClickException(
-            f"COPY reported success but {output} is not readable back "
-            "via read_parquet — write did not land"
-        )
+    with timed_stage("validate_output"):
+        if not file_exists(conn, output):
+            raise click.ClickException(
+                f"COPY reported success but {output} is not readable back "
+                "via read_parquet — write did not land"
+            )
 
-    row_count, n_strata = conn.execute(
-        f"SELECT COUNT(*), COUNT(DISTINCT resolved_stratum_id) "
-        f"FROM read_parquet('{output}')"
-    ).fetchall()[0]
+        row_count, n_strata = conn.execute(
+            f"SELECT COUNT(*), COUNT(DISTINCT resolved_stratum_id) "
+            f"FROM read_parquet('{output}')"
+        ).fetchall()[0]
 
     if row_count == 0:
         if blob_storage_settings is None:

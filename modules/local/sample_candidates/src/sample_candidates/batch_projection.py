@@ -8,8 +8,10 @@ from collections.abc import Iterator
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass
 
+import duckdb
 import pyarrow as pa
 import pyarrow.parquet as pq
+from pyarrow.fs import FileSystem
 
 from sample_candidates.projection import ProjectionModel, _project_batch_worker
 
@@ -23,9 +25,12 @@ class BatchProjectionResult:
     n_batches: int
 
 
-def _iter_record_batches(input_path: str, batch_size: int) -> Iterator[pa.RecordBatch]:
-    parquet_file = pq.ParquetFile(input_path)
-    yield from parquet_file.iter_batches(batch_size=batch_size)
+def _iter_record_batches(
+    connection: duckdb.DuckDBPyConnection, source_sql: str, batch_size: int
+) -> Iterator[pa.RecordBatch]:
+    result = connection.execute(f"SELECT * FROM {source_sql}")
+    reader = result.fetch_record_batch(batch_size)
+    yield from reader
 
 
 def _default_n_workers() -> int:
@@ -34,13 +39,16 @@ def _default_n_workers() -> int:
 
 
 def project_all_batches(
+    connection: duckdb.DuckDBPyConnection,
     input_path: str,
     output_path: str,
     model: ProjectionModel,
     batch_size: int = 50_000,
     n_workers: int | None = None,
+    filesystem: FileSystem | None = None,
 ) -> BatchProjectionResult:
     resolved_n_workers = n_workers if n_workers is not None else _default_n_workers()
+    source_sql = f"read_parquet('{input_path}')"
 
     writer: pq.ParquetWriter | None = None
     n_rows = 0
@@ -51,7 +59,7 @@ def project_all_batches(
             futures = {
                 executor.submit(_project_batch_worker, batch, model): batch_index
                 for batch_index, batch in enumerate(
-                    _iter_record_batches(input_path, batch_size)
+                    _iter_record_batches(connection, source_sql, batch_size)
                 )
             }
 
@@ -68,7 +76,11 @@ def project_all_batches(
             for batch_index in sorted(results_by_index):
                 projected_batch = results_by_index[batch_index]
                 if writer is None:
-                    writer = pq.ParquetWriter(output_path, projected_batch.schema)
+                    writer = pq.ParquetWriter(
+                        output_path,
+                        projected_batch.schema,
+                        filesystem=filesystem,
+                    )
                 writer.write_batch(projected_batch)
                 n_rows += projected_batch.num_rows
                 n_batches += 1
