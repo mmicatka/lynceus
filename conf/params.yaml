@@ -24,7 +24,7 @@ surrogate:
   train:
     sample:
       seed: 1000
-      num_samples: 100000
+      num_samples: 250000
       fields:
         - name: morgan_fingerprint
           kind: array
