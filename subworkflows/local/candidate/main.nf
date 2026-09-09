@@ -38,9 +38,15 @@ workflow CANDIDATE {
     config.num_per_shard,
   )
 
-  ch_rebalanced = REBALANCE_CANDIDATES.out.done
-    .flatMap { files("${directory}/rebalanced/*.parquet") }
-    .map { f -> "${directory}/rebalanced/${f.name}" }
+  _ch_rebalance_done = REBALANCE_CANDIDATES.out.done
+    .collect()
+    .ifEmpty { true }
+
+  ch_rebalanced_files = channel.fromPath("${directory}/rebalanced/*.parquet", checkIfExists: true)
+
+  ch_rebalanced = _ch_rebalance_done
+    .combine(ch_rebalanced_files)
+    .map { _sentinel, f -> f.name }
 
   PHYSIOCHEMICAL_FILTER(ch_rebalanced, config.filter_config, config.bucket)
 

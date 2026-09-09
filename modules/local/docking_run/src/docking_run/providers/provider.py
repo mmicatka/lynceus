@@ -52,8 +52,6 @@ class DockingProvider(ABC):
         Yields:
             (ligand_id, results) pairs. ligand_id is LigandRecord.ligand_id
             (not a filename stem, since ligands no longer arrive as files).
-            Yield granularity is provider-specific — see prior docstring
-            notes on batch-primitive providers surfacing multiple pairs
-            together, and on failed ligands being silently omitted.
+            Yield granularity is provider-specific
         """
         ...

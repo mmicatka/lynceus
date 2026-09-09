@@ -78,8 +78,7 @@ def existing_entry_is_valid(
 
     if not recorded_files or recorded_params is None or not output:
         raise RuntimeError(
-            "Manifest entry is missing 'matched_files', 'params', or "
-            "'output' — malformed entry, cannot trust as complete"
+            "Manifest entry is missing 'matched_files', 'params', or 'output'"
         )
 
     if sorted(recorded_files) != sorted(matched_files):
@@ -88,27 +87,20 @@ def existing_entry_is_valid(
         raise RuntimeError(
             f"Glob '{entry['input_glob']}' now matches a different file "
             f"set than when it was sampled. Added: {added}. "
-            f"Removed: {removed}. Refusing to silently skip or reprocess "
-            f"— resolve manually (e.g. delete the manifest entry to force "
-            f"a redo, or narrow the glob to exclude the new files)."
+            f"Removed: {removed}."
         )
 
     if recorded_params != params:
         raise RuntimeError(
             f"Glob '{entry['input_glob']}' was previously sampled with "
             f"different parameters. Recorded: {recorded_params}. "
-            f"Requested: {params}. Refusing to silently skip or "
-            f"reprocess — resolve manually (e.g. delete the manifest "
-            f"entry to force a redo with the new parameters)."
+            f"Requested: {params}."
         )
 
     if not file_exists(con, output):
         raise RuntimeError(
             f"Manifest claims glob '{entry['input_glob']}' is sampled "
-            f"but output {output} is missing or unreadable — manifest "
-            f"is out of sync with actual output. Refusing to silently "
-            f"reprocess; resolve manually (e.g. delete the manifest "
-            f"entry to force a redo)."
+            f"but output {output} is missing or unreadable"
         )
 
     return True

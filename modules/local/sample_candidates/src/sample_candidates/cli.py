@@ -9,6 +9,8 @@ import click
 from lynceus_utils.duckdb import file_exists, get_connection
 from lynceus_utils.storage import get_blob_storage_settings, get_filesystem
 
+from sample_candidates.autotune import suggest_stratification_shape
+from sample_candidates.batch_projection import project_all_batches
 from sample_candidates.binning import fit_quantile_bins
 from sample_candidates.config import FeatureKind, FeatureSpec, StratificationConfig
 from sample_candidates.manifest import (
@@ -19,7 +21,8 @@ from sample_candidates.manifest import (
     serialize_params,
     write_manifest,
 )
-from sample_candidates.projection import fit_projection, project_batch
+from sample_candidates.metrics import timed_stage
+from sample_candidates.projection import fit_projection
 from sample_candidates.sampling import (
     build_capped_sample_query,
     resolve_cap_per_stratum,
@@ -95,6 +98,64 @@ def _matched_input_files(con, input_path: str) -> list[str]:
     return sorted(row[0] for row in rows)
 
 
+def _count_rows(con, input_path: str) -> int:
+    result = con.execute(
+        f"SELECT COUNT(*) FROM read_parquet('{input_path}')"
+    ).fetchone()
+    if result is None:
+        raise click.ClickException(f"Could not count rows for '{input_path}'.")
+    return result[0]
+
+
+def _resolve_stratification_shape(
+    con,
+    input_path: str,
+    *,
+    n_projected_dims: int | None,
+    n_quantiles_per_dim: int | None,
+    target_total_samples: int | None,
+    desired_cap_per_stratum: int,
+) -> tuple[int, int]:
+    if n_projected_dims is not None and n_quantiles_per_dim is not None:
+        return n_projected_dims, n_quantiles_per_dim
+
+    if target_total_samples is None:
+        raise click.ClickException(
+            "--n-projected-dims and --n-quantiles-per-dim must both be "
+            "provided explicitly when using --cap-per-stratum; autotuning "
+            "is only supported with --target-total-samples."
+        )
+
+    with timed_stage("count_input_rows"):
+        n_input_rows = _count_rows(con, input_path)
+
+    shape = suggest_stratification_shape(
+        n_input_rows=n_input_rows,
+        target_total_samples=target_total_samples,
+        n_quantiles_per_dim=n_quantiles_per_dim
+        if n_quantiles_per_dim is not None
+        else 10,
+        desired_cap_per_stratum=desired_cap_per_stratum,
+    )
+    resolved_dims = (
+        n_projected_dims if n_projected_dims is not None else shape.n_projected_dims
+    )
+    resolved_quantiles = (
+        n_quantiles_per_dim
+        if n_quantiles_per_dim is not None
+        else shape.n_quantiles_per_dim
+    )
+    logger.info(
+        "Autotuned stratification shape from %d input rows: "
+        "n_projected_dims=%d n_quantiles_per_dim=%d (max n_strata=%d)",
+        n_input_rows,
+        resolved_dims,
+        resolved_quantiles,
+        shape.n_strata,
+    )
+    return resolved_dims, resolved_quantiles
+
+
 @click.command()
 @click.option(
     "--input",
@@ -126,10 +187,11 @@ def _matched_input_files(con, input_path: str) -> list[str]:
 )
 @click.option(
     "--n-projected-dims",
-    default=8,
-    show_default=True,
+    default=None,
     type=int,
-    help="Number of dimensions to random-project the combined feature vector into.",
+    help="Number of dimensions to random-project the combined feature vector into. "
+    "If omitted and --target-total-samples is given, this is autotuned from "
+    "the input row count.",
 )
 @click.option(
     "--projection-density",
@@ -147,10 +209,20 @@ def _matched_input_files(con, input_path: str) -> list[str]:
 )
 @click.option(
     "--n-quantiles-per-dim",
-    default=10,
+    default=None,
+    type=int,
+    help="Number of quantile bins per projected dimension. If omitted and "
+    "--target-total-samples is given, this is autotuned from the input "
+    "row count.",
+)
+@click.option(
+    "--desired-cap-per-stratum",
+    default=20,
     show_default=True,
     type=int,
-    help="Number of quantile bins per projected dimension.",
+    help="Only used when autotuning (--n-projected-dims/--n-quantiles-per-dim "
+    "omitted with --target-total-samples): target average rows-per-stratum "
+    "after capping, used to pick a stratification shape.",
 )
 @click.option(
     "--cap-per-stratum",
@@ -176,6 +248,29 @@ def _matched_input_files(con, input_path: str) -> list[str]:
     help="Strata smaller than this are pooled into an overflow stratum.",
 )
 @click.option(
+    "--fit-sample-size",
+    default=2_000_000,
+    show_default=True,
+    type=int,
+    help="Maximum number of rows to sample for fitting the projection/SVD "
+    "models. If the input has fewer rows than this, all rows are used.",
+)
+@click.option(
+    "--projection-batch-size",
+    default=50_000,
+    show_default=True,
+    type=int,
+    help="Number of rows per batch when applying the fitted projection "
+    "across the full input.",
+)
+@click.option(
+    "--projection-workers",
+    default=None,
+    type=int,
+    help="Number of worker processes for parallel batch projection. "
+    "Defaults to (CPU count - 1).",
+)
+@click.option(
     "--use-blob-storage",
     is_flag=True,
     help="Read/write Parquet via blob storage instead of the local filesystem.",
@@ -190,29 +285,22 @@ def sample_candidates(
     input: str,
     output: str,
     features: tuple[FeatureSpec, ...],
-    n_projected_dims: int,
+    n_projected_dims: int | None,
     projection_density: float,
     random_seed: int,
-    n_quantiles_per_dim: int,
+    n_quantiles_per_dim: int | None,
+    desired_cap_per_stratum: int,
     cap_per_stratum: int | None,
     target_total_samples: int | None,
     min_stratum_size_for_cap: int,
+    fit_sample_size: int,
+    projection_batch_size: int,
+    projection_workers: int | None,
     use_blob_storage: bool,
     bucket: str,
 ) -> None:
     if cap_per_stratum is None and target_total_samples is None:
         cap_per_stratum = 500
-
-    config = StratificationConfig(
-        features=features,
-        n_projected_dims=n_projected_dims,
-        projection_density=projection_density,
-        random_seed=random_seed,
-        n_quantiles_per_dim=n_quantiles_per_dim,
-        cap_per_stratum=cap_per_stratum,
-        target_total_samples=target_total_samples,
-        min_stratum_size_for_cap=min_stratum_size_for_cap,
-    )
 
     blob_storage_settings = None
     conn = get_connection()
@@ -222,11 +310,7 @@ def sample_candidates(
         conn = get_connection(blob_storage_settings)
         input = f"s3://{bucket}/{input.lstrip('/')}"
         output = f"s3://{bucket}/{output.lstrip('/')}"
-
     fs = get_filesystem(blob_storage_settings)
-
-    manifest_file_path = manifest_path(output)
-    manifest = load_manifest(fs, manifest_file_path)
 
     matched_files = _matched_input_files(conn, input)
     if not matched_files:
@@ -235,9 +319,34 @@ def sample_candidates(
             f"empty manifest entry."
         )
 
+    resolved_n_projected_dims, resolved_n_quantiles_per_dim = (
+        _resolve_stratification_shape(
+            conn,
+            input,
+            n_projected_dims=n_projected_dims,
+            n_quantiles_per_dim=n_quantiles_per_dim,
+            target_total_samples=target_total_samples,
+            desired_cap_per_stratum=desired_cap_per_stratum,
+        )
+    )
+    config = StratificationConfig(
+        features=features,
+        n_projected_dims=resolved_n_projected_dims,
+        projection_density=projection_density,
+        random_seed=random_seed,
+        n_quantiles_per_dim=resolved_n_quantiles_per_dim,
+        cap_per_stratum=cap_per_stratum,
+        target_total_samples=target_total_samples,
+        min_stratum_size_for_cap=min_stratum_size_for_cap,
+    )
+
+    manifest_file_path = manifest_path(output)
+    manifest = load_manifest(fs, manifest_file_path)
+
     # cap_per_stratum is only known after n_strata is computed, so it is
     # excluded here; requested_params otherwise reflects every input that
-    # can change sampling output.
+    # can change sampling output, including the (possibly autotuned)
+    # n_projected_dims/n_quantiles_per_dim actually used.
     requested_params = serialize_params(config, cap_per_stratum=None)
 
     existing_entry = manifest["globs"].get(input)
@@ -264,37 +373,82 @@ def sample_candidates(
         "Sampling '%s' (%d files matched) -> %s", input, len(matched_files), output
     )
 
-    raw_table = conn.execute(f"SELECT * FROM read_parquet('{input}')").to_arrow_table()
-    model = fit_projection(raw_table, config)
-    projected_table = project_batch(raw_table, model)
+    fit_table = conn.execute(
+        f"SELECT * FROM read_parquet('{input}') USING SAMPLE {fit_sample_size} ROWS"
+    ).to_arrow_table()
+    logger.info("Fitting projection on %d sampled rows...", fit_table.num_rows)
+    with timed_stage("fit_projection", n_fit_rows=fit_table.num_rows):
+        model = fit_projection(fit_table, config)
 
-    conn.register("projected_table", projected_table)
-    binner = fit_quantile_bins("projected_table", config, connection=conn)
+    projected_output_path = f"{output}.projected.parquet"
+    logger.info(
+        "Projecting full input in batches (batch_size=%d, workers=%s)...",
+        projection_batch_size,
+        projection_workers if projection_workers is not None else "auto",
+    )
+    with timed_stage(
+        "project_all_batches",
+        batch_size=projection_batch_size,
+        n_workers=projection_workers if projection_workers is not None else "auto",
+    ) as timing:
+        projection_result = project_all_batches(
+            connection=conn,
+            input_path=input,
+            output_path=projected_output_path.removeprefix("s3://"),
+            model=model,
+            batch_size=projection_batch_size,
+            n_workers=projection_workers,
+            filesystem=fs if blob_storage_settings is not None else None,
+        )
+    rows_per_second = (
+        projection_result.n_rows / timing.elapsed_seconds
+        if timing.elapsed_seconds > 0
+        else 0.0
+    )
+    logger.info(
+        "METRIC stage=project_all_batches n_rows=%d n_batches=%d rows_per_second=%.1f",
+        projection_result.n_rows,
+        projection_result.n_batches,
+        rows_per_second,
+    )
 
-    n_strata = conn.execute(binner.count_strata_query("projected_table")).fetchone()
+    conn.execute(
+        f"CREATE OR REPLACE VIEW projected_table AS "
+        f"SELECT * FROM read_parquet('{projected_output_path}')"
+    )
+    with timed_stage("fit_quantile_bins"):
+        binner = fit_quantile_bins("projected_table", config, connection=conn)
 
-    if not n_strata:
-        raise click.ClickException(f"No strata available from '{input}'.")
+    with timed_stage("count_strata"):
+        res = conn.execute(binner.count_strata_query("projected_table")).fetchone()
+
+    if res:
+        n_strata = res[0]
     else:
-        n_strata = n_strata[0]
+        raise click.ClickException(f"No strata available from '{input}'.")
 
     resolved_cap_per_stratum = resolve_cap_per_stratum(config, n_strata)
     query = build_capped_sample_query(
         "projected_table", binner, config, resolved_cap_per_stratum
     )
 
-    conn.execute(f"COPY (SELECT * FROM ({query})) TO '{output}' (FORMAT PARQUET)")
+    with timed_stage(
+        "rank_and_sample", n_strata=n_strata, cap=resolved_cap_per_stratum
+    ):
+        conn.execute(f"COPY (SELECT * FROM ({query})) TO '{output}' (FORMAT PARQUET)")
+    conn.execute("DROP VIEW IF EXISTS projected_table")
 
-    if not file_exists(conn, output):
-        raise click.ClickException(
-            f"COPY reported success but {output} is not readable back "
-            "via read_parquet — write did not land"
-        )
+    with timed_stage("validate_output"):
+        if not file_exists(conn, output):
+            raise click.ClickException(
+                f"COPY reported success but {output} is not readable back "
+                "via read_parquet — write did not land"
+            )
 
-    row_count, n_strata = conn.execute(
-        f"SELECT COUNT(*), COUNT(DISTINCT resolved_stratum_id) "
-        f"FROM read_parquet('{output}')"
-    ).fetchall()[0]
+        row_count, n_strata = conn.execute(
+            f"SELECT COUNT(*), COUNT(DISTINCT resolved_stratum_id) "
+            f"FROM read_parquet('{output}')"
+        ).fetchall()[0]
 
     if row_count == 0:
         if blob_storage_settings is None:

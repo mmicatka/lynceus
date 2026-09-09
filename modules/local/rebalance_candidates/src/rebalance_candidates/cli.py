@@ -147,10 +147,7 @@ def _next_shard_counter(fs, target_dir: str, manifest: dict) -> int:
     if orphans:
         raise RuntimeError(
             f"Found shard file(s) in {target_dir} not referenced by any "
-            f"manifest entry: {sorted(orphans)}. This indicates a crashed "
-            f"or partial prior run. Refusing to proceed silently — "
-            f"resolve manually (delete orphans or repair the manifest) "
-            f"before rerunning."
+            f"manifest entry: {sorted(orphans)}."
         )
 
     return max(on_disk.keys(), default=-1) + 1
@@ -171,10 +168,7 @@ def _existing_entry_is_valid(
     shard_files = entry.get("shard_files")
 
     if not recorded_files or not shard_files:
-        raise RuntimeError(
-            "Manifest entry is missing 'matched_files' or 'shard_files' — "
-            "malformed entry, cannot trust as complete"
-        )
+        raise RuntimeError("Manifest entry is missing 'matched_files' or 'shard_files'")
 
     if sorted(recorded_files) != matched_files:
         added = sorted(set(matched_files) - set(recorded_files))
@@ -182,9 +176,7 @@ def _existing_entry_is_valid(
         raise RuntimeError(
             f"Glob '{entry['input_glob']}' now matches a different file "
             f"set than when it was rebalanced. Added: {added}. "
-            f"Removed: {removed}. Refusing to silently skip or reprocess "
-            f"— resolve manually (e.g. delete the manifest entry to force "
-            f"a redo, or narrow the glob to exclude the new files)."
+            f"Removed: {removed}."
         )
 
     for shard_file in shard_files:
@@ -193,7 +185,7 @@ def _existing_entry_is_valid(
             raise RuntimeError(
                 f"Manifest claims glob '{entry['input_glob']}' is "
                 f"rebalanced but shard {shard_path} is missing or "
-                f"unreadable — manifest is out of sync with actual "
+                f"unreadable, manifest is out of sync with actual "
                 f"output. Refusing to silently reprocess; resolve "
                 f"manually (e.g. delete the manifest entry to force a "
                 f"redo)."
@@ -223,8 +215,7 @@ def _rebalance_glob(
         if file_exists(con, shard_path):
             raise RuntimeError(
                 f"Refusing to overwrite existing shard {shard_path}. "
-                f"This should be unreachable given the counter scan — "
-                f"investigate a possible race with another concurrent run."
+                "This should be unreachable given the counter scan"
             )
 
         export_parquet(con, shard_table, shard_path)
@@ -287,7 +278,7 @@ def rebalance_candidates(
     matched_files = _matched_input_files(conn, input)
     if not matched_files:
         raise RuntimeError(
-            f"Glob '{input}' matched no files — refusing to write an "
+            f"Glob '{input}' matched no files - refusing to write an "
             f"empty manifest entry."
         )
 

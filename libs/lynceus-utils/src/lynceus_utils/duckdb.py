@@ -44,7 +44,7 @@ def export_parquet(
     if not file_exists(con, file_path):
         raise RuntimeError(
             f"export_parquet: COPY reported success but {file_path} "
-            "is not readable back via read_parquet — write did not land"
+            "is not readable back via read_parquet"
         )
 
 

@@ -70,7 +70,7 @@ def existing_entry_is_valid(
     if not recorded_ligands_path or recorded_row_count is None or not out_parquet:
         raise RuntimeError(
             "Manifest entry is missing 'ligands_path', 'ligand_row_count', "
-            "or 'out_parquet' — malformed entry, cannot trust as complete"
+            "or 'out_parquet', malformed entry, cannot trust as complete"
         )
 
     if recorded_ligands_path != ligands_path:
@@ -79,7 +79,7 @@ def existing_entry_is_valid(
             f"site={entry.get('site_id')!r} was recorded against "
             f"ligands_path={recorded_ligands_path!r} but this run passed "
             f"ligands_path={ligands_path!r}. Refusing to silently skip "
-            f"or reprocess — resolve manually (e.g. delete the manifest "
+            f"or reprocess, resolve manually (e.g. delete the manifest "
             f"entry to force a redo)."
         )
 
@@ -90,7 +90,7 @@ def existing_entry_is_valid(
             f"{recorded_row_count} ligand rows at {ligands_path!r} but "
             f"this run sees {ligand_row_count}. The file at that path "
             f"appears to have changed. Refusing to silently skip or "
-            f"reprocess — resolve manually (e.g. delete the manifest "
+            f"reprocess, resolve manually (e.g. delete the manifest "
             f"entry to force a redo)."
         )
 
@@ -98,7 +98,7 @@ def existing_entry_is_valid(
         raise RuntimeError(
             f"Manifest claims member={entry.get('member_id')!r} "
             f"site={entry.get('site_id')!r} is docked but output "
-            f"{out_parquet} is missing — manifest is out of sync with "
+            f"{out_parquet} is missing, manifest is out of sync with "
             f"actual output. Refusing to silently reprocess; resolve "
             f"manually (e.g. delete the manifest entry to force a redo)."
         )
