@@ -3,20 +3,17 @@
 import lightgbm as lgb
 import numpy as np
 import optuna
+from skfp.metrics import bedroc_score, enrichment_factor
 from sklearn.model_selection import KFold
-
-from surrogate_model.metrics import surrogate_metrics
-
-RECALL_TOP_5_PERCENT = "recall_top_5_percent"
-RECALL_TOP_1_PERCENT = "recall_top_1_percent"
 
 
 def make_objective(
     X: np.ndarray,
     y: np.ndarray,
     n_splits: int = 5,
-    primary_metric: str = RECALL_TOP_5_PERCENT,
-    random_seed=1000,
+    primary_metric: str = "bedroc",
+    active_quantile: float = 0.05,
+    random_seed: int = 1000,
 ):
     def objective(trial: optuna.Trial) -> float:
         params = {
@@ -27,10 +24,10 @@ def make_objective(
             "deterministic": True,
             "force_row_wise": True,
             "random_state": random_seed,
-            "num_leaves": trial.suggest_int("num_leaves", 16, 256),
-            "max_depth": trial.suggest_int("max_depth", 3, 12),
-            "learning_rate": trial.suggest_float("learning_rate", 1e-3, 0.3, log=True),
-            "n_estimators": trial.suggest_int("n_estimators", 100, 2000),
+            "num_leaves": trial.suggest_int("num_leaves", 16, 128),
+            "max_depth": trial.suggest_int("max_depth", 3, 10),
+            "learning_rate": trial.suggest_float("learning_rate", 5e-3, 0.3, log=True),
+            "n_estimators": trial.suggest_int("n_estimators", 100, 800),
             "min_child_samples": trial.suggest_int("min_child_samples", 5, 100),
             "subsample": trial.suggest_float("subsample", 0.5, 1.0),
             "colsample_bytree": trial.suggest_float("colsample_bytree", 0.5, 1.0),
@@ -55,7 +52,24 @@ def make_objective(
             )
 
             y_pred = np.asarray(model.predict(X_val))
-            fold_metrics.append(surrogate_metrics(y_val, y_pred))
+
+            # Define active ground truth (lower/more negative kcal/mol is better)
+            affinity_threshold = np.quantile(y_val, active_quantile)
+            y_true_binary = (y_val <= affinity_threshold).astype(int)
+
+            # Invert predicted affinities so higher score = better predicted binder
+            scores = -y_pred
+
+            metrics = {
+                "ef_top_1_percent": float(
+                    enrichment_factor(y_true_binary, scores, fraction=0.01)
+                ),
+                "ef_top_5_percent": float(
+                    enrichment_factor(y_true_binary, scores, fraction=0.05)
+                ),
+                "bedroc": float(bedroc_score(y_true_binary, scores, alpha=20.0)),
+            }
+            fold_metrics.append(metrics)
 
         agg = {
             key: float(np.mean([fm[key] for fm in fold_metrics]))
