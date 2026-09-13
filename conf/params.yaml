@@ -11,6 +11,10 @@ candidates:
   source_prefix: candidates
   sources:
     - TEST
+  target_total: 20000000
+  floor_per_folder: 50000
+  candidate_samples_prefix: candidates/sampled
+  shard_output_prefix: candidates/shards
 
   filter_config:
     pains:
