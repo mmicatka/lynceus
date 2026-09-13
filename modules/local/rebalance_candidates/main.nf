@@ -1,25 +1,21 @@
 // modules/local/rebalance/main.nf
 
-process REBALANCE_CANDIDATES {
+process COUNT_CANDIDATES {
     container "${params.registry}/lynceus/rebalance-candidates:0.1.0"
 
     input:
-    val input_path
-    val output_path
+    val source
     val bucket
-    val num_per_shard
 
     output:
-    val true, emit: done
+    path "${folder}_count.json", emit: count
 
     script:
+    folder = source.toString().tokenize('/').last()
     """
-    rebalance-candidates \\
-        --input '${input_path}' \\
-        --output ${output_path} \\
-        --skip-col-val steps_ok False \\
-        --skip-col-val parse_ok False \\
-        --num-per-shard ${num_per_shard} \\
+    count-candidates \\
+        --input ${source} \\
+        --output ${folder}_count.json \\
         --use-blob-storage \\
         --bucket ${bucket}
     """

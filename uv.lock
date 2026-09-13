@@ -1095,7 +1095,6 @@ dependencies = [
     { name = "duckdb" },
     { name = "lynceus-utils" },
     { name = "numpy" },
-    { name = "nvmolkit" },
     { name = "pyarrow" },
 ]
 
@@ -1107,7 +1106,6 @@ requires-dist = [
     { name = "duckdb", specifier = ">=1.5.4" },
     { name = "lynceus-utils", editable = "libs/lynceus-utils" },
     { name = "numpy", specifier = ">=2.5.1" },
-    { name = "nvmolkit", specifier = ">=0.6.0" },
     { name = "pyarrow", specifier = ">=24.0.0" },
 ]
 
@@ -1777,6 +1775,7 @@ name = "lynceus-utils"
 version = "0.1.0"
 source = { editable = "libs/lynceus-utils" }
 dependencies = [
+    { name = "click" },
     { name = "duckdb" },
     { name = "fsspec" },
     { name = "pyarrow" },
@@ -1791,6 +1790,7 @@ s3 = [
 
 [package.metadata]
 requires-dist = [
+    { name = "click", specifier = ">=8.4.2" },
     { name = "duckdb", specifier = ">=1.5.4" },
     { name = "fsspec", specifier = ">=2026.6.0" },
     { name = "pyarrow", specifier = ">=24.0.0" },

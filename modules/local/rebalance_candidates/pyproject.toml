@@ -14,7 +14,7 @@ dependencies = [
 ]
 
 [project.scripts]
-rebalance-candidates = "rebalance_candidates.cli:rebalance_candidates"
+count-candidates = "rebalance_candidates.count_candidates:count_candidates"
 
 [build-system]
 requires = ["uv_build>=0.12.5,<0.13.0"]
