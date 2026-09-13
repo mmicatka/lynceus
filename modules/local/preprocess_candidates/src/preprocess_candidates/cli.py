@@ -1,8 +1,9 @@
-# modules/local/preprocess_candidates/src/preprocess_candidates/preprocess.py
+# modules/local/preprocess_candidates/src/preprocess_candidates/cli.py
 
-# modules/local/preprocess_candidates/src/preprocess_candidates/preprocess.py
 
+import contextlib
 import gzip
+import itertools
 import logging
 import os
 import sys
@@ -17,12 +18,11 @@ import pyarrow.parquet as pq
 from lynceus_utils.storage.blob_storage import get_blob_storage_settings
 from pyarrow.fs import FileType, LocalFileSystem, S3FileSystem
 from rdkit import Chem, rdBase
+from rdkit.Chem import AllChem
+
+from preprocess_candidates.steps.conformers_gpu import ConformersGPUStep
 
 from .steps import (
-    ConformersStep,
-    DescriptorsStep,
-    MorganFingerprintStep,
-    PainsStep,
     Step,
 )
 
@@ -34,6 +34,7 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
+    stream=sys.stdout,
 )
 
 logger = logging.getLogger(__name__)
@@ -41,6 +42,20 @@ logger = logging.getLogger(__name__)
 _LOG_INTERVAL = 1000
 
 _worker_steps: list[Step] = []
+
+
+@contextlib.contextmanager
+def _suppress_native_stderr():
+    stderr_fd = 2
+    saved_fd = os.dup(stderr_fd)
+    devnull_fd = os.open(os.devnull, os.O_WRONLY)
+    try:
+        os.dup2(devnull_fd, stderr_fd)
+        yield
+    finally:
+        os.dup2(saved_fd, stderr_fd)
+        os.close(devnull_fd)
+        os.close(saved_fd)
 
 
 def _init_worker(steps: list[Step]) -> None:
@@ -111,8 +126,8 @@ def _batch(iterator: Iterator, size: int) -> Iterator[list]:
 
 
 def _process_batch(batch: list[tuple[str, str]]) -> list[dict[str, Any]]:
-    """Worker function to process a batch of molecules."""
-    results = []
+    rows = []
+    parsed_mols: list[Chem.Mol | None] = []
 
     for smiles, catalog_id in batch:
         row = {
@@ -123,28 +138,41 @@ def _process_batch(batch: list[tuple[str, str]]) -> list[dict[str, Any]]:
             "error_reason": "",
         }
         mol = Chem.MolFromSmiles(smiles)
-
         if mol is None:
             row["parse_ok"] = False
             row["steps_ok"] = False
             row["error_reason"] = "rdkit_parse_failed"
-            for step in _worker_steps:
-                row.update(step.failure_result())
-        else:
-            try:
-                for step in _worker_steps:
-                    out = step.compute(mol)
-                    if out:
-                        row.update(out)
-            except Exception as exc:
-                row["steps_ok"] = False
-                row["error_reason"] = f"step_failed: {exc}"
-                for step in _worker_steps:
-                    row.update(step.failure_result())
+        rows.append(row)
+        parsed_mols.append(mol)
 
-        results.append(row)
+    for step in _worker_steps:
+        live_indices = [
+            i
+            for i, (row, mol) in enumerate(zip(rows, parsed_mols))
+            if row["steps_ok"] and mol is not None
+        ]
+        if not live_indices:
+            continue
 
-    return results
+        live_mols = [parsed_mols[i] for i in live_indices]
+        try:
+            outs = step.compute_batch(live_mols)
+        except Exception as exc:
+            for i in live_indices:
+                rows[i]["steps_ok"] = False
+                rows[i]["error_reason"] = f"step_failed: {exc}"
+                rows[i].update(step.failure_result())
+            continue
+
+        for i, out in zip(live_indices, outs):
+            if out is None:
+                rows[i]["steps_ok"] = False
+                rows[i]["error_reason"] = "step_failed"
+                rows[i].update(step.failure_result())
+            else:
+                rows[i].update(out)
+
+    return rows
 
 
 def _preprocess(
@@ -223,13 +251,75 @@ def _preprocess(
     )
 
 
-def _build_pipeline(morgan_radius: int, morgan_n_bits: int, seed: int) -> list[Step]:
+# def _build_pipeline(morgan_radius: int, morgan_n_bits: int, seed: int) -> list[Step]:
+#     return [
+#         # DescriptorsStep(),
+#         # PainsStep(),
+#         # MorganFingerprintStep(morgan_radius, morgan_n_bits),
+#         # ConformersCPUStep(seed=seed),
+#         ConformersGPUStep(seed=seed)
+#     ]
+
+
+def _build_pipeline(
+    seed: int,
+    embed_hardware_options_path: Path | None = None,
+    mmff_hardware_options_path: Path | None = None,
+) -> list[Step]:
     return [
-        DescriptorsStep(),
-        PainsStep(),
-        MorganFingerprintStep(morgan_radius, morgan_n_bits),
-        ConformersStep(seed=seed),
+        ConformersGPUStep(
+            seed=seed,
+            embed_hardware_options_path=embed_hardware_options_path,
+            mmff_hardware_options_path=mmff_hardware_options_path,
+        )
     ]
+
+
+def _sample_mols_for_tuning(
+    input_path: Path, sample_size: int, seed: int
+) -> list[Chem.Mol]:
+    mols: list[Chem.Mol] = []
+    for smiles, _catalog_id in itertools.islice(_iter_smiles(input_path), sample_size):
+        mol = Chem.MolFromSmiles(smiles)
+        if mol is not None:
+            mols.append(Chem.AddHs(mol))
+    if not mols:
+        logger.error("no valid molecules parsed from %s for tuning", input_path)
+        sys.exit(1)
+    return mols
+
+
+def _run_autotune(
+    input_path: Path,
+    sample_size: int,
+    seed: int,
+    output_dir: Path,
+) -> None:
+    from nvmolkit.autotune import save, tune_embed_molecules, tune_mmff_optimize
+
+    logger.info(
+        "Sampling %d molecules from %s for autotuning...", sample_size, input_path.name
+    )
+    mols = _sample_mols_for_tuning(input_path, sample_size, seed)
+    logger.info("Sampled %d valid molecules.", len(mols))
+
+    embed_params = AllChem.ETKDGv3()
+    embed_params.randomSeed = seed
+    embed_params.useRandomCoords = True
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    logger.info("Running tune_embed_molecules...")
+    embed_result = tune_embed_molecules(mols, params=embed_params, seed=seed)
+    embed_tune_path = output_dir / "embed_tune.json"
+    save(embed_result.best_config, str(embed_tune_path))
+    logger.info("Saved embed tuning result to %s", embed_tune_path)
+
+    logger.info("Running tune_mmff_optimize...")
+    mmff_result = tune_mmff_optimize(mols, seed=seed)
+    mmff_tune_path = output_dir / "mmff_tune.json"
+    save(mmff_result.best_config, str(mmff_tune_path))
+    logger.info("Saved MMFF tuning result to %s", mmff_tune_path)
 
 
 class NumWorkersType(click.ParamType):
@@ -294,6 +384,39 @@ NUM_WORKERS = NumWorkersType()
     is_flag=True,
     help="Skip processing if the output file already exists.",
 )
+@click.option(
+    "--tune",
+    is_flag=True,
+    help="Run nvMolKit autotune against a sample of --input and exit.",
+)
+@click.option(
+    "--tune-sample-size",
+    default=2000,
+    type=int,
+    show_default=True,
+    help="Number of molecules to sample from --input for autotuning.",
+)
+@click.option(
+    "--tune-output-dir",
+    default="./nvmolkit_tune",
+    type=click.Path(file_okay=False),
+    show_default=True,
+    help="Directory to write tuning result JSON files.",
+)
+@click.option(
+    "--embed-hardware-options",
+    "embed_hardware_options_path",
+    type=click.Path(exists=True, dir_okay=False),
+    default=None,
+    help="Path to a saved HardwareOptions JSON for embedding (from --tune).",
+)
+@click.option(
+    "--mmff-hardware-options",
+    "mmff_hardware_options_path",
+    type=click.Path(exists=True, dir_okay=False),
+    default=None,
+    help="Path to a saved HardwareOptions JSON for MMFF optimization (from --tune).",
+)
 def preprocess(
     input_path: str,
     output: str,
@@ -303,7 +426,24 @@ def preprocess(
     bucket: str,
     skip_if_exists: bool,
     batch_size: int,
+    tune: bool,
+    tune_sample_size: int,
+    tune_output_dir: str,
+    embed_hardware_options_path: str | None,
+    mmff_hardware_options_path: str | None,
 ):
+    if tune:
+        if num_workers != 1:
+            logger.warning("--tune runs single-process against the GPU")
+        with _suppress_native_stderr():
+            _run_autotune(
+                input_path=Path(input_path),
+                sample_size=tune_sample_size,
+                seed=seed,
+                output_dir=Path(tune_output_dir),
+            )
+        return
+
     if use_blob_storage:
         blob_settings = get_blob_storage_settings()
         target_path = f"{bucket}/{output.lstrip('/')}"
@@ -324,13 +464,22 @@ def preprocess(
             logger.info("%s already exists. Skipping.", target_path)
             return
 
-    steps = _build_pipeline(2, 1024, seed)
-
-    _preprocess(
-        input_path=Path(input_path),
-        num_workers=num_workers,
-        batch_size=batch_size,
-        steps=steps,
-        target_path=target_path,
-        filesystem=filesystem,
+    steps = _build_pipeline(
+        seed,
+        embed_hardware_options_path=Path(embed_hardware_options_path)
+        if embed_hardware_options_path
+        else None,
+        mmff_hardware_options_path=Path(mmff_hardware_options_path)
+        if mmff_hardware_options_path
+        else None,
     )
+
+    with _suppress_native_stderr():
+        _preprocess(
+            input_path=Path(input_path),
+            num_workers=num_workers,
+            batch_size=batch_size,
+            steps=steps,
+            target_path=target_path,
+            filesystem=filesystem,
+        )

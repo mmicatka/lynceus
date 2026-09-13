@@ -1,6 +1,10 @@
 # modules/local/preprocess_candidates/src/preprocess_candidates/steps/conformers.py
 
-from typing import Any
+import contextlib
+import logging
+import sys
+import time
+from typing import Any, Generator
 
 import blake3
 import dimorphite_dl
@@ -8,9 +12,29 @@ import pyarrow as pa
 from rdkit import Chem
 from rdkit.Chem import AllChem, Mol
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+    stream=sys.stdout,
+)
 
-class ConformersStep:
-    name = "conformers"
+logger = logging.getLogger(__name__)
+
+
+@contextlib.contextmanager
+def timed_stage(stage: str, logger: logging.Logger) -> Generator[None, None, None]:
+    logger.info("METRIC stage=%s event=start", stage)
+    start = time.perf_counter()
+    try:
+        yield
+    finally:
+        elapsed = time.perf_counter() - start
+        logger.info("METRIC stage=%s event=end elapsed_seconds=%.4f", stage, elapsed)
+
+
+class ConformersCPUStep:
+    name = "conformersCPU"
 
     def __init__(
         self,
@@ -31,7 +55,16 @@ class ConformersStep:
     def init_worker(self) -> None:
         pass
 
-    def compute(self, mol: Mol) -> dict[str, Any]:
+    def compute_batch(self, mols: list[Chem.Mol]) -> list[dict[str, Any] | None]:
+        results = []
+        for mol in mols:
+            try:
+                results.append(self._compute_one(mol))
+            except Exception:
+                results.append(None)
+        return results
+
+    def _compute_one(self, mol: Mol) -> dict[str, Any]:
         smiles = Chem.MolToSmiles(mol)
         prot_smiles = self._select_protonation_state(smiles)
         embed_mol = Chem.MolFromSmiles(prot_smiles)

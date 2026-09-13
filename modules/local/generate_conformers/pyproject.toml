@@ -1,27 +1,25 @@
 [project]
-name = "preprocess-candidates"
+name = "generate-conformers"
 version = "0.1.0"
 description = "Add your description here"
 authors = [{ name = "Mike Micatka", email = "mike.micatka@gmail.com" }]
 requires-python = ">=3.12"
 dependencies = [
-    "click>=8.4.2",
-    "numpy>=2.5.1",
-    "polars>=1.42.1",
-    "pyarrow>=24.0.0",
-    "rdkit>=2026.3.4",
-    "dimorphite-dl",
     "blake3>=1.0.9",
+    "click>=8.4.2",
+    "dimorphite-dl",
     "duckdb>=1.5.4",
     "lynceus-utils",
-    "nvmolkit>=0.6.0",
+    "numpy>=2.5.1",
+    "pyarrow>=24.0.0",
 ]
 
+
 [project.scripts]
-preprocess-candidates = "preprocess_candidates.cli:preprocess"
+generate-conformers = "generate_conformers.cli:generate_conformers"
 
 [build-system]
-requires = ["uv_build>=0.12.3,<0.13.0"]
+requires = ["uv_build>=0.12.9,<0.13.0"]
 build-backend = "uv_build"
 
 [tool.uv.sources]

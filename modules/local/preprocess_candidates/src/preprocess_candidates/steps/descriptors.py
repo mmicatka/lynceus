@@ -89,11 +89,6 @@ class PkaRule:
     label: str
 
 
-# FIXME: rule selection is "highest pKa among all substructure matches", not
-# "most specific pattern wins". Several patterns overlap (e.g. secondary_amine
-# vs secondary_amine_gen, guanidine vs guanidine_sub) and are only implicitly
-# disambiguated by pKa ordering. Verify this against a reference dataset
-# (e.g. DataWarrior or a curated basic-pKa benchmark) before trusting output.
 _PKA_RULES: tuple[PkaRule, ...] = (
     PkaRule("[NX3;H2][CX3](=[NH])[NX3;H2]", 13.5, "guanidine"),
     PkaRule("[NX3;H1,H2][CX3](=[NH])[NX3;H1,H2]", 12.5, "guanidine_sub"),
