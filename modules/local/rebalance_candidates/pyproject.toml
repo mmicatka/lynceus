@@ -10,11 +10,16 @@ dependencies = [
     "fsspec>=2026.6.0",
     "lynceus-utils",
     "pyarrow>=24.0.0",
+    "pydantic>=2.13.5",
     "s3fs>=2026.6.0",
 ]
 
 [project.scripts]
-rebalance-candidates = "rebalance_candidates.cli:rebalance_candidates"
+count-candidates = "rebalance_candidates:count_candidates"
+merge-candidate-counts = "rebalance_candidates:merge_candidate_counts"
+allocate-candidate-samples = "rebalance_candidates:allocate_candidate_samples"
+sample-candidates = "rebalance_candidates:sample_candidates"
+shard-candidate-samples = "rebalance_candidates:shard_candidate_samples"
 
 [build-system]
 requires = ["uv_build>=0.12.5,<0.13.0"]
