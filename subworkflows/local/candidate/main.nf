@@ -1,6 +1,6 @@
 // subworkflows/candidate/main.nf
 
-include { COUNT_CANDIDATES } from '../../../modules/local/rebalance_candidates'
+include { COUNT_CANDIDATES ; MERGE_CANDIDATE_COUNTS } from '../../../modules/local/rebalance_candidates'
 
 workflow CANDIDATE {
   take:
@@ -15,4 +15,7 @@ workflow CANDIDATE {
   }
 
   COUNT_CANDIDATES(ch_candidate_sources, bucket)
+
+  ch_count_keys = COUNT_CANDIDATES.out.count.collect()
+  MERGE_CANDIDATE_COUNTS(ch_count_keys, bucket)
 }

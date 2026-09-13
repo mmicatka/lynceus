@@ -38,6 +38,8 @@ def _fsspec_storage_options(
 def get_filesystem(
     blob_storage_settings: Optional[BlobStorageSettings],
 ) -> fsspec.AbstractFileSystem:
-    if blob_storage_settings:
-        return fsspec.filesystem("s3", **_fsspec_storage_options(blob_storage_settings))
-    return fsspec.filesystem("file")
+    return (
+        fsspec.filesystem("s3", **_fsspec_storage_options(blob_storage_settings))
+        if blob_storage_settings
+        else fsspec.filesystem("file")
+    )

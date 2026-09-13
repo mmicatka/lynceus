@@ -15,6 +15,7 @@ dependencies = [
 
 [project.scripts]
 count-candidates = "rebalance_candidates.count_candidates:count_candidates"
+merge-candidate-counts = "rebalance_candidates.count_candidates:merge_candidate_counts"
 
 [build-system]
 requires = ["uv_build>=0.12.5,<0.13.0"]
