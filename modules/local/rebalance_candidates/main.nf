@@ -1,8 +1,39 @@
 // modules/local/rebalance/main.nf
 
+process RESOLVE_PENDING_CANDIDATE_FOLDERS {
+    container "${params.registry}/lynceus/rebalance-candidates:0.1.0"
+    tag { output_suffix }
+
+    label 'pvc_io_retry'
+
+    input:
+    val sources
+    val output_suffix
+    val output_dir
+    val bucket
+
+    output:
+    val output_key, emit: pending_key
+
+    script:
+    output_key = "pending_${output_suffix.toString().replaceAll('[^a-zA-Z0-9]', '')}.json"
+    def sources_arg = sources.join(',')
+    """
+    resolve-pending-candidate-folders \\
+        --sources ${sources_arg} \\
+        --output-suffix ${output_suffix} \\
+        --output-dir ${output_dir} \\
+        --output ${output_key} \\
+        --use-blob-storage \\
+        --bucket ${bucket}
+    """
+}
+
 process COUNT_CANDIDATES {
     container "${params.registry}/lynceus/rebalance-candidates:0.1.0"
     tag { folder }
+
+    label 'pvc_io_retry'
 
     input:
     val source
@@ -31,6 +62,8 @@ process COUNT_CANDIDATES {
 process MERGE_CANDIDATE_COUNTS {
     container "${params.registry}/lynceus/rebalance-candidates:0.1.0"
 
+    label 'pvc_io_retry'
+
     input:
     val count_keys
     val bucket
@@ -54,11 +87,13 @@ process ALLOCATE_CANDIDATE_SAMPLES {
     container "${params.registry}/lynceus/rebalance-candidates:0.1.0"
     tag { "target_total=${target_total}" }
 
+    label 'pvc_io_retry'
+
     input:
     val candidate_counts_key
     val source_prefix
     val target_total
-    val floor_per_folder
+    val floor_per_source
     val bucket
 
     output:
@@ -71,7 +106,7 @@ process ALLOCATE_CANDIDATE_SAMPLES {
         --candidate-counts ${candidate_counts_key} \\
         --source-prefix ${source_prefix} \\
         --target-total ${target_total} \\
-        --floor-per-folder ${floor_per_folder} \\
+        --floor-per-source ${floor_per_source} \\
         --output ${output_key} \\
         --use-blob-storage \\
         --bucket ${bucket}
@@ -81,6 +116,8 @@ process ALLOCATE_CANDIDATE_SAMPLES {
 process SAMPLE_CANDIDATES {
     container "${params.registry}/lynceus/rebalance-candidates:0.1.0"
     tag { folder }
+
+    label 'pvc_io_retry'
 
     input:
     tuple val(folder), val(source), val(target_count)
@@ -107,23 +144,24 @@ process SHARD_SAMPLES {
     container "${params.registry}/lynceus/rebalance-candidates:0.1.0"
     tag { "n_shards=${n_shards}" }
 
+    label 'pvc_io_retry'
+
     input:
     val ready
     val source_glob
     val n_shards
-    val output_prefix
+    val output
     val bucket
 
     output:
-    val output_prefix, emit: shard_prefix
-    val true, emit: done
+    val "${output}/shard_manifest.jsonl", emit: shard_manifest
 
     script:
     """
     shard-candidate-samples \\
         --input ${source_glob} \\
         --n-shards ${n_shards} \\
-        --output-prefix ${output_prefix} \\
+        --output ${output} \\
         --use-blob-storage \\
         --bucket ${bucket}
     """

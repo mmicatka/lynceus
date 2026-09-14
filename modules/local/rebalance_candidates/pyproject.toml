@@ -15,6 +15,7 @@ dependencies = [
 ]
 
 [project.scripts]
+resolve-pending-candidate-folders = "rebalance_candidates:resolve_pending_candidate_folders"
 count-candidates = "rebalance_candidates:count_candidates"
 merge-candidate-counts = "rebalance_candidates:merge_candidate_counts"
 allocate-candidate-samples = "rebalance_candidates:allocate_candidate_samples"

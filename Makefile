@@ -12,7 +12,10 @@ NF_DRIVER_DEPLOYMENT ?= nf-driver
 
 .PHONY: build push build-* run-dev run-k8s driver-exec driver-restart clean reset lint
 
-build: build-preprocess-candidates build-physiochemical-filter build-rebalance-candidates build-sample-candidates build-detect-binding-sites build-docking-run-gpu build-nf-driver
+build: build-preprocess-candidates build-generate-conformers build-physiochemical-filter build-rebalance-candidates build-sample-candidates build-detect-binding-sites build-docking-run-gpu build-nf-driver
+
+build-generate-conformers:
+	docker buildx build --platform linux/amd64,linux/arm64 --push -f modules/local/generate_conformers/Dockerfile -t $(IMAGE_PREFIX)/generate-conformers:$(VERSION) .
 
 build-preprocess-candidates:
 	docker buildx build --platform linux/amd64,linux/arm64 --push -f modules/local/preprocess_candidates/Dockerfile -t $(IMAGE_PREFIX)/preprocess-candidates:$(VERSION) .
