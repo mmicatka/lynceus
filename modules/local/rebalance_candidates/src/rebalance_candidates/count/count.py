@@ -17,6 +17,22 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def _resolve_path(path: str, use_blob_storage: bool, bucket: str) -> str:
+    return f"s3://{bucket}/{path.lstrip('/')}" if use_blob_storage else path
+
+
+def _read_json(path: str, use_blob_storage: bool, bucket: str) -> dict | None:
+    blob_storage_settings = get_blob_storage_settings() if use_blob_storage else None
+    fs = get_filesystem(blob_storage_settings)
+    resolved_path = _resolve_path(path, use_blob_storage, bucket)
+
+    if not fs.exists(resolved_path):
+        return None
+
+    with fs.open(resolved_path, "r") as f:
+        return json.load(f)
+
+
 def _write_json(
     output_path: str, payload: dict, use_blob_storage: bool, bucket: str
 ) -> None:
@@ -24,9 +40,7 @@ def _write_json(
 
     blob_storage_settings = get_blob_storage_settings() if use_blob_storage else None
     fs = get_filesystem(blob_storage_settings)
-    resolved_path = (
-        f"s3://{bucket}/{output_path.lstrip('/')}" if use_blob_storage else output_path
-    )
+    resolved_path = _resolve_path(output_path, use_blob_storage, bucket)
 
     with fs.open(resolved_path, "w") as f:
         f.write(content)
@@ -64,6 +78,21 @@ def count_candidates(
     bucket: str,
 ) -> None:
     folder = input_path.rstrip("/").split("/")[-1]
+
+    existing = _read_json(output_path, use_blob_storage, bucket)
+    if (
+        existing is not None
+        and existing.get("folder") == folder
+        and existing.get("count", 0) > 0
+    ):
+        logger.info(
+            "folder=%s already counted at %s (count=%d), skipping",
+            folder,
+            output_path,
+            existing["count"],
+        )
+        return
+
     source_glob = f"{input_path.rstrip('/')}/*.smi.gz"
 
     if use_blob_storage:
@@ -92,5 +121,5 @@ def count_candidates(
     logger.info("folder=%s count=%d", folder, row_count)
 
     _write_json(
-        output_path, {"tranche": folder, "count": row_count}, use_blob_storage, bucket
+        output_path, {"folder": folder, "count": row_count}, use_blob_storage, bucket
     )

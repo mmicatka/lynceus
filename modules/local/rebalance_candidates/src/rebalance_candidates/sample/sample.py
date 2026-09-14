@@ -3,6 +3,7 @@
 import logging
 
 import click
+from duckdb import IOException
 from lynceus_utils.duckdb import export_parquet, get_connection
 from lynceus_utils.storage.blob_storage import get_blob_storage_settings
 
@@ -12,6 +13,18 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 logger = logging.getLogger(__name__)
+
+
+def _existing_output_row_count(conn, output_path: str) -> int | None:
+    try:
+        result = conn.read_parquet(output_path).count("*").fetchone()
+    except IOException:
+        return None
+
+    if result is None:
+        return None
+
+    return result[0]
 
 
 @click.command()
@@ -64,6 +77,16 @@ def sample_candidates(
         output_path = f"s3://{bucket}/{output_path.lstrip('/')}"
     else:
         conn = get_connection()
+
+    existing_row_count = _existing_output_row_count(conn, output_path)
+    if existing_row_count == target_count:
+        logger.info(
+            "folder=%s already has %d rows at %s, skipping",
+            folder,
+            existing_row_count,
+            output_path,
+        )
+        return
 
     logger.info(
         "Sampling folder=%s target_count=%d from %s", folder, target_count, source_glob
