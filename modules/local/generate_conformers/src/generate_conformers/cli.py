@@ -74,6 +74,14 @@ def _chunk_list(input_list, size):
         yield input_list[i : i + size]
 
 
+def _output_matches_input_row_count(fs, output: str, expected_rows: int) -> bool:
+    try:
+        existing_num_rows = pq.ParquetFile(output, filesystem=fs).metadata.num_rows
+    except FileNotFoundError:
+        return False
+    return existing_num_rows == expected_rows
+
+
 @click.command()
 @click.option(
     "--input", type=str, required=True, help="Path to the input Parquet file."
@@ -123,6 +131,14 @@ def generate_conformers(
     parquet_file = pq.ParquetFile(input, filesystem=fs)
 
     num_rows = parquet_file.metadata.num_rows
+
+    if _output_matches_input_row_count(fs, output, num_rows):
+        logger.info(
+            "%s already exists with %d rows matching input. Skipping.",
+            output,
+            num_rows,
+        )
+        return
 
     writer = None
 

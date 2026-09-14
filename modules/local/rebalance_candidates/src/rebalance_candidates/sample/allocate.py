@@ -1,5 +1,7 @@
 # modules/local/rebalance_candidates/src/rebalance_candidates/sample/allocate.py
 
+import csv
+import io
 import json
 import logging
 import math
@@ -18,15 +20,34 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def _resolve_path(path: str, use_blob_storage: bool, bucket: str) -> str:
+    return f"s3://{bucket}/{path.lstrip('/')}" if use_blob_storage else path
+
+
 def _read_json(input_path: str, use_blob_storage: bool, bucket: str) -> dict:
     blob_storage_settings = get_blob_storage_settings() if use_blob_storage else None
     fs = get_filesystem(blob_storage_settings)
-    resolved_path = (
-        f"s3://{bucket}/{input_path.lstrip('/')}" if use_blob_storage else input_path
-    )
+    resolved_path = _resolve_path(input_path, use_blob_storage, bucket)
 
     with fs.open(resolved_path, "r") as f:
         return json.load(f)
+
+
+def _read_text(input_path: str, use_blob_storage: bool, bucket: str) -> str | None:
+    blob_storage_settings = get_blob_storage_settings() if use_blob_storage else None
+    fs = get_filesystem(blob_storage_settings)
+    resolved_path = _resolve_path(input_path, use_blob_storage, bucket)
+
+    if not fs.exists(resolved_path):
+        return None
+
+    with fs.open(resolved_path, "r") as f:
+        content = f.read()
+
+    if not isinstance(content, str):
+        raise RuntimeError(f"Expected text content from {resolved_path}, got bytes")
+
+    return content
 
 
 def _write_text(
@@ -34,14 +55,66 @@ def _write_text(
 ) -> None:
     blob_storage_settings = get_blob_storage_settings() if use_blob_storage else None
     fs = get_filesystem(blob_storage_settings)
-    resolved_path = (
-        f"s3://{bucket}/{output_path.lstrip('/')}" if use_blob_storage else output_path
-    )
+    resolved_path = _resolve_path(output_path, use_blob_storage, bucket)
 
     with fs.open(resolved_path, "w") as f:
         f.write(content)
 
     logger.info("Wrote allocation manifest to %s", resolved_path)
+
+
+def _parse_manifest(content: str) -> list[dict[str, str]]:
+    reader = csv.DictReader(io.StringIO(content))
+    return list(reader)
+
+
+def _manifest_matches_config(
+    manifest_content: str,
+    source_counts: dict[str, int],
+    source_prefix: str,
+    target_total: int,
+    floor_per_source: int,
+) -> bool:
+    try:
+        rows = _parse_manifest(manifest_content)
+    except csv.Error:
+        return False
+
+    if not rows:
+        return False
+
+    expected_source_prefix = source_prefix.rstrip("/")
+    manifest_folders = set()
+    total_allocated = 0
+    for row in rows:
+        folder = row.get("folder")
+        source = row.get("source")
+        target_count_raw = row.get("target_count")
+        if folder is None or source is None or target_count_raw is None:
+            return False
+        if source != f"{expected_source_prefix}/{folder}":
+            return False
+        if folder not in source_counts:
+            return False
+        try:
+            target_count = int(target_count_raw)
+        except ValueError:
+            return False
+        if target_count <= 0 or target_count > source_counts[folder]:
+            return False
+        manifest_folders.add(folder)
+        total_allocated += target_count
+
+    excluded_folders = {
+        folder
+        for folder, count in source_counts.items()
+        if min(count, floor_per_source) == 0 and folder not in manifest_folders
+    }
+    expected_folders = set(source_counts) - excluded_folders
+    if manifest_folders != expected_folders:
+        return False
+
+    return total_allocated <= target_total
 
 
 def _allocate_candidate_samples(
@@ -157,6 +230,16 @@ def allocate_candidate_samples(
     source_counts = {
         str(source): int(count) for source, count in source_counts_raw.items()
     }
+
+    existing_manifest = _read_text(output_path, use_blob_storage, bucket)
+    if existing_manifest is not None and _manifest_matches_config(
+        existing_manifest, source_counts, source_prefix, target_total, floor_per_source
+    ):
+        logger.info(
+            "%s already contains a valid allocation for the current config, skipping",
+            output_path,
+        )
+        return
 
     plan = _allocate_candidate_samples(
         source_counts=source_counts,

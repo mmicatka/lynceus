@@ -157,6 +157,49 @@ def math_ceil_div(numerator: int, denominator: int) -> int:
     return numerator // denominator
 
 
+def _read_existing_manifest(
+    manifest_key: str, use_blob_storage: bool, bucket: str
+) -> list[dict] | None:
+    blob_storage_settings = get_blob_storage_settings() if use_blob_storage else None
+    fs = get_filesystem(blob_storage_settings)
+    resolved_path = (
+        f"s3://{bucket}/{manifest_key.lstrip('/')}"
+        if use_blob_storage
+        else manifest_key
+    )
+
+    if not fs.exists(resolved_path):
+        return None
+
+    with fs.open(resolved_path, "r") as f:
+        lines = f.read().splitlines()
+
+    return [json.loads(line) for line in lines if line]
+
+
+def _manifest_is_valid(
+    manifest_rows: list[dict], n_shards: int, output: str, conn
+) -> bool:
+    if len(manifest_rows) != n_shards:
+        return False
+
+    expected_shard_ids = set(range(n_shards))
+    manifest_shard_ids = {row.get("shard_id") for row in manifest_rows}
+    if manifest_shard_ids != expected_shard_ids:
+        return False
+
+    for row in manifest_rows:
+        expected_output_path = f"{output.rstrip('/')}/shard_{row['shard_id']}.parquet"
+        if row.get("output_path") != expected_output_path:
+            return False
+
+        result = conn.read_parquet(expected_output_path).count("*").fetchone()
+        if result is None or result[0] != row.get("row_count"):
+            return False
+
+    return True
+
+
 @click.command()
 @click.option(
     "--input",
@@ -205,6 +248,21 @@ def shard_candidate_samples(
         output = f"s3://{bucket}/{output_key.lstrip('/')}"
     else:
         conn = get_connection()
+
+    manifest_key = f"{output_key}/shard_manifest.jsonl"
+
+    existing_manifest_rows = _read_existing_manifest(
+        manifest_key, use_blob_storage, bucket
+    )
+    if existing_manifest_rows is not None and _manifest_is_valid(
+        existing_manifest_rows, n_shards, output, conn
+    ):
+        logger.info(
+            "%s already reflects %d valid shards, skipping",
+            manifest_key,
+            n_shards,
+        )
+        return
 
     files = _collect_folder_files(conn, input_glob)
 
@@ -267,5 +325,4 @@ def shard_candidate_samples(
             }
         )
 
-    manifest_key = f"{output_key}/shard_manifest.jsonl"
     _write_manifest(manifest_key, manifest_rows, use_blob_storage, bucket)
