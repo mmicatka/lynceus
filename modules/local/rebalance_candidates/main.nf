@@ -5,6 +5,7 @@ process COUNT_CANDIDATES {
     tag { folder }
 
     label 'pvc_io_retry'
+    label 'process_high'
 
     input:
     val source
