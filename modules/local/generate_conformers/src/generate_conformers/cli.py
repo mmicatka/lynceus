@@ -9,6 +9,8 @@ import dimorphite_dl
 import pyarrow as pa
 import pyarrow.parquet as pq
 from lynceus_utils.cli import NumWorkers
+from lynceus_utils.storage.blob_storage import get_blob_storage_settings
+from lynceus_utils.storage.filesystem import get_filesystem
 from rdkit import rdBase
 from rdkit.Chem import AddHs, AllChem, MolFromSmiles, MolToMolBlock
 
@@ -79,10 +81,18 @@ def _chunk_list(input_list, size):
 @click.option(
     "--output", type=str, required=True, help="Path to the output Parquet file."
 )
-@click.option("--batch-size", default=1_000, type=int, help="Parquet read batch size.")
+@click.option(
+    "--use-blob-storage",
+    is_flag=True,
+    help="Read input and write output via blob storage.",
+)
+@click.option(
+    "--bucket", type=str, default="lynceus", help="S3-compatible bucket name."
+)
+@click.option("--batch-size", default=10_000, type=int, help="Parquet read batch size.")
 @click.option(
     "--chunk-size",
-    default=50,
+    default=25,
     type=int,
     help="Worker chunk size for the conformer process pool.",
 )
@@ -96,12 +106,27 @@ def _chunk_list(input_list, size):
 def generate_conformers(
     input: str,
     output: str,
+    use_blob_storage: bool,
+    bucket: str,
     batch_size: int,
     chunk_size: int,
     num_workers: int,
 ):
-    parquet_file = pq.ParquetFile(input)
+    logger.info("generating conformers for %s", input)
+
+    blob_storage_settings = get_blob_storage_settings() if use_blob_storage else None
+    fs = get_filesystem(blob_storage_settings)
+
+    input = f"s3://{bucket}/{input}" if use_blob_storage else input
+    output = f"s3://{bucket}/{output}" if use_blob_storage else output
+
+    parquet_file = pq.ParquetFile(input, filesystem=fs)
+
+    num_rows = parquet_file.metadata.num_rows
+
     writer = None
+
+    logger.info("processed 0 of %d", num_rows)
 
     with ProcessPoolExecutor(max_workers=num_workers) as executor:
         for i, batch in enumerate(parquet_file.iter_batches(batch_size=batch_size)):
@@ -121,10 +146,10 @@ def generate_conformers(
             )
 
             if writer is None:
-                writer = pq.ParquetWriter(output, new_batch.schema)
+                writer = pq.ParquetWriter(output, new_batch.schema, filesystem=fs)
 
             writer.write_batch(new_batch)
-            logger.info("processed %d", (i + 1) * batch_size)
+            logger.info("processed %d of %d", (i + 1) * batch_size, num_rows)
 
     if writer is not None:
         writer.close()

@@ -4,6 +4,8 @@ process RESOLVE_PENDING_CANDIDATE_FOLDERS {
     container "${params.registry}/lynceus/rebalance-candidates:0.1.0"
     tag { output_suffix }
 
+    label 'pvc_io_retry'
+
     input:
     val sources
     val output_suffix
@@ -30,6 +32,8 @@ process RESOLVE_PENDING_CANDIDATE_FOLDERS {
 process COUNT_CANDIDATES {
     container "${params.registry}/lynceus/rebalance-candidates:0.1.0"
     tag { folder }
+
+    label 'pvc_io_retry'
 
     input:
     val source
@@ -58,6 +62,8 @@ process COUNT_CANDIDATES {
 process MERGE_CANDIDATE_COUNTS {
     container "${params.registry}/lynceus/rebalance-candidates:0.1.0"
 
+    label 'pvc_io_retry'
+
     input:
     val count_keys
     val bucket
@@ -80,6 +86,8 @@ process MERGE_CANDIDATE_COUNTS {
 process ALLOCATE_CANDIDATE_SAMPLES {
     container "${params.registry}/lynceus/rebalance-candidates:0.1.0"
     tag { "target_total=${target_total}" }
+
+    label 'pvc_io_retry'
 
     input:
     val candidate_counts_key
@@ -109,6 +117,8 @@ process SAMPLE_CANDIDATES {
     container "${params.registry}/lynceus/rebalance-candidates:0.1.0"
     tag { folder }
 
+    label 'pvc_io_retry'
+
     input:
     tuple val(folder), val(source), val(target_count)
     val output_prefix
@@ -134,23 +144,24 @@ process SHARD_SAMPLES {
     container "${params.registry}/lynceus/rebalance-candidates:0.1.0"
     tag { "n_shards=${n_shards}" }
 
+    label 'pvc_io_retry'
+
     input:
     val ready
     val source_glob
     val n_shards
-    val output_prefix
+    val output
     val bucket
 
     output:
-    val output_prefix, emit: shard_prefix
-    val true, emit: done
+    val "${output}/shard_manifest.jsonl", emit: shard_manifest
 
     script:
     """
     shard-candidate-samples \\
         --input ${source_glob} \\
         --n-shards ${n_shards} \\
-        --output-prefix ${output_prefix} \\
+        --output ${output} \\
         --use-blob-storage \\
         --bucket ${bucket}
     """

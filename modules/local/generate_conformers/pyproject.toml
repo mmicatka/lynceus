@@ -9,7 +9,7 @@ dependencies = [
     "click>=8.4.2",
     "dimorphite-dl",
     "duckdb>=1.5.4",
-    "lynceus-utils",
+    "lynceus-utils[s3]",
     "numpy>=2.5.1",
     "pyarrow>=24.0.0",
 ]

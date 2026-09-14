@@ -63,7 +63,7 @@ def _collect_folder_files(
 
 
 def _write_manifest(
-    manifest_path: str,
+    manifest_key: str,
     manifest_rows: list[dict],
     use_blob_storage: bool,
     bucket: str,
@@ -74,9 +74,9 @@ def _write_manifest(
     blob_storage_settings = get_blob_storage_settings() if use_blob_storage else None
     fs = get_filesystem(blob_storage_settings)
     resolved_path = (
-        f"s3://{bucket}/{manifest_path.lstrip('/')}"
+        f"s3://{bucket}/{manifest_key.lstrip('/')}"
         if use_blob_storage
-        else manifest_path
+        else manifest_key
     )
 
     with fs.open(resolved_path, "w") as f:
@@ -154,7 +154,7 @@ def _plan_balanced_shards(
 def math_ceil_div(numerator: int, denominator: int) -> int:
     if denominator <= 0:
         raise RuntimeError(f"denominator must be positive, got {denominator}")
-    return -(-numerator // denominator)
+    return numerator // denominator
 
 
 @click.command()
@@ -173,11 +173,10 @@ def math_ceil_div(numerator: int, denominator: int) -> int:
     help="Number of balanced output shards to write.",
 )
 @click.option(
-    "--output-prefix",
-    "output_prefix",
+    "--output",
     required=True,
     type=str,
-    help="Output prefix for shard_{i}.parquet files.",
+    help="Output folder for shard_{i}.parquet files.",
 )
 @click.option(
     "--use-blob-storage",
@@ -190,22 +189,25 @@ def math_ceil_div(numerator: int, denominator: int) -> int:
 def shard_candidate_samples(
     input_glob: str,
     n_shards: int,
-    output_prefix: str,
+    output: str,
     use_blob_storage: bool,
     bucket: str,
 ) -> None:
     if n_shards <= 0:
         raise RuntimeError(f"n_shards must be positive, got {n_shards}")
 
+    output_key = output.rstrip("/")
+
     if use_blob_storage:
         blob_storage_settings = get_blob_storage_settings()
         conn = get_connection(blob_storage_settings)
         input_glob = f"s3://{bucket}/{input_glob.lstrip('/')}"
-        output_prefix = f"s3://{bucket}/{output_prefix.lstrip('/')}"
+        output = f"s3://{bucket}/{output_key.lstrip('/')}"
     else:
         conn = get_connection()
 
     files = _collect_folder_files(conn, input_glob)
+
     logger.info("Collected %d candidate sample files for shard planning", len(files))
 
     shard_plan = _plan_balanced_shards(files, n_shards)
@@ -225,7 +227,7 @@ def shard_candidate_samples(
         if not assignments:
             raise RuntimeError(f"shard_id={shard_id} received zero assignments")
 
-        output_path = f"{output_prefix.rstrip('/')}/shard_{shard_id}.parquet"
+        output_path = f"{output.rstrip('/')}/shard_{shard_id}.parquet"
 
         union_parts = []
         for assignment in assignments:
@@ -265,5 +267,5 @@ def shard_candidate_samples(
             }
         )
 
-    manifest_path = f"{output_prefix.rstrip('/')}/shard_manifest.jsonl"
-    _write_manifest(manifest_path, manifest_rows, use_blob_storage, bucket)
+    manifest_key = f"{output_key}/shard_manifest.jsonl"
+    _write_manifest(manifest_key, manifest_rows, use_blob_storage, bucket)
