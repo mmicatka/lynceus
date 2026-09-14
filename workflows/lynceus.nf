@@ -1,6 +1,6 @@
 // workflows/lynceus.nf
 
-include { CANDIDATE } from '../subworkflows/local/candidate'
+include { CANDIDATES } from '../subworkflows/local/candidate'
 include { TARGET } from '../subworkflows/local/target'
 include { SURROGATE_TRAIN } from '../subworkflows/local/surrogate'
 include { DOCKING } from '../subworkflows/local/docking'
@@ -46,7 +46,7 @@ include { DOCKING } from '../subworkflows/local/docking'
 // }
 
 workflow LYNCEUS {
-  CANDIDATE(
+  CANDIDATES(
     params.candidates
   )
 }

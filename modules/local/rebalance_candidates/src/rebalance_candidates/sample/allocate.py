@@ -45,33 +45,33 @@ def _write_text(
 
 
 def _allocate_candidate_samples(
-    folder_counts: dict[str, int],
+    source_counts: dict[str, int],
     target_total: int,
-    floor_per_folder: int,
+    floor_per_source: int,
 ) -> SamplingPlan:
     if target_total <= 0:
         raise RuntimeError(f"target_total must be positive, got {target_total}")
-    if floor_per_folder < 0:
+    if floor_per_source < 0:
         raise RuntimeError(
-            f"floor_per_folder must be non-negative, got {floor_per_folder}"
+            f"floor_per_folder must be non-negative, got {floor_per_source}"
         )
 
     floor_alloc = {
-        folder: min(count, floor_per_folder) for folder, count in folder_counts.items()
+        folder: min(count, floor_per_source) for folder, count in source_counts.items()
     }
     floor_total = sum(floor_alloc.values())
 
     if floor_total > target_total:
         raise RuntimeError(
-            f"floor_per_folder={floor_per_folder} across {len(folder_counts)} folders "
+            f"floor_per_source={floor_per_source} across {len(source_counts)} sources "
             f"requires {floor_total} rows, exceeding target_total={target_total}"
         )
 
     remaining_budget = target_total - floor_total
     proportional_pool = {
         folder: count
-        for folder, count in folder_counts.items()
-        if count > floor_per_folder
+        for folder, count in source_counts.items()
+        if count > floor_per_source
     }
     pool_total = sum(proportional_pool.values())
 
@@ -84,15 +84,15 @@ def _allocate_candidate_samples(
     allocations = [
         FolderAllocation(
             folder=folder,
-            source_count=folder_counts[folder],
+            source_count=source_counts[folder],
             target_count=final_alloc[folder],
         )
-        for folder in folder_counts
+        for folder in source_counts
     ]
 
     return SamplingPlan(
         target_total=target_total,
-        floor_per_folder=floor_per_folder,
+        floor_per_folder=floor_per_source,
         allocations=allocations,
     )
 
@@ -120,11 +120,11 @@ def _allocate_candidate_samples(
     help="Total number of compounds desired in the sampled POC dataset.",
 )
 @click.option(
-    "--floor-per-folder",
-    "floor_per_folder",
+    "--floor-per-source",
+    "floor_per_source",
     required=True,
     type=int,
-    help="Minimum number of compounds guaranteed per folder.",
+    help="Minimum number of compounds guaranteed per source.",
 )
 @click.option(
     "--output",
@@ -145,23 +145,23 @@ def allocate_candidate_samples(
     counts_path: str,
     source_prefix: str,
     target_total: int,
-    floor_per_folder: int,
+    floor_per_source: int,
     output_path: str,
     use_blob_storage: bool,
     bucket: str,
 ) -> None:
-    folder_counts_raw = _read_json(counts_path, use_blob_storage, bucket)
-    if not folder_counts_raw:
+    source_counts_raw = _read_json(counts_path, use_blob_storage, bucket)
+    if not source_counts_raw:
         raise RuntimeError(f"Candidate counts file is empty: {counts_path}")
 
-    folder_counts = {
-        str(folder): int(count) for folder, count in folder_counts_raw.items()
+    source_counts = {
+        str(source): int(count) for source, count in source_counts_raw.items()
     }
 
     plan = _allocate_candidate_samples(
-        folder_counts=folder_counts,
+        source_counts=source_counts,
         target_total=target_total,
-        floor_per_folder=floor_per_folder,
+        floor_per_source=floor_per_source,
     )
 
     total_allocated = sum(a.target_count for a in plan.allocations)

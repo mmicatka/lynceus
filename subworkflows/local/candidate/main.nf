@@ -1,8 +1,8 @@
 // subworkflows/candidate/main.nf
 
-include { COUNT_CANDIDATES ; MERGE_CANDIDATE_COUNTS ; ALLOCATE_CANDIDATE_SAMPLES ; SAMPLE_CANDIDATES ; SHARD_SAMPLES } from '../../../modules/local/rebalance_candidates'
+include { COUNT_CANDIDATES ; MERGE_CANDIDATE_COUNTS ; ALLOCATE_CANDIDATE_SAMPLES ; SAMPLE_CANDIDATES ; SHARD_SAMPLES ; RESOLVE_PENDING_CANDIDATE_FOLDERS } from '../../../modules/local/rebalance_candidates'
 
-workflow CANDIDATE {
+workflow _REBALANCE_CANDIDATES {
   take:
   config
 
@@ -15,7 +15,19 @@ workflow CANDIDATE {
     "${config.source_prefix}/${source_key}"
   }
 
-  COUNT_CANDIDATES(ch_candidate_sources, bucket)
+  RESOLVE_PENDING_CANDIDATE_FOLDERS(
+    ch_candidate_sources.collect(),
+    "_count.json",
+    config.source_prefix,
+    bucket,
+  )
+
+  ch_pending_count_sources = RESOLVE_PENDING_CANDIDATE_FOLDERS.out.pending_key
+    .map { key -> file("s3://${bucket}/${key}") }
+    .splitJson()
+    .flatten()
+
+  COUNT_CANDIDATES(ch_pending_count_sources, bucket)
 
   ch_count_keys = COUNT_CANDIDATES.out.count.collect()
 
@@ -25,16 +37,16 @@ workflow CANDIDATE {
     MERGE_CANDIDATE_COUNTS.out.counts_json,
     config.source_prefix,
     config.target_total,
-    config.floor_per_folder,
+    config.floor_per_source,
     bucket,
   )
 
-  ch_folder_allocations = ALLOCATE_CANDIDATE_SAMPLES.out.manifest_key
+  ch_source_allocations = ALLOCATE_CANDIDATE_SAMPLES.out.manifest_key
     .map { key -> file("s3://${bucket}/${key}") }
     .splitCsv(header: true)
     .map { row -> tuple(row.folder, row.source, row.target_count as Integer) }
 
-  SAMPLE_CANDIDATES(ch_folder_allocations, config.candidate_samples_prefix, bucket)
+  SAMPLE_CANDIDATES(ch_source_allocations, config.candidate_samples_prefix, bucket)
 
   ch_all_samples_done = SAMPLE_CANDIDATES.out.done
     .collect()
@@ -57,4 +69,14 @@ workflow CANDIDATE {
   allocation_manifest = ALLOCATE_CANDIDATE_SAMPLES.out.manifest_key
   shard_prefix = SHARD_SAMPLES.out.shard_prefix
   done = SHARD_SAMPLES.out.done
+}
+
+workflow CANDIDATES {
+  take:
+  config
+
+  main:
+  _REBALANCE_CANDIDATES(
+    config
+  )
 }

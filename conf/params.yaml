@@ -8,11 +8,22 @@ s3_url_style: path
 candidates:
   bucket: lynceus
   num_per_shard: 1000000
-  source_prefix: candidates
+  source_prefix: candidates/raw
   sources:
-    - TEST
-  target_total: 20000000
-  floor_per_folder: 50000
+    - H04
+    - H05
+    - H06
+    - H07
+    - H08
+    - H09
+    - H10
+    - H11
+    - H12
+    - H13
+    - H14
+    - H15
+  target_total: 10000000
+  floor_per_source: 50000
   candidate_samples_prefix: candidates/sampled
   shard_output_prefix: candidates/shards
 

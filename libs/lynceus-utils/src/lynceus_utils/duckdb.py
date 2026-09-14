@@ -34,10 +34,16 @@ def export_parquet(
     con: duckdb.DuckDBPyConnection,
     data: pa.Table | pa.RecordBatch | duckdb.DuckDBPyRelation,
     file_path: str,
+    compression: str = "zstd",
 ):
+    safe_path = file_path.replace("'", "''")
+
     con.register("_tmp_export_view", data)
     try:
-        con.execute(f"COPY _tmp_export_view TO '{file_path}' (FORMAT PARQUET)")
+        con.execute(
+            f"COPY _tmp_export_view TO '{safe_path}' "
+            f"(FORMAT PARQUET, COMPRESSION '{compression}')"
+        )
     finally:
         con.unregister("_tmp_export_view")
 

@@ -1,18 +1,16 @@
 # modules/local/generate_conformers/src/generate_conformers/cli.py
 
 import logging
-import os
 import sys
 from concurrent.futures import ProcessPoolExecutor
-from pathlib import Path
 
 import click
+import dimorphite_dl
 import pyarrow as pa
 import pyarrow.parquet as pq
 from lynceus_utils.cli import NumWorkers
-from lynceus_utils.duckdb import get_connection
-
-from generate_conformers.generate_conformers import generate_conformers_chunk
+from rdkit import rdBase
+from rdkit.Chem import AddHs, AllChem, MolFromSmiles, MolToMolBlock
 
 logging.basicConfig(
     level=logging.INFO,
@@ -23,58 +21,71 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
+# RDKit prints a lot of low-level parsing warnings to stderr by default;
+# we handle/report parse failures ourselves, so silence RDKit's own logger.
+rdBase.DisableLog("rdApp.*")
 
-class ShardWriter:
-    def __init__(self, output_dir: Path, rows_per_shard: int):
-        self._output_dir = output_dir
-        self._rows_per_shard = rows_per_shard
-        self._shard_idx = 0
-        self._shard_rows = 0
-        self._open_shard: tuple[pq.ParquetWriter, Path, Path] | None = None
+MAX_PROTONATION_VARIANTS = 4
 
-    def write(self, batch: pa.RecordBatch) -> None:
-        if self._open_shard is None:
-            self._open_shard = self._start_shard(batch.schema)
+EMBED_PARAMS = AllChem.ETKDGv3()
+EMBED_PARAMS.randomSeed = 1000
+EMBED_PARAMS.maxIterations = 50
 
-        writer, _, _ = self._open_shard
-        writer.write_batch(batch)
-        self._shard_rows += batch.num_rows
+OPTIMIZE_MAX_ITERS = 50
 
-        if self._shard_rows >= self._rows_per_shard:
-            self._close_shard()
 
-    def _start_shard(self, schema: pa.Schema) -> tuple[pq.ParquetWriter, Path, Path]:
-        final_path = self._output_dir / f"shard_{self._shard_idx:04d}.parquet"
-        tmp_path = final_path.with_suffix(".parquet.tmp")
-        writer = pq.ParquetWriter(tmp_path, schema)
-        self._shard_rows = 0
-        return writer, tmp_path, final_path
+def _process_chunk(
+    smiles_chunk: list[str], max_variants: int = MAX_PROTONATION_VARIANTS
+) -> list[str]:
+    res = []
 
-    def _close_shard(self) -> None:
-        if self._open_shard is None:
-            return
+    for smiles in smiles_chunk:
+        variants = dimorphite_dl.protonate_smiles(
+            smiles, validate_output=True, max_variants=max_variants
+        )
+        target_smiles = variants[0] if variants else smiles
 
-        writer, tmp_path, final_path = self._open_shard
-        writer.close()
-        os.replace(tmp_path, final_path)
-        self._open_shard = None
-        self._shard_idx += 1
+        mol = MolFromSmiles(target_smiles)
 
-    def close(self) -> None:
-        self._close_shard()
+        if mol is None:
+            res.append("")
+            continue
+
+        try:
+            mol = AddHs(mol)
+        except Exception:
+            res.append("")
+            continue
+
+        if AllChem.EmbedMolecule(mol, EMBED_PARAMS) != -1:
+            if AllChem.MMFFOptimizeMolecule(mol, maxIters=OPTIMIZE_MAX_ITERS) != -1:
+                res.append(MolToMolBlock(mol))
+                continue
+
+        res.append("")
+
+    return res
+
+
+def _chunk_list(input_list, size):
+    for i in range(0, len(input_list), size):
+        yield input_list[i : i + size]
 
 
 @click.command()
-@click.option("--input", type=str, required=True, help="Path to the input file.")
-@click.option("--output", type=str, required=True, help="Output Parquet file.")
-@click.option("--batch-size", default=1_000, type=int, help="DuckDB read batch size.")
+@click.option(
+    "--input", type=str, required=True, help="Path to the input Parquet file."
+)
+@click.option(
+    "--output", type=str, required=True, help="Path to the output Parquet file."
+)
+@click.option("--batch-size", default=1_000, type=int, help="Parquet read batch size.")
 @click.option(
     "--chunk-size",
     default=50,
     type=int,
     help="Worker chunk size for the conformer process pool.",
 )
-@click.option("--rows-per-shard", default=1_000_000, type=int, help="Rows per shard.")
 @click.option(
     "--num-workers",
     default="auto",
@@ -87,37 +98,33 @@ def generate_conformers(
     output: str,
     batch_size: int,
     chunk_size: int,
-    rows_per_shard: int,
     num_workers: int,
 ):
-    conn = get_connection()
-
-    query_res = conn.execute(f"""
-        SELECT
-            column0 AS smiles,
-            column1 AS zinc_id
-        FROM read_csv('{input}', delim='\t', header=false)
-    """)
-
-    reader = query_res.to_arrow_reader(batch_size=batch_size)
-
-    output_dir = Path(output)
-    shard_writer = ShardWriter(output_dir, rows_per_shard)
+    parquet_file = pq.ParquetFile(input)
+    writer = None
 
     with ProcessPoolExecutor(max_workers=num_workers) as executor:
-        for i, batch in enumerate(reader):
+        for i, batch in enumerate(parquet_file.iter_batches(batch_size=batch_size)):
             smiles_list = batch["smiles"].to_pylist()
 
-            conformers = generate_conformers_chunk(
-                executor, smiles_list, chunk_size=chunk_size
-            )
+            futures = [
+                executor.submit(_process_chunk, chunk)
+                for chunk in _chunk_list(smiles_list, chunk_size)
+            ]
+
+            conformers = []
+            for future in futures:
+                conformers.extend(future.result())
 
             new_batch = batch.append_column(
                 "conformer", pa.array(conformers, type=pa.string())
             )
 
-            shard_writer.write(new_batch)
+            if writer is None:
+                writer = pq.ParquetWriter(output, new_batch.schema)
 
+            writer.write_batch(new_batch)
             logger.info("processed %d", (i + 1) * batch_size)
 
-    shard_writer.close()
+    if writer is not None:
+        writer.close()
