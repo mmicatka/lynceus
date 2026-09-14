@@ -26,7 +26,8 @@ process COUNT_CANDIDATES {
         --input ${source} \\
         --output ${output_key} \\
         --use-blob-storage \\
-        --bucket ${bucket}
+        --bucket ${bucket} \\
+        --num-workers ${task.cpus}
     """
 }
 
