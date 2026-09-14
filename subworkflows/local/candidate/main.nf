@@ -1,6 +1,6 @@
 // subworkflows/candidate/main.nf
 
-include { COUNT_CANDIDATES ; MERGE_CANDIDATE_COUNTS ; ALLOCATE_CANDIDATE_SAMPLES ; SAMPLE_CANDIDATES ; SHARD_SAMPLES ; RESOLVE_PENDING_CANDIDATE_FOLDERS } from '../../../modules/local/rebalance_candidates'
+include { COUNT_CANDIDATES ; MERGE_CANDIDATE_COUNTS ; ALLOCATE_CANDIDATE_SAMPLES ; SAMPLE_CANDIDATES ; SHARD_SAMPLES } from '../../../modules/local/rebalance_candidates'
 include { GENERATE_CONFORMERS } from '../../../modules/local/generate_conformers'
 
 
@@ -17,19 +17,7 @@ workflow _REBALANCE_CANDIDATES {
     "${config.source_prefix}/${source_key}"
   }
 
-  RESOLVE_PENDING_CANDIDATE_FOLDERS(
-    ch_candidate_sources.collect(),
-    "_count.json",
-    config.source_prefix,
-    bucket,
-  )
-
-  ch_pending_count_sources = RESOLVE_PENDING_CANDIDATE_FOLDERS.out.pending_key
-    .map { key -> file("s3://${bucket}/${key}") }
-    .splitJson()
-    .flatten()
-
-  COUNT_CANDIDATES(ch_pending_count_sources, bucket)
+  COUNT_CANDIDATES(ch_candidate_sources, bucket)
 
   ch_count_keys = COUNT_CANDIDATES.out.count.collect()
 

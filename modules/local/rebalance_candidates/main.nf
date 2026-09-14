@@ -1,34 +1,5 @@
 // modules/local/rebalance/main.nf
 
-process RESOLVE_PENDING_CANDIDATE_FOLDERS {
-    container "${params.registry}/lynceus/rebalance-candidates:0.1.0"
-    tag { output_suffix }
-
-    label 'pvc_io_retry'
-
-    input:
-    val sources
-    val output_suffix
-    val output_dir
-    val bucket
-
-    output:
-    val output_key, emit: pending_key
-
-    script:
-    output_key = "pending_${output_suffix.toString().replaceAll('[^a-zA-Z0-9]', '')}.json"
-    def sources_arg = sources.join(',')
-    """
-    resolve-pending-candidate-folders \\
-        --sources ${sources_arg} \\
-        --output-suffix ${output_suffix} \\
-        --output-dir ${output_dir} \\
-        --output ${output_key} \\
-        --use-blob-storage \\
-        --bucket ${bucket}
-    """
-}
-
 process COUNT_CANDIDATES {
     container "${params.registry}/lynceus/rebalance-candidates:0.1.0"
     tag { folder }
