@@ -57,15 +57,25 @@ def _existing_output_row_count(conn, output_path: str) -> int | None:
 @click.option(
     "--bucket", type=str, default="lynceus", help="S3-compatible bucket name."
 )
+@click.option(
+    "--source-count",
+    "source_row_count",
+    required=True,
+    type=int,
+    help="Known row count for the source folder (from merged candidate counts).",
+)
 def sample_candidates(
     input_path: str,
     target_count: int,
+    source_row_count: int,
     output_path: str,
     use_blob_storage: bool,
     bucket: str,
 ) -> None:
     if target_count <= 0:
         raise RuntimeError(f"target_count must be positive, got {target_count}")
+    if source_row_count <= 0:
+        raise RuntimeError(f"source_row_count must be positive, got {source_row_count}")
 
     folder = input_path.rstrip("/").split("/")[-1]
     source_glob = f"{input_path.rstrip('/')}/*.smi.gz"
@@ -88,22 +98,33 @@ def sample_candidates(
         )
         return
 
-    logger.info(
-        "Sampling folder=%s target_count=%d from %s", folder, target_count, source_glob
-    )
-
-    sampled_rel = conn.sql(
-        f"""
-        SELECT smiles, id, '{folder}' AS folder
-        FROM read_csv(
-            '{source_glob}',
-            delim='\t',
-            header=False,
-            columns={{'smiles': 'VARCHAR', 'id': 'VARCHAR'}}
+    if source_row_count <= target_count:
+        sampled_rel = conn.sql(
+            f"""
+            SELECT smiles, id, '{folder}' AS folder
+            FROM read_csv(
+                '{source_glob}',
+                delim='\t',
+                header=False,
+                columns={{'smiles': 'VARCHAR', 'id': 'VARCHAR'}}
+            )
+            """
         )
-        USING SAMPLE {target_count} ROWS
-        """
-    )
+    else:
+        sample_fraction = min(1.0, (target_count / source_row_count) * 1.05)
+        sampled_rel = conn.sql(
+            f"""
+            SELECT smiles, id, '{folder}' AS folder
+            FROM read_csv(
+                '{source_glob}',
+                delim='\t',
+                header=False,
+                columns={{'smiles': 'VARCHAR', 'id': 'VARCHAR'}}
+            )
+            USING SAMPLE {sample_fraction * 100} PERCENT (bernoulli)
+            LIMIT {target_count}
+            """
+        )
 
     export_parquet(conn, sampled_rel, output_path)
 

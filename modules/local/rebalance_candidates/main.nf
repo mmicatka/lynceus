@@ -73,7 +73,7 @@ process ALLOCATE_CANDIDATE_SAMPLES {
     val output_key, emit: manifest_key
 
     script:
-    output_key = "allocation_manifest.csv"
+    output_key = "candidates/allocation_manifest.csv"
     """
     allocate-candidate-samples \\
         --candidate-counts ${candidate_counts_key} \\
@@ -91,9 +91,10 @@ process SAMPLE_CANDIDATES {
     tag { folder }
 
     label 'pvc_io_retry'
+    label 'process_high'
 
     input:
-    tuple val(folder), val(source), val(target_count)
+    tuple val(folder), val(source), val(target_count), val(source_count)
     val output_prefix
     val bucket
 
@@ -107,6 +108,7 @@ process SAMPLE_CANDIDATES {
     sample-candidates \\
         --input ${source} \\
         --target-count ${target_count} \\
+        --source-count ${source_count} \\
         --output ${output_key} \\
         --use-blob-storage \\
         --bucket ${bucket}

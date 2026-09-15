@@ -18,7 +18,7 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_CHUNK_SIZE = 1024 * 1024 * 256
+DEFAULT_CHUNK_SIZE = 1024 * 1024 * 32
 
 
 def _resolve_path(path: str, use_blob_storage: bool, bucket: str) -> str:

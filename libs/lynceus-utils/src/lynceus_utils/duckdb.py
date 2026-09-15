@@ -38,14 +38,20 @@ def export_parquet(
 ):
     safe_path = file_path.replace("'", "''")
 
-    con.register("_tmp_export_view", data)
-    try:
+    if isinstance(data, duckdb.DuckDBPyRelation):
         con.execute(
-            f"COPY _tmp_export_view TO '{safe_path}' "
+            f"COPY ({data.sql_query()}) TO '{safe_path}' "
             f"(FORMAT PARQUET, COMPRESSION '{compression}')"
         )
-    finally:
-        con.unregister("_tmp_export_view")
+    else:
+        con.register("_tmp_export_view", data)
+        try:
+            con.execute(
+                f"COPY _tmp_export_view TO '{safe_path}' "
+                f"(FORMAT PARQUET, COMPRESSION '{compression}')"
+            )
+        finally:
+            con.unregister("_tmp_export_view")
 
     if not file_exists(con, file_path):
         raise RuntimeError(
