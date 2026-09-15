@@ -9,6 +9,7 @@ candidates:
   bucket: lynceus
   num_per_shard: 2000000
   source_prefix: candidates/raw
+  parquet_prefix: candidates/parquet
   sources:
     - H04
     - H05

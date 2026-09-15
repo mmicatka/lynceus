@@ -4,7 +4,7 @@ import logging
 
 import click
 from duckdb import IOException
-from lynceus_utils.duckdb import export_parquet, get_connection
+from lynceus_utils.duckdb import export_parquet, file_exists, get_connection
 from lynceus_utils.storage.blob_storage import get_blob_storage_settings
 
 logging.basicConfig(
@@ -25,6 +25,66 @@ def _existing_output_row_count(conn, output_path: str) -> int | None:
         return None
 
     return result[0]
+
+
+def _ensure_converted_parquet(
+    conn, source_glob: str, converted_path: str, folder: str
+) -> None:
+    if file_exists(conn, converted_path):
+        existing_count = _existing_output_row_count(conn, converted_path)
+        if existing_count is not None and existing_count > 0:
+            logger.info(
+                "folder=%s converted parquet already exists at %s with %d rows,"
+                " skipping conversion",
+                folder,
+                converted_path,
+                existing_count,
+            )
+            return
+        raise RuntimeError(
+            f"folder={folder} converted_path={converted_path} exists but is"
+            " empty or unreadable, refusing to proceed"
+        )
+
+    logger.info(
+        "folder=%s converting gzip CSV at %s to parquet at %s",
+        folder,
+        source_glob,
+        converted_path,
+    )
+
+    conn.execute(
+        f"""
+        COPY (
+            SELECT smiles, id, '{folder}' AS folder
+            FROM read_csv(
+                '{source_glob}',
+                delim='\t',
+                header=False,
+                columns={{'smiles': 'VARCHAR', 'id': 'VARCHAR'}}
+            )
+        ) TO '{converted_path}' (FORMAT PARQUET, COMPRESSION 'zstd')
+        """
+    )
+
+    if not file_exists(conn, converted_path):
+        raise RuntimeError(
+            f"folder={folder} conversion reported success but {converted_path}"
+            " is not readable back"
+        )
+
+    converted_count = _existing_output_row_count(conn, converted_path)
+    if converted_count is None or converted_count == 0:
+        raise RuntimeError(
+            f"folder={folder} converted parquet at {converted_path} is empty"
+        )
+
+    logger.info(
+        "folder=%s wrote %d rows to converted parquet at %s",
+        folder,
+        converted_count,
+        converted_path,
+    )
 
 
 @click.command()
@@ -50,6 +110,13 @@ def _existing_output_row_count(conn, output_path: str) -> int | None:
     help="Output Parquet file path.",
 )
 @click.option(
+    "--parquet-prefix",
+    "parquet_prefix",
+    required=True,
+    type=str,
+    help="Folder to store converted gzip-CSV-to-Parquet intermediates.",
+)
+@click.option(
     "--use-blob-storage",
     is_flag=True,
     help="Read source and write output via blob storage.",
@@ -69,6 +136,7 @@ def sample_candidates(
     target_count: int,
     source_row_count: int,
     output_path: str,
+    parquet_prefix: str,
     use_blob_storage: bool,
     bucket: str,
 ) -> None:
@@ -79,12 +147,14 @@ def sample_candidates(
 
     folder = input_path.rstrip("/").split("/")[-1]
     source_glob = f"{input_path.rstrip('/')}/*.smi.gz"
+    converted_path = f"{parquet_prefix.rstrip('/')}/{folder}_converted.parquet"
 
     if use_blob_storage:
         blob_storage_settings = get_blob_storage_settings()
         conn = get_connection(blob_storage_settings)
         source_glob = f"s3://{bucket}/{source_glob.lstrip('/')}"
         output_path = f"s3://{bucket}/{output_path.lstrip('/')}"
+        converted_path = f"s3://{bucket}/{converted_path.lstrip('/')}"
     else:
         conn = get_connection()
 
@@ -98,33 +168,22 @@ def sample_candidates(
         )
         return
 
+    _ensure_converted_parquet(conn, source_glob, converted_path, folder)
+
     logger.info(
         "sampling %d rows from %d for %s", target_count, source_row_count, folder
     )
 
     if source_row_count <= target_count:
         sampled_rel = conn.sql(
-            f"""
-            SELECT smiles, id, '{folder}' AS folder
-            FROM read_csv(
-                '{source_glob}',
-                delim='\t',
-                header=False,
-                columns={{'smiles': 'VARCHAR', 'id': 'VARCHAR'}}
-            )
-            """
+            f"SELECT smiles, id, folder FROM read_parquet('{converted_path}')"
         )
     else:
         sample_fraction = min(1.0, (target_count / source_row_count) * 1.05)
         sampled_rel = conn.sql(
             f"""
-            SELECT smiles, id, '{folder}' AS folder
-            FROM read_csv(
-                '{source_glob}',
-                delim='\t',
-                header=False,
-                columns={{'smiles': 'VARCHAR', 'id': 'VARCHAR'}}
-            )
+            SELECT smiles, id, folder
+            FROM read_parquet('{converted_path}')
             USING SAMPLE {sample_fraction * 100} PERCENT (bernoulli)
             LIMIT {target_count}
             """

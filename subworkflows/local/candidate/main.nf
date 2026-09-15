@@ -57,7 +57,7 @@ workflow _REBALANCE_CANDIDATES {
     "${config.source_prefix}/${source_key}"
   }
 
-  COUNT_CANDIDATES(ch_candidate_sources, bucket)
+  COUNT_CANDIDATES(ch_candidate_sources, config.parquet_prefix, bucket)
 
   ch_count_keys = COUNT_CANDIDATES.out.count.collect()
 
@@ -78,7 +78,7 @@ workflow _REBALANCE_CANDIDATES {
       tuple(row.folder, row.source, row.target_count as Long, row.source_count as Long)
     }
 
-  SAMPLE_CANDIDATES(ch_source_allocations, config.candidate_samples_prefix, bucket)
+  SAMPLE_CANDIDATES(ch_source_allocations, config.candidate_samples_prefix, config.parquet_prefix, bucket)
 
   ch_all_samples_done = SAMPLE_CANDIDATES.out.done
     .collect()

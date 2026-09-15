@@ -1,11 +1,14 @@
 # modules/local/rebalance_candidates/src/rebalance_candidates/count_candidates.py
 
 import gzip
+import io
 import json
 import logging
 from concurrent.futures import ProcessPoolExecutor
 
 import click
+import pyarrow as pa
+import pyarrow.parquet as pq
 from lynceus_utils.cli import NumWorkers
 from lynceus_utils.storage.blob_storage import get_blob_storage_settings
 from lynceus_utils.storage.filesystem import get_filesystem
@@ -19,6 +22,14 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 DEFAULT_CHUNK_SIZE = 1024 * 1024 * 32
+DEFAULT_BATCH_ROWS = 100_000
+
+PARQUET_SCHEMA = pa.schema(
+    [
+        pa.field("smiles", pa.string()),
+        pa.field("id", pa.string()),
+    ]
+)
 
 
 def _resolve_path(path: str, use_blob_storage: bool, bucket: str) -> str:
@@ -64,49 +75,122 @@ def _resolve_glob_paths(fs, source_glob: str) -> list[str]:
     return [str(path) for path in matches]
 
 
-def _count_lines_in_gzip(fs, path: str, chunk_size: int = DEFAULT_CHUNK_SIZE) -> int:
-    count = 0
-    last_byte = b""
-    with fs.open(path, "rb") as raw:
-        with gzip.GzipFile(fileobj=raw) as f:
-            while chunk := f.read(chunk_size):
-                count += chunk.count(b"\n")
-                last_byte = chunk[-1:]
-    if last_byte and last_byte != b"\n":
-        count += 1
-    return count
+def _source_filename(path: str) -> str:
+    return path.rstrip("/").split("/")[-1]
 
 
-def _count_file_worker(
-    path: str,
+def _parquet_output_path(source_path: str, output_dir: str) -> str:
+    filename = _source_filename(source_path)
+    stem = filename[: -len(".smi.gz")] if filename.endswith(".smi.gz") else filename
+    return f"{output_dir.rstrip('/')}/{stem}.parquet"
+
+
+def _parse_smi_line(line: str) -> tuple[str, str] | None:
+    stripped = line.rstrip("\n")
+    if not stripped:
+        return None
+    parts = stripped.split(None, 1)
+    smiles = parts[0]
+    identifier = parts[1] if len(parts) > 1 else ""
+    return smiles, identifier
+
+
+def _iter_smi_batches(fs, path: str, batch_rows: int, chunk_size: int):
+    smiles_batch: list[str] = []
+    id_batch: list[str] = []
+
+    with fs.open(path, "rb", block_size=chunk_size) as raw:
+        with gzip.GzipFile(fileobj=raw) as gz:
+            with io.TextIOWrapper(gz, encoding="utf-8", newline="") as text_stream:
+                for line in text_stream:
+                    parsed = _parse_smi_line(line)
+                    if parsed is None:
+                        continue
+                    smiles, identifier = parsed
+                    smiles_batch.append(smiles)
+                    id_batch.append(identifier)
+
+                    if len(smiles_batch) >= batch_rows:
+                        yield smiles_batch, id_batch
+                        smiles_batch = []
+                        id_batch = []
+
+    if smiles_batch:
+        yield smiles_batch, id_batch
+
+
+def _write_parquet_from_smi(
+    source_path: str,
+    output_path: str,
     use_blob_storage: bool,
     bucket: str,
     chunk_size: int,
+    batch_rows: int,
 ) -> tuple[str, int]:
     blob_storage_settings = get_blob_storage_settings() if use_blob_storage else None
     fs = get_filesystem(blob_storage_settings)
-    return path, _count_lines_in_gzip(fs, path, chunk_size)
+    resolved_output = _resolve_path(output_path, use_blob_storage, bucket)
+
+    row_count = 0
+
+    with fs.open(resolved_output, "wb") as out_f:
+        writer = pq.ParquetWriter(out_f, PARQUET_SCHEMA)
+        try:
+            for smiles_batch, id_batch in _iter_smi_batches(
+                fs, source_path, batch_rows, chunk_size
+            ):
+                table = pa.table(
+                    {"smiles": smiles_batch, "id": id_batch}, schema=PARQUET_SCHEMA
+                )
+                writer.write_table(table)
+                row_count += len(smiles_batch)
+        finally:
+            writer.close()
+
+    return source_path, row_count
 
 
-def _count_rows_parallel(
-    source_paths: list[str],
+def _write_parquet_worker(
+    source_path: str,
+    output_dir: str,
     use_blob_storage: bool,
     bucket: str,
     chunk_size: int,
+    batch_rows: int,
+) -> tuple[str, int]:
+    output_path = _parquet_output_path(source_path, output_dir)
+    return _write_parquet_from_smi(
+        source_path, output_path, use_blob_storage, bucket, chunk_size, batch_rows
+    )
+
+
+def _write_parquet_parallel(
+    source_paths: list[str],
+    output_dir: str,
+    use_blob_storage: bool,
+    bucket: str,
+    chunk_size: int,
+    batch_rows: int,
     num_workers: int,
 ) -> int:
     total = 0
     with ProcessPoolExecutor(max_workers=num_workers) as executor:
         futures = [
             executor.submit(
-                _count_file_worker, path, use_blob_storage, bucket, chunk_size
+                _write_parquet_worker,
+                path,
+                output_dir,
+                use_blob_storage,
+                bucket,
+                chunk_size,
+                batch_rows,
             )
             for path in source_paths
         ]
         for future in futures:
             path, file_count = future.result()
             total += file_count
-            logger.info("counted path=%s rows=%d", path, file_count)
+            logger.info("wrote parquet path=%s rows=%d", path, file_count)
     return total
 
 
@@ -126,6 +210,13 @@ def _count_rows_parallel(
     help="Output path for the candidate count JSON.",
 )
 @click.option(
+    "--parquet-output",
+    "parquet_output_dir",
+    required=True,
+    type=str,
+    help="Output folder for the per-file Parquet files.",
+)
+@click.option(
     "--use-blob-storage",
     is_flag=True,
     help="Read source and write output via blob storage.",
@@ -140,6 +231,12 @@ def _count_rows_parallel(
     help="Read buffer size in bytes for streaming decompression.",
 )
 @click.option(
+    "--batch-rows",
+    type=int,
+    default=DEFAULT_BATCH_ROWS,
+    help="Number of rows to buffer before flushing a Parquet row group.",
+)
+@click.option(
     "--num-workers",
     default="auto",
     type=NumWorkers(),
@@ -149,9 +246,11 @@ def _count_rows_parallel(
 def count_candidates(
     input_path: str,
     output_path: str,
+    parquet_output_dir: str,
     use_blob_storage: bool,
     bucket: str,
     chunk_size: int,
+    batch_rows: int,
     num_workers: int,
 ) -> None:
     folder = input_path.rstrip("/").split("/")[-1]
@@ -179,14 +278,21 @@ def count_candidates(
         raise RuntimeError(f"folder={folder} resolved to zero files at {source_glob}")
 
     logger.info(
-        "Counting folder=%s across %d files with %d workers",
+        "Streaming folder=%s across %d files to parquet at %s with %d workers",
         folder,
         len(source_paths),
+        parquet_output_dir,
         num_workers,
     )
 
-    row_count = _count_rows_parallel(
-        source_paths, use_blob_storage, bucket, chunk_size, num_workers
+    row_count = _write_parquet_parallel(
+        source_paths,
+        parquet_output_dir,
+        use_blob_storage,
+        bucket,
+        chunk_size,
+        batch_rows,
+        num_workers,
     )
 
     if row_count == 0:
@@ -197,7 +303,3 @@ def count_candidates(
     _write_json(
         output_path, {"folder": folder, "count": row_count}, use_blob_storage, bucket
     )
-
-
-if __name__ == "__main__":
-    count_candidates()

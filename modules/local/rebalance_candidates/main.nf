@@ -9,10 +9,12 @@ process COUNT_CANDIDATES {
 
     input:
     val source
+    val parquet_prefix
     val bucket
 
     output:
     val output_key, emit: count
+    val parquet_output_key, emit: parquet
 
     script:
     def parts = source.toString().tokenize('/')
@@ -22,10 +24,12 @@ process COUNT_CANDIDATES {
     folder = parts.last()
     parent_dir = parts[0..-2].join('/')
     output_key = "${parent_dir}/${folder}_count.json"
+    parquet_output_key = "${parquet_prefix.toString().replaceAll('/$', '')}/${folder}"
     """
     count-candidates \\
         --input ${source} \\
         --output ${output_key} \\
+        --parquet-output ${parquet_output_key} \\
         --use-blob-storage \\
         --bucket ${bucket} \\
         --num-workers ${task.cpus}
@@ -96,6 +100,7 @@ process SAMPLE_CANDIDATES {
     input:
     tuple val(folder), val(source), val(target_count), val(source_count)
     val output_prefix
+    val parquet_prefix
     val bucket
 
     output:
@@ -110,6 +115,7 @@ process SAMPLE_CANDIDATES {
         --target-count ${target_count} \\
         --source-count ${source_count} \\
         --output ${output_key} \\
+        --parquet-prefix ${parquet_prefix} \\
         --use-blob-storage \\
         --bucket ${bucket}
     """
