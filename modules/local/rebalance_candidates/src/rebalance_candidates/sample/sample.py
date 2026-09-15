@@ -98,6 +98,10 @@ def sample_candidates(
         )
         return
 
+    logger.info(
+        "sampling %d rows from %d for %s", target_count, source_row_count, folder
+    )
+
     if source_row_count <= target_count:
         sampled_rel = conn.sql(
             f"""
