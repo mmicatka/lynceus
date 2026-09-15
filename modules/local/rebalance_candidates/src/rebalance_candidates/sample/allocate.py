@@ -90,7 +90,13 @@ def _manifest_matches_config(
         folder = row.get("folder")
         source = row.get("source")
         target_count_raw = row.get("target_count")
-        if folder is None or source is None or target_count_raw is None:
+        source_count_raw = row.get("source_count")
+        if (
+            folder is None
+            or source is None
+            or target_count_raw is None
+            or source_count_raw is None
+        ):
             return False
         if source != f"{expected_source_prefix}/{folder}":
             return False
@@ -98,7 +104,10 @@ def _manifest_matches_config(
             return False
         try:
             target_count = int(target_count_raw)
+            source_count = int(source_count_raw)
         except ValueError:
+            return False
+        if source_count != source_counts[folder]:
             return False
         if target_count <= 0 or target_count > source_counts[folder]:
             return False
@@ -255,7 +264,7 @@ def allocate_candidate_samples(
         total_allocated,
     )
 
-    lines = ["folder,source,target_count"]
+    lines = ["folder,source,target_count,source_count"]
     for allocation in plan.allocations:
         if allocation.target_count <= 0:
             logger.warning(
@@ -264,7 +273,10 @@ def allocate_candidate_samples(
             )
             continue
         source = f"{source_prefix.rstrip('/')}/{allocation.folder}"
-        lines.append(f"{allocation.folder},{source},{allocation.target_count}")
+        lines.append(
+            f"{allocation.folder},{source},{allocation.target_count},"
+            f"{allocation.source_count}"
+        )
 
     manifest_content = "\n".join(lines) + "\n"
     _write_text(output_path, manifest_content, use_blob_storage, bucket)
