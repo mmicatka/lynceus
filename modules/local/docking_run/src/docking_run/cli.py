@@ -63,7 +63,7 @@ logger = logging.getLogger(__name__)
     "--ligands-path",
     type=str,
     required=True,
-    help="Parquet file of candidate conformers (catalog_id, conformer_sdf columns).",
+    help="Parquet file of candidate conformers (id, conformer columns).",
 )
 @click.option(
     "--center",
@@ -131,7 +131,7 @@ logger = logging.getLogger(__name__)
     required=True,
     help=(
         "Path to write docking results as a row-per-pose Parquet "
-        "file with catalog_id, conformational_state_id, and site_id columns."
+        "file with id, conformational_state_id, and site_id columns."
     ),
 )
 @click.option(
