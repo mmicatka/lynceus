@@ -37,31 +37,34 @@ OPTIMIZE_MAX_ITERS = 50
 
 
 def _process_chunk(
-    smiles_chunk: list[str], max_variants: int = MAX_PROTONATION_VARIANTS
+    smiles_chunk: list[tuple[str, str]], max_variants: int = MAX_PROTONATION_VARIANTS
 ) -> list[str]:
     res = []
 
-    for smiles in smiles_chunk:
+    for id, smiles in smiles_chunk:
         variants = dimorphite_dl.protonate_smiles(
             smiles, validate_output=True, max_variants=max_variants
         )
         target_smiles = variants[0] if variants else smiles
 
-        mol = MolFromSmiles(target_smiles)
+        _mol = MolFromSmiles(target_smiles)
 
-        if mol is None:
+        if _mol is None:
             res.append("")
             continue
 
         try:
-            mol = AddHs(mol)
+            _mol = AddHs(_mol)
         except Exception:
             res.append("")
             continue
 
-        if AllChem.EmbedMolecule(mol, EMBED_PARAMS) != -1:
-            if AllChem.MMFFOptimizeMolecule(mol, maxIters=OPTIMIZE_MAX_ITERS) != -1:
-                res.append(MolToMolBlock(mol))
+        if AllChem.EmbedMolecule(_mol, EMBED_PARAMS) != -1:
+            if AllChem.MMFFOptimizeMolecule(_mol, maxIters=OPTIMIZE_MAX_ITERS) != -1:
+                _mol.SetIntProp("conf_id", 0)
+                _mol.SetProp("_Name", id)
+
+                res.append(MolToMolBlock(_mol))
                 continue
 
         res.append("")
@@ -146,11 +149,14 @@ def generate_conformers(
 
     with ProcessPoolExecutor(max_workers=num_workers) as executor:
         for i, batch in enumerate(parquet_file.iter_batches(batch_size=batch_size)):
+            id_list = batch["id"].to_pylist()
             smiles_list = batch["smiles"].to_pylist()
+
+            id_smiles_list = list(zip(id_list, smiles_list))
 
             futures = [
                 executor.submit(_process_chunk, chunk)
-                for chunk in _chunk_list(smiles_list, chunk_size)
+                for chunk in _chunk_list(id_smiles_list, chunk_size)
             ]
 
             conformers = []

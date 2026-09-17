@@ -5,7 +5,7 @@ process COUNT_CANDIDATES {
     tag { folder }
 
     label 'pvc_io_retry'
-    label 'process_high'
+    label 'cpu_medium'
 
     input:
     val source
@@ -18,12 +18,12 @@ process COUNT_CANDIDATES {
 
     script:
     def parts = source.toString().tokenize('/')
-    if (parts.size() < 2) {
-        throw new IllegalArgumentException("source=${source} has no parent directory")
+    if (parts.size() < 3) {
+        throw new IllegalArgumentException("source=${source} has no grandparent directory")
     }
     folder = parts.last()
-    parent_dir = parts[0..-2].join('/')
-    output_key = "${parent_dir}/${folder}_count.json"
+    output_dir = parts[0..-3].join('/')
+    output_key = "${output_dir}/${folder}_count.json"
     parquet_output_key = "${parquet_prefix.toString().replaceAll('/$', '')}/${folder}"
     """
     count-candidates \\
@@ -40,6 +40,7 @@ process MERGE_CANDIDATE_COUNTS {
     container "${params.registry}/lynceus/rebalance-candidates:0.1.0"
 
     label 'pvc_io_retry'
+    label 'cpu_low'
 
     input:
     val count_keys
@@ -49,7 +50,7 @@ process MERGE_CANDIDATE_COUNTS {
     val output_key, emit: counts_json
 
     script:
-    output_key = "candidates/raw/candidate_counts.json"
+    output_key = "candidates/candidate_counts.json"
     def keys_arg = count_keys.join(',')
     """
     merge-candidate-counts \\
@@ -65,6 +66,7 @@ process ALLOCATE_CANDIDATE_SAMPLES {
     tag { "target_total=${target_total}" }
 
     label 'pvc_io_retry'
+    label 'cpu_low'
 
     input:
     val candidate_counts_key
@@ -95,12 +97,11 @@ process SAMPLE_CANDIDATES {
     tag { folder }
 
     label 'pvc_io_retry'
-    label 'process_high'
+    label 'cpu_medium'
 
     input:
     tuple val(folder), val(source), val(target_count), val(source_count)
     val output_prefix
-    val parquet_prefix
     val bucket
 
     output:
@@ -115,7 +116,6 @@ process SAMPLE_CANDIDATES {
         --target-count ${target_count} \\
         --source-count ${source_count} \\
         --output ${output_key} \\
-        --parquet-prefix ${parquet_prefix} \\
         --use-blob-storage \\
         --bucket ${bucket}
     """
@@ -126,6 +126,7 @@ process SHARD_SAMPLES {
     tag { "n_shards=${n_shards}" }
 
     label 'pvc_io_retry'
+    label 'cpu_high'
 
     input:
     val ready

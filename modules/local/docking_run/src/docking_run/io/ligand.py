@@ -10,8 +10,8 @@ from docking_run.types import DockingError, LigandRecord
 
 logger = logging.getLogger(__name__)
 
-_ID_COL = "catalog_id"
-_SDF_COL = "conformer_sdf"
+_ID_COL = "id"
+_SDF_COL = "conformer"
 
 
 class LigandRecordReadError(DockingError):
@@ -53,23 +53,22 @@ def iter_ligand_records(
 
     n_skipped_empty = 0
 
-    for catalog_id, molblock in rel.fetchall():
+    for id, molblock in rel.fetchall():
         if not molblock:
             n_skipped_empty += 1
             logger.warning(
-                "Skipping candidate '%s': empty %s with no error_reason set "
-                "-- this indicates a gap in upstream error tagging.",
-                catalog_id,
+                "Skipping candidate '%s': empty %s.",
+                id,
                 sdf_col,
             )
             continue
 
         mol = _mol_from_molblock(molblock)
-        yield LigandRecord(ligand_id=catalog_id, mol_bytes=mol.ToBinary())
+        yield LigandRecord(ligand_id=id, mol_bytes=mol.ToBinary())
 
     if n_skipped_empty:
-        raise LigandRecordReadError(
-            f"{n_skipped_empty} row(s) skipped due to empty {sdf_col} with no "
-            f"error_reason -- refusing to proceed with a partial ligand set. "
-            f"See preceding WARNING logs for per-candidate detail."
+        logger.warning(
+            "%d row(s) skipped due to empty %s.",
+            n_skipped_empty,
+            sdf_col,
         )

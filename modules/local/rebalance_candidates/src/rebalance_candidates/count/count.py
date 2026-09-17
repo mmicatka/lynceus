@@ -119,6 +119,12 @@ def _iter_smi_batches(fs, path: str, batch_rows: int, chunk_size: int):
         yield smiles_batch, id_batch
 
 
+def _parquet_row_count(fs, resolved_path: str) -> int:
+    """Row count of an existing Parquet file via its metadata (no full read)."""
+    with fs.open(resolved_path, "rb") as f:
+        return pq.ParquetFile(f).metadata.num_rows
+
+
 def _write_parquet_from_smi(
     source_path: str,
     output_path: str,
@@ -159,6 +165,20 @@ def _write_parquet_worker(
     batch_rows: int,
 ) -> tuple[str, int]:
     output_path = _parquet_output_path(source_path, output_dir)
+    resolved_output = _resolve_path(output_path, use_blob_storage, bucket)
+
+    blob_storage_settings = get_blob_storage_settings() if use_blob_storage else None
+    fs = get_filesystem(blob_storage_settings)
+
+    if fs.exists(resolved_output):
+        row_count = _parquet_row_count(fs, resolved_output)
+        logger.info(
+            "parquet already exists path=%s rows=%d, skipping write",
+            resolved_output,
+            row_count,
+        )
+        return source_path, row_count
+
     return _write_parquet_from_smi(
         source_path, output_path, use_blob_storage, bucket, chunk_size, batch_rows
     )
@@ -255,20 +275,6 @@ def count_candidates(
 ) -> None:
     folder = input_path.rstrip("/").split("/")[-1]
 
-    existing = _read_json(output_path, use_blob_storage, bucket)
-    if (
-        existing is not None
-        and existing.get("folder") == folder
-        and existing.get("count", 0) > 0
-    ):
-        logger.info(
-            "folder=%s already counted at %s (count=%d), skipping",
-            folder,
-            output_path,
-            existing["count"],
-        )
-        return
-
     blob_storage_settings = get_blob_storage_settings() if use_blob_storage else None
     fs = get_filesystem(blob_storage_settings)
     source_glob = _resolve_source_glob(input_path, use_blob_storage, bucket)
@@ -299,6 +305,16 @@ def count_candidates(
         raise RuntimeError(f"folder={folder} resolved to zero rows at {source_glob}")
 
     logger.info("folder=%s count=%d", folder, row_count)
+
+    existing = _read_json(output_path, use_blob_storage, bucket)
+    if existing is not None and existing.get("count") == row_count:
+        logger.info(
+            "folder=%s count unchanged (count=%d), leaving %s as-is",
+            folder,
+            row_count,
+            output_path,
+        )
+        return
 
     _write_json(
         output_path, {"folder": folder, "count": row_count}, use_blob_storage, bucket

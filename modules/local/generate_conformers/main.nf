@@ -3,7 +3,7 @@
 process GENERATE_CONFORMERS {
     container "${params.registry}/lynceus/generate-conformers:0.1.0"
 
-    label 'process_high'
+    label 'cpu_medium'
     label 'pvc_io_retry'
 
     input:
