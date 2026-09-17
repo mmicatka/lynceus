@@ -1,10 +1,11 @@
 # modules/local/rebalance_candidates/src/rebalance_candidates/sample/sample.py
 
 import logging
+import time
 
 import click
 from duckdb import IOException
-from lynceus_utils.duckdb import export_parquet, file_exists, get_connection
+from lynceus_utils.duckdb import export_parquet, get_connection
 from lynceus_utils.storage.blob_storage import get_blob_storage_settings
 
 logging.basicConfig(
@@ -15,9 +16,9 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def _existing_output_row_count(conn, output_path: str) -> int | None:
+def _existing_output_row_count(conn, path: str) -> int | None:
     try:
-        result = conn.read_parquet(output_path).count("*").fetchone()
+        result = conn.read_parquet(path).count("*").fetchone()
     except IOException:
         return None
 
@@ -27,64 +28,11 @@ def _existing_output_row_count(conn, output_path: str) -> int | None:
     return result[0]
 
 
-def _ensure_converted_parquet(
-    conn, source_glob: str, converted_path: str, folder: str
-) -> None:
-    if file_exists(conn, converted_path):
-        existing_count = _existing_output_row_count(conn, converted_path)
-        if existing_count is not None and existing_count > 0:
-            logger.info(
-                "folder=%s converted parquet already exists at %s with %d rows,"
-                " skipping conversion",
-                folder,
-                converted_path,
-                existing_count,
-            )
-            return
+def _validate_source_nonempty(source_row_count: int, folder: str) -> None:
+    if source_row_count <= 0:
         raise RuntimeError(
-            f"folder={folder} converted_path={converted_path} exists but is"
-            " empty or unreadable, refusing to proceed"
+            f"folder={folder} source_row_count must be positive, got {source_row_count}"
         )
-
-    logger.info(
-        "folder=%s converting gzip CSV at %s to parquet at %s",
-        folder,
-        source_glob,
-        converted_path,
-    )
-
-    conn.execute(
-        f"""
-        COPY (
-            SELECT smiles, id, '{folder}' AS folder
-            FROM read_csv(
-                '{source_glob}',
-                delim='\t',
-                header=False,
-                columns={{'smiles': 'VARCHAR', 'id': 'VARCHAR'}}
-            )
-        ) TO '{converted_path}' (FORMAT PARQUET, COMPRESSION 'zstd')
-        """
-    )
-
-    if not file_exists(conn, converted_path):
-        raise RuntimeError(
-            f"folder={folder} conversion reported success but {converted_path}"
-            " is not readable back"
-        )
-
-    converted_count = _existing_output_row_count(conn, converted_path)
-    if converted_count is None or converted_count == 0:
-        raise RuntimeError(
-            f"folder={folder} converted parquet at {converted_path} is empty"
-        )
-
-    logger.info(
-        "folder=%s wrote %d rows to converted parquet at %s",
-        folder,
-        converted_count,
-        converted_path,
-    )
 
 
 @click.command()
@@ -93,7 +41,7 @@ def _ensure_converted_parquet(
     "input_path",
     required=True,
     type=str,
-    help="Input folder",
+    help="Input folder containing Parquet files.",
 )
 @click.option(
     "--target-count",
@@ -108,13 +56,6 @@ def _ensure_converted_parquet(
     required=True,
     type=str,
     help="Output Parquet file path.",
-)
-@click.option(
-    "--parquet-prefix",
-    "parquet_prefix",
-    required=True,
-    type=str,
-    help="Folder to store converted gzip-CSV-to-Parquet intermediates.",
 )
 @click.option(
     "--use-blob-storage",
@@ -136,28 +77,26 @@ def sample_candidates(
     target_count: int,
     source_row_count: int,
     output_path: str,
-    parquet_prefix: str,
     use_blob_storage: bool,
     bucket: str,
 ) -> None:
     if target_count <= 0:
         raise RuntimeError(f"target_count must be positive, got {target_count}")
-    if source_row_count <= 0:
-        raise RuntimeError(f"source_row_count must be positive, got {source_row_count}")
 
     folder = input_path.rstrip("/").split("/")[-1]
-    source_glob = f"{input_path.rstrip('/')}/*.smi.gz"
-    converted_path = f"{parquet_prefix.rstrip('/')}/{folder}_converted.parquet"
+    source_glob = f"{input_path.rstrip('/')}/*.parquet"
+
+    _validate_source_nonempty(source_row_count, folder)
 
     if use_blob_storage:
         blob_storage_settings = get_blob_storage_settings()
         conn = get_connection(blob_storage_settings)
         source_glob = f"s3://{bucket}/{source_glob.lstrip('/')}"
         output_path = f"s3://{bucket}/{output_path.lstrip('/')}"
-        converted_path = f"s3://{bucket}/{converted_path.lstrip('/')}"
     else:
         conn = get_connection()
 
+    logger.info("folder=%s checking for existing output at %s", folder, output_path)
     existing_row_count = _existing_output_row_count(conn, output_path)
     if existing_row_count == target_count:
         logger.info(
@@ -168,28 +107,48 @@ def sample_candidates(
         )
         return
 
-    _ensure_converted_parquet(conn, source_glob, converted_path, folder)
-
     logger.info(
-        "sampling %d rows from %d for %s", target_count, source_row_count, folder
+        "folder=%s sampling %d rows from %d (source=%s)",
+        folder,
+        target_count,
+        source_row_count,
+        source_glob,
     )
 
+    sample_start = time.monotonic()
+
     if source_row_count <= target_count:
+        logger.info(
+            "folder=%s source_row_count <= target_count, taking full source",
+            folder,
+        )
         sampled_rel = conn.sql(
-            f"SELECT smiles, id, folder FROM read_parquet('{converted_path}')"
+            f"""
+            SELECT smiles, id, '{folder}' AS folder
+            FROM read_parquet('{source_glob}')
+            """
         )
     else:
         sample_fraction = min(1.0, (target_count / source_row_count) * 1.05)
+        logger.info(
+            "folder=%s sample_fraction=%.4f%% (system sampling, row-group granularity)",
+            folder,
+            sample_fraction * 100,
+        )
         sampled_rel = conn.sql(
             f"""
-            SELECT smiles, id, folder
-            FROM read_parquet('{converted_path}')
-            USING SAMPLE {sample_fraction * 100} PERCENT (bernoulli)
+            SELECT smiles, id, '{folder}' AS folder
+            FROM read_parquet('{source_glob}')
+            USING SAMPLE {sample_fraction * 100} PERCENT (system)
             LIMIT {target_count}
             """
         )
 
+    logger.info("folder=%s writing sampled output to %s", folder, output_path)
     export_parquet(conn, sampled_rel, output_path)
+
+    elapsed = time.monotonic() - sample_start
+    logger.info("folder=%s sample+export took %.1fs", folder, elapsed)
 
     row_count = conn.read_parquet(output_path).count("*").fetchone()
     if row_count is None or row_count[0] == 0:

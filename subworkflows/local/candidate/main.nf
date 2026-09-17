@@ -71,14 +71,20 @@ workflow _REBALANCE_CANDIDATES {
     bucket,
   )
 
+  ch_parquet_dirs = COUNT_CANDIDATES.out.parquet.map { parquet_key -> tuple(parquet_key.tokenize('/').last(), parquet_key) }
+
   ch_source_allocations = ALLOCATE_CANDIDATE_SAMPLES.out.manifest_key
     .map { key -> file("s3://${bucket}/${key}") }
     .splitCsv(header: true)
     .map { row ->
-      tuple(row.folder, row.source, row.target_count as Long, row.source_count as Long)
+      tuple(row.folder, row.target_count as Long, row.source_count as Long)
+    }
+    .combine(ch_parquet_dirs, by: 0)
+    .map { folder, target_count, source_count, parquet_dir ->
+      tuple(folder, parquet_dir, target_count, source_count)
     }
 
-  SAMPLE_CANDIDATES(ch_source_allocations, config.candidate_samples_prefix, config.parquet_prefix, bucket)
+  SAMPLE_CANDIDATES(ch_source_allocations, config.candidate_samples_prefix, bucket)
 
   ch_all_samples_done = SAMPLE_CANDIDATES.out.done
     .collect()

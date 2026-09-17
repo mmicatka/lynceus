@@ -1,0 +1,23 @@
+[project]
+name = "feature-generation"
+version = "0.1.0"
+description = "Add your description here"
+authors = [{ name = "Mike Micatka", email = "mike.micatka@gmail.com" }]
+requires-python = ">=3.12"
+dependencies = [
+    "click>=8.4.2",
+    "lynceus-utils[s3]",
+    "rdkit>=2026.3.5",
+    "scikit-fingerprints>=2.1.0",
+]
+
+[project.scripts]
+generate-features = "feature_generation:generate_features"
+
+
+[build-system]
+requires = ["uv_build>=0.12.9,<0.13.0"]
+build-backend = "uv_build"
+
+[tool.uv.sources]
+lynceus-utils = { workspace = true }

@@ -15,7 +15,6 @@ dependencies = [
     "sample-candidates",
     "docking-run",
     "surrogate-model",
-    "preprocess-candidates",
     "rebalance-candidates",
     "generate-conformers",
 ]
@@ -30,7 +29,6 @@ members = [
     "modules/local/sample_candidates",
     "modules/local/docking_run",
     "modules/local/surrogate_model",
-    "modules/local/preprocess_candidates",
     "modules/local/rebalance_candidates",
     "modules/local/generate_conformers",
 ]
@@ -43,7 +41,6 @@ detect-binding-sites = { workspace = true }
 lynceus-utils = { workspace = true }
 docking-run = { workspace = true }
 surrogate-model = { workspace = true }
-preprocess-candidates = { workspace = true }
 rebalance-candidates = { workspace = true }
 generate-conformers = { workspace = true }
 

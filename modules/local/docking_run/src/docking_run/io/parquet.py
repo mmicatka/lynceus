@@ -15,7 +15,7 @@ DEFAULT_STREAM_BATCH_ROWS = 10_000
 
 DOCKING_RESULTS_SCHEMA = pa.schema(
     [
-        pa.field("catalog_id", pa.string(), nullable=False),
+        pa.field("id", pa.string(), nullable=False),
         pa.field("conformational_state_id", pa.string(), nullable=False),
         pa.field("site_id", pa.string(), nullable=False),
         pa.field("mode", pa.int32(), nullable=False),
@@ -33,10 +33,10 @@ def _iter_pose_rows(
     conformational_state_id: str,
     site_id: str,
 ) -> Iterator[tuple]:
-    for catalog_id, results in results_iter:
+    for id, results in results_iter:
         for result in results:
             yield (
-                catalog_id,
+                id,
                 conformational_state_id,
                 site_id,
                 result.mode,
