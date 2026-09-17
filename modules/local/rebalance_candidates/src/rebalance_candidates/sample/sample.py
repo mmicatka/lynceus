@@ -5,6 +5,7 @@ import time
 
 import click
 from duckdb import IOException
+from lynceus_utils.cli import NumWorkers
 from lynceus_utils.duckdb import export_parquet, get_connection
 from lynceus_utils.storage.blob_storage import get_blob_storage_settings
 
@@ -72,6 +73,13 @@ def _validate_source_nonempty(source_row_count: int, folder: str) -> None:
     type=int,
     help="Known row count for the source folder (from merged candidate counts).",
 )
+@click.option(
+    "--num-workers",
+    default="auto",
+    type=NumWorkers(),
+    show_default=True,
+    help="Number of parallel workers (integer >= 1 or 'auto').",
+)
 def sample_candidates(
     input_path: str,
     target_count: int,
@@ -79,6 +87,7 @@ def sample_candidates(
     output_path: str,
     use_blob_storage: bool,
     bucket: str,
+    num_workers: int,
 ) -> None:
     if target_count <= 0:
         raise RuntimeError(f"target_count must be positive, got {target_count}")
@@ -90,11 +99,11 @@ def sample_candidates(
 
     if use_blob_storage:
         blob_storage_settings = get_blob_storage_settings()
-        conn = get_connection(blob_storage_settings)
+        conn = get_connection(blob_storage_settings, threads=num_workers)
         source_glob = f"s3://{bucket}/{source_glob.lstrip('/')}"
         output_path = f"s3://{bucket}/{output_path.lstrip('/')}"
     else:
-        conn = get_connection()
+        conn = get_connection(threads=num_workers)
 
     logger.info("folder=%s checking for existing output at %s", folder, output_path)
     existing_row_count = _existing_output_row_count(conn, output_path)

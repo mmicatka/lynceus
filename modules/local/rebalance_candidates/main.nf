@@ -117,7 +117,8 @@ process SAMPLE_CANDIDATES {
         --source-count ${source_count} \\
         --output ${output_key} \\
         --use-blob-storage \\
-        --bucket ${bucket}
+        --bucket ${bucket} \\
+        --num-workers ${task.cpus}
     """
 }
 

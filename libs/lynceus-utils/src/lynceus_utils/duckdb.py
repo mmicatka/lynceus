@@ -1,5 +1,6 @@
 # libs/lynceus-utils/src/lynceus_utils/duckdb.py
 
+import os
 from typing import Optional
 
 import duckdb
@@ -10,8 +11,11 @@ from .storage import BlobStorageSettings
 
 def get_connection(
     blob_storage_settings: Optional[BlobStorageSettings] = None,
+    threads: Optional[int] = None,
 ) -> duckdb.DuckDBPyConnection:
     con = duckdb.connect()
+
+    con.execute("SET threads = ?", [threads or _detect_available_threads()])
 
     if blob_storage_settings:
         con.execute("LOAD httpfs")
@@ -28,6 +32,13 @@ def get_connection(
     con.execute("SET arrow_large_buffer_size=true")
 
     return con
+
+
+def _detect_available_threads() -> int:
+    try:
+        return len(os.sched_getaffinity(0))
+    except AttributeError:
+        return os.cpu_count() or 1
 
 
 def export_parquet(
