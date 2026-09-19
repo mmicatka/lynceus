@@ -1,0 +1,5 @@
+large_dataset/
+conformers/
+parquet/
+docking_run/
+features/

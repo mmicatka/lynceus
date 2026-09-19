@@ -6,16 +6,12 @@ import optuna
 from sklearn.model_selection import KFold
 
 
-def _recall_at_k(
-    y_true_binary: np.ndarray, scores: np.ndarray, fraction: float
-) -> float:
-    n = len(y_true_binary)
+def recall_at_k(y_true: np.ndarray, y_pred: np.ndarray, fraction: float) -> float:
+    n = len(y_true)
     k = max(1, int(np.ceil(n * fraction)))
-    top_k_idx = np.argsort(scores)[-k:]
-    n_actives = int(y_true_binary.sum())
-    if n_actives == 0:
-        return 0.0
-    return float(y_true_binary[top_k_idx].sum() / n_actives)
+    true_top_idx = set(np.argsort(y_true)[:k])
+    pred_top_idx = set(np.argsort(y_pred)[:k])
+    return len(true_top_idx & pred_top_idx) / k
 
 
 def make_objective(
@@ -23,7 +19,6 @@ def make_objective(
     y: np.ndarray,
     n_splits: int = 5,
     primary_metric: str = "recall_top_1_percent",
-    active_quantile: float = 0.05,
     random_seed: int = 1000,
 ):
     def objective(trial: optuna.Trial) -> float:
@@ -64,18 +59,8 @@ def make_objective(
 
             y_pred = np.asarray(model.predict(X_val))
 
-            affinity_threshold = np.quantile(y_val, active_quantile)
-            y_true_binary = (y_val <= affinity_threshold).astype(int)
-
-            scores = -y_pred
-
             metrics = {
-                "recall_top_1_percent": _recall_at_k(
-                    y_true_binary, scores, fraction=0.01
-                ),
-                "recall_top_5_percent": _recall_at_k(
-                    y_true_binary, scores, fraction=0.05
-                ),
+                "recall_top_1_percent": recall_at_k(y_val, y_pred, fraction=0.01),
             }
             fold_metrics.append(metrics)
 

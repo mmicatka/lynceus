@@ -12,37 +12,25 @@ workflow CANDIDATES {
   _REBALANCE_CANDIDATES(
     config
   )
+
+  ch_shards = _REBALANCE_CANDIDATES.out.shard_manifest
+    .map { key -> file("s3://${config.bucket}/${key}") }
+    .splitText()
+    .map { line -> new groovy.json.JsonSlurper().parseText(line.trim()) }
+    .map { row ->
+      def input_key = row.output_path.replaceFirst("^s3://${config.bucket}/", "")
+      def output_key = "${config.conformers_output_prefix}/shard_${row.shard_id}_conformers.parquet"
+      return tuple(input_key, output_key)
+    }
+
+  GENERATE_CONFORMERS(
+    ch_shards,
+    config.bucket,
+  )
+
+  emit:
+  conformers_done = GENERATE_CONFORMERS.out.done.collect()
 }
-
-// workflow CANDIDATES {
-//   take:
-//   config
-
-//   main:
-//   _REBALANCE_CANDIDATES(
-//     config
-//   )
-
-//   ch_shards = _REBALANCE_CANDIDATES.out.shard_manifest
-//     .map { key -> file("s3://${config.bucket}/${key}") }
-//     .splitText()
-//     .map { line -> new groovy.json.JsonSlurper().parseText(line.trim()) }
-//     .map { row ->
-//       def input_key = row.output_path.replaceFirst("^s3://${config.bucket}/", "")
-//       def output_key = "${config.conformers_output_prefix}/shard_${row.shard_id}_conformers.parquet"
-//       return tuple(input_key, output_key)
-//     }
-
-//   GENERATE_CONFORMERS(
-//     ch_shards,
-//     config.bucket,
-//   )
-
-//   emit:
-//   candidate_counts = _REBALANCE_CANDIDATES.out.candidate_counts
-//   allocation_manifest = _REBALANCE_CANDIDATES.out.allocation_manifest
-//   conformers_done = GENERATE_CONFORMERS.out.done.collect()
-// }
 
 workflow _REBALANCE_CANDIDATES {
   take:
@@ -91,13 +79,12 @@ workflow _REBALANCE_CANDIDATES {
     .map { true }
     .first()
 
-  n_shards = Math.ceil(config.target_total / config.num_per_shard) as int
   sample_glob = "${config.candidate_samples_prefix.toString().replaceAll('/$', '')}/*_sample.parquet"
 
   SHARD_SAMPLES(
     ch_all_samples_done,
     sample_glob,
-    n_shards,
+    config.candidates_per_shard,
     config.shard_output_prefix,
     bucket,
   )

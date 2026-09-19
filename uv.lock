@@ -21,7 +21,6 @@ members = [
     "lynceus-dev",
     "lynceus-utils",
     "physiochemical-filter",
-    "preprocess-candidates",
     "rebalance-candidates",
     "sample-candidates",
     "surrogate-model",
@@ -1093,7 +1092,7 @@ dependencies = [
     { name = "click" },
     { name = "dimorphite-dl" },
     { name = "duckdb" },
-    { name = "lynceus-utils" },
+    { name = "lynceus-utils", extra = ["s3"] },
     { name = "numpy" },
     { name = "pyarrow" },
 ]
@@ -1104,7 +1103,7 @@ requires-dist = [
     { name = "click", specifier = ">=8.4.2" },
     { name = "dimorphite-dl", git = "https://github.com/mmicatka/dimorphite_dl.git" },
     { name = "duckdb", specifier = ">=1.5.4" },
-    { name = "lynceus-utils", editable = "libs/lynceus-utils" },
+    { name = "lynceus-utils", extras = ["s3"], editable = "libs/lynceus-utils" },
     { name = "numpy", specifier = ">=2.5.1" },
     { name = "pyarrow", specifier = ">=24.0.0" },
 ]
@@ -1729,7 +1728,6 @@ dependencies = [
     { name = "generate-conformers" },
     { name = "lynceus-utils" },
     { name = "physiochemical-filter" },
-    { name = "preprocess-candidates" },
     { name = "rebalance-candidates" },
     { name = "sample-candidates" },
     { name = "surrogate-model" },
@@ -1753,7 +1751,6 @@ requires-dist = [
     { name = "generate-conformers", editable = "modules/local/generate_conformers" },
     { name = "lynceus-utils", editable = "libs/lynceus-utils" },
     { name = "physiochemical-filter", editable = "modules/local/physiochemical_filter" },
-    { name = "preprocess-candidates", editable = "modules/local/preprocess_candidates" },
     { name = "rebalance-candidates", editable = "modules/local/rebalance_candidates" },
     { name = "sample-candidates", editable = "modules/local/sample_candidates" },
     { name = "surrogate-model", editable = "modules/local/surrogate_model" },
@@ -2278,16 +2275,6 @@ wheels = [
 ]
 
 [[package]]
-name = "nvidia-cuda-runtime-cu12"
-version = "12.9.79"
-source = { registry = "https://pypi.org/simple" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/bc/e0/0279bd94539fda525e0c8538db29b72a5a8495b0c12173113471d28bce78/nvidia_cuda_runtime_cu12-12.9.79-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:83469a846206f2a733db0c42e223589ab62fd2fabac4432d2f8802de4bded0a4", size = 3515012, upload-time = "2025-06-05T20:00:35.519Z" },
-    { url = "https://files.pythonhosted.org/packages/bc/46/a92db19b8309581092a3add7e6fceb4c301a3fd233969856a8cbf042cd3c/nvidia_cuda_runtime_cu12-12.9.79-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:25bba2dfb01d48a9b59ca474a1ac43c6ebf7011f1b0b8cc44f54eb6ac48a96c3", size = 3493179, upload-time = "2025-06-05T20:00:53.735Z" },
-    { url = "https://files.pythonhosted.org/packages/59/df/e7c3a360be4f7b93cee39271b792669baeb3846c58a4df6dfcf187a7ffab/nvidia_cuda_runtime_cu12-12.9.79-py3-none-win_amd64.whl", hash = "sha256:8e018af8fa02363876860388bd10ccb89eb9ab8fb0aa749aaf58430a9f7c4891", size = 3591604, upload-time = "2025-06-05T20:11:17.036Z" },
-]
-
-[[package]]
 name = "nvidia-cudnn-cu13"
 version = "9.24.0.43"
 source = { registry = "https://pypi.org/simple" }
@@ -2398,22 +2385,6 @@ source = { registry = "https://pypi.org/simple" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/c2/f3/d86c845465a2723ad7e1e5c36dcd75ddb82898b3f53be47ebd429fb2fa5d/nvidia_nvtx-13.0.85-py3-none-manylinux1_x86_64.manylinux_2_5_x86_64.whl", hash = "sha256:4936d1d6780fbe68db454f5e72a42ff64d1fd6397df9f363ae786930fd5c1cd4", size = 148047, upload-time = "2025-09-04T08:29:01.761Z" },
     { url = "https://files.pythonhosted.org/packages/a8/64/3708a90d1ebe202ffdeb7185f878a3c84d15c2b2c31858da2ce0583e2def/nvidia_nvtx-13.0.85-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:cb7780edb6b14107373c835bf8b72e7a178bac7367e23da7acb108f973f157a6", size = 148878, upload-time = "2025-09-04T08:28:53.627Z" },
-]
-
-[[package]]
-name = "nvmolkit"
-version = "0.6.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "numpy" },
-    { name = "nvidia-cuda-runtime-cu12" },
-    { name = "rdkit" },
-    { name = "torch" },
-]
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/92/e0/abf6ec8216abe21ff6eaf51ad9eb8457e36f4122e76aed4748fc818dca1c/nvmolkit-0.6.0-cp312-cp312-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:fd68843d679ae2b2319873309de65df6a57f0f7b99d957d2d2480e624ec9a21a", size = 80556213, upload-time = "2026-08-18T17:19:44.429Z" },
-    { url = "https://files.pythonhosted.org/packages/fe/21/bd4326b643600b163803f05b6e2d88827f5428a9575afac1c30f6c48d8d2/nvmolkit-0.6.0-cp313-cp313-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:36f08ddc240f5ea1d7ff7725291e6a491d7fe0be9b2b9a4d3f6591450c428598", size = 80556238, upload-time = "2026-08-18T17:19:57.946Z" },
-    { url = "https://files.pythonhosted.org/packages/02/d9/f400e2ea47b413d0cfd61c6e43eb3a887b1846d25709e20bae90e58470c5/nvmolkit-0.6.0-cp314-cp314-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:5e01a4f9494e243d5e22c9be9f7f4a40a1f5c9d10928b796c11c19715c2318c9", size = 80562124, upload-time = "2026-08-18T17:20:21.129Z" },
 ]
 
 [[package]]
@@ -2677,37 +2648,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/8e/22/2de9408ac81acbb8a7d05d4cc064a152ccf33b3d480ebe0cd292153db239/pre_commit-4.6.0.tar.gz", hash = "sha256:718d2208cef53fdc38206e40524a6d4d9576d103eb16f0fec11c875e7716e9d9", size = 198525, upload-time = "2026-04-21T20:31:41.613Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/80/6e/4b28b62ecb6aae56769c34a8ff1d661473ec1e9519e2d5f8b2c150086b26/pre_commit-4.6.0-py2.py3-none-any.whl", hash = "sha256:e2cf246f7299edcabcf15f9b0571fdce06058527f0a06535068a86d38089f29b", size = 226472, upload-time = "2026-04-21T20:31:40.092Z" },
-]
-
-[[package]]
-name = "preprocess-candidates"
-version = "0.1.0"
-source = { editable = "modules/local/preprocess_candidates" }
-dependencies = [
-    { name = "blake3" },
-    { name = "click" },
-    { name = "dimorphite-dl" },
-    { name = "duckdb" },
-    { name = "lynceus-utils" },
-    { name = "numpy" },
-    { name = "nvmolkit" },
-    { name = "polars" },
-    { name = "pyarrow" },
-    { name = "rdkit" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "blake3", specifier = ">=1.0.9" },
-    { name = "click", specifier = ">=8.4.2" },
-    { name = "dimorphite-dl", git = "https://github.com/mmicatka/dimorphite_dl.git" },
-    { name = "duckdb", specifier = ">=1.5.4" },
-    { name = "lynceus-utils", editable = "libs/lynceus-utils" },
-    { name = "numpy", specifier = ">=2.5.1" },
-    { name = "nvmolkit", specifier = ">=0.6.0" },
-    { name = "polars", specifier = ">=1.42.1" },
-    { name = "pyarrow", specifier = ">=24.0.0" },
-    { name = "rdkit", specifier = ">=2026.3.4" },
 ]
 
 [[package]]
@@ -3683,6 +3623,7 @@ dependencies = [
     { name = "optuna" },
     { name = "polars" },
     { name = "scikit-learn" },
+    { name = "torch" },
 ]
 
 [package.metadata]
@@ -3692,6 +3633,7 @@ requires-dist = [
     { name = "optuna", specifier = ">=4.9.0" },
     { name = "polars", specifier = ">=1.42.1" },
     { name = "scikit-learn", specifier = ">=1.9.0" },
+    { name = "torch", specifier = ">=2.14.0" },
 ]
 
 [[package]]

@@ -7,7 +7,7 @@ s3_url_style: path
 
 candidates:
   bucket: lynceus
-  num_per_shard: 2000000
+  candidates_per_shard: 2000000
   source_prefix: candidates/raw
   parquet_prefix: candidates/parquet
   sources:

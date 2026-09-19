@@ -124,7 +124,6 @@ process SAMPLE_CANDIDATES {
 
 process SHARD_SAMPLES {
     container "${params.registry}/lynceus/rebalance-candidates:0.1.0"
-    tag { "n_shards=${n_shards}" }
 
     label 'pvc_io_retry'
     label 'cpu_high'
@@ -132,7 +131,7 @@ process SHARD_SAMPLES {
     input:
     val ready
     val source_glob
-    val n_shards
+    val candidates_per_shard
     val output
     val bucket
 
@@ -143,7 +142,7 @@ process SHARD_SAMPLES {
     """
     shard-candidate-samples \\
         --input ${source_glob} \\
-        --n-shards ${n_shards} \\
+        --candidates-per-shard ${candidates_per_shard} \\
         --output ${output} \\
         --use-blob-storage \\
         --bucket ${bucket}

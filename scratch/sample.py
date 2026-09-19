@@ -2,8 +2,8 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 input_file = "parquet/sample.parquet"
-output_file = "parquet/sample_50k.parquet"
-target_rows = 50_000
+output_file = "parquet/sample_500k.parquet"
+target_rows = 500_000
 
 parquet_file = pq.ParquetFile(input_file)
 selected_batches = []

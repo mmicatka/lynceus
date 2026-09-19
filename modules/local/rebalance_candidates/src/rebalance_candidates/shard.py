@@ -1,6 +1,5 @@
 # modules/local/rebalance_candidates/src/rebalance_candidates/shard.py
 
-import heapq
 import json
 import logging
 from dataclasses import dataclass
@@ -31,7 +30,7 @@ class ShardAssignment(BaseModel):
 
 class ShardPlan(BaseModel):
     n_shards: int
-    target_rows_per_shard: int
+    rows_per_shard: int
     assignments: list[ShardAssignment]
 
 
@@ -87,74 +86,57 @@ def _write_manifest(
 
 def _plan_balanced_shards(
     files: list[FolderSampleFile],
-    n_shards: int,
+    rows_per_shard: int,
 ) -> ShardPlan:
-    if n_shards <= 0:
-        raise RuntimeError(f"n_shards must be positive, got {n_shards}")
+    if rows_per_shard <= 0:
+        raise RuntimeError(f"rows_per_shard must be positive, got {rows_per_shard}")
     if not files:
         raise RuntimeError("No folder sample files provided for shard planning")
 
-    total_rows = sum(f.row_count for f in files)
-    target_rows_per_shard = total_rows // n_shards
-    if target_rows_per_shard == 0:
-        raise RuntimeError(
-            f"target_rows_per_shard resolved to 0: total_rows={total_rows},"
-            f" n_shards={n_shards}"
-        )
-
-    shard_heap = [(0, shard_id) for shard_id in range(n_shards)]
-    heapq.heapify(shard_heap)
-
     assignments: list[ShardAssignment] = []
-    files_sorted = sorted(files, key=lambda f: f.row_count, reverse=True)
+    current_shard_id = 0
+    current_shard_rows = 0
 
-    for file in files_sorted:
-        if file.row_count <= target_rows_per_shard:
-            current_load, shard_id = heapq.heappop(shard_heap)
+    for file in files:
+        remaining_file_rows = file.row_count
+        current_row_start = 0
+
+        while remaining_file_rows > 0:
+            available_in_shard = rows_per_shard - current_shard_rows
+
+            # Move to the next shard if the current one is full
+            if available_in_shard == 0:
+                current_shard_id += 1
+                current_shard_rows = 0
+                available_in_shard = rows_per_shard
+
+            take_rows = min(remaining_file_rows, available_in_shard)
+            is_full_file = take_rows == file.row_count
+
             assignments.append(
                 ShardAssignment(
-                    shard_id=shard_id,
+                    shard_id=current_shard_id,
                     folder=file.folder,
                     source_key=file.source_key,
-                    full_file=True,
+                    row_start=current_row_start if not is_full_file else None,
+                    row_end=(current_row_start + take_rows)
+                    if not is_full_file
+                    else None,
+                    full_file=is_full_file,
                 )
             )
-            heapq.heappush(shard_heap, (current_load + file.row_count, shard_id))
-            continue
 
-        n_splits = max(1, math_ceil_div(file.row_count, target_rows_per_shard))
-        rows_per_split = math_ceil_div(file.row_count, n_splits)
+            current_row_start += take_rows
+            remaining_file_rows -= take_rows
+            current_shard_rows += take_rows
 
-        for split_index in range(n_splits):
-            row_start = split_index * rows_per_split
-            row_end = min(row_start + rows_per_split, file.row_count)
-            if row_start >= row_end:
-                continue
-
-            current_load, shard_id = heapq.heappop(shard_heap)
-            assignments.append(
-                ShardAssignment(
-                    shard_id=shard_id,
-                    folder=file.folder,
-                    source_key=file.source_key,
-                    row_start=row_start,
-                    row_end=row_end,
-                    full_file=False,
-                )
-            )
-            heapq.heappush(shard_heap, (current_load + (row_end - row_start), shard_id))
+    n_shards = current_shard_id + 1 if assignments else 0
 
     return ShardPlan(
         n_shards=n_shards,
-        target_rows_per_shard=target_rows_per_shard,
+        rows_per_shard=rows_per_shard,
         assignments=assignments,
     )
-
-
-def math_ceil_div(numerator: int, denominator: int) -> int:
-    if denominator <= 0:
-        raise RuntimeError(f"denominator must be positive, got {denominator}")
-    return numerator // denominator
 
 
 def _read_existing_manifest(
@@ -178,17 +160,24 @@ def _read_existing_manifest(
 
 
 def _manifest_is_valid(
-    manifest_rows: list[dict], n_shards: int, output: str, conn
+    manifest_rows: list[dict],
+    rows_per_shard: int,
+    output: str,
+    conn: duckdb.DuckDBPyConnection,
 ) -> bool:
-    if len(manifest_rows) != n_shards:
+    if not manifest_rows:
         return False
 
+    n_shards = len(manifest_rows)
     expected_shard_ids = set(range(n_shards))
     manifest_shard_ids = {row.get("shard_id") for row in manifest_rows}
     if manifest_shard_ids != expected_shard_ids:
         return False
 
     for row in manifest_rows:
+        if row.get("row_count", 0) > rows_per_shard:
+            return False
+
         expected_output_path = f"{output.rstrip('/')}/shard_{row['shard_id']}.parquet"
         if row.get("output_path") != expected_output_path:
             return False
@@ -209,11 +198,11 @@ def _manifest_is_valid(
     help="Glob pattern for candidate sample Parquet files.",
 )
 @click.option(
-    "--n-shards",
-    "n_shards",
+    "--candidates-per-shard",
+    "candidates_per_shard",
     required=True,
-    type=int,
-    help="Number of balanced output shards to write.",
+    type=click.IntRange(min=1),
+    help="Maximum number of candidates per output shard.",
 )
 @click.option(
     "--output",
@@ -231,14 +220,11 @@ def _manifest_is_valid(
 )
 def shard_candidate_samples(
     input_glob: str,
-    n_shards: int,
+    candidates_per_shard: int,
     output: str,
     use_blob_storage: bool,
     bucket: str,
 ) -> None:
-    if n_shards <= 0:
-        raise RuntimeError(f"n_shards must be positive, got {n_shards}")
-
     output_key = output.rstrip("/")
 
     if use_blob_storage:
@@ -255,12 +241,13 @@ def shard_candidate_samples(
         manifest_key, use_blob_storage, bucket
     )
     if existing_manifest_rows is not None and _manifest_is_valid(
-        existing_manifest_rows, n_shards, output, conn
+        existing_manifest_rows, candidates_per_shard, output, conn
     ):
         logger.info(
-            "%s already reflects %d valid shards, skipping",
+            "%s already reflects valid shards under the %d"
+            " rows-per-shard limit, skipping",
             manifest_key,
-            n_shards,
+            candidates_per_shard,
         )
         return
 
@@ -268,15 +255,15 @@ def shard_candidate_samples(
 
     logger.info("Collected %d candidate sample files for shard planning", len(files))
 
-    shard_plan = _plan_balanced_shards(files, n_shards)
+    shard_plan = _plan_balanced_shards(files, candidates_per_shard)
     logger.info(
-        "Shard plan: n_shards=%d target_rows_per_shard=%d assignments=%d",
+        "Shard plan: n_shards=%d rows_per_shard=%d assignments=%d",
         shard_plan.n_shards,
-        shard_plan.target_rows_per_shard,
+        shard_plan.rows_per_shard,
         len(shard_plan.assignments),
     )
 
-    assignments_by_shard: dict[int, list] = {i: [] for i in range(n_shards)}
+    assignments_by_shard: dict[int, list] = {i: [] for i in range(shard_plan.n_shards)}
     for assignment in shard_plan.assignments:
         assignments_by_shard[assignment.shard_id].append(assignment)
 
