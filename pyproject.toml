@@ -12,11 +12,11 @@ dependencies = [
     # utils
     "detect-binding-sites",
     "physiochemical-filter",
-    "sample-candidates",
     "docking-run",
     "surrogate-model",
     "rebalance-candidates",
     "generate-conformers",
+    "feature-generation",
 ]
 
 [tool.uv.workspace]
@@ -25,8 +25,8 @@ members = [
     "libs/lynceus-utils",
     # utils
     "modules/local/detect_binding_sites",
+    "modules/local/feature_generation",
     "modules/local/physiochemical_filter",
-    "modules/local/sample_candidates",
     "modules/local/docking_run",
     "modules/local/surrogate_model",
     "modules/local/rebalance_candidates",
@@ -36,13 +36,13 @@ members = [
 [tool.uv.sources]
 
 physiochemical-filter = { workspace = true }
-sample-candidates = { workspace = true }
 detect-binding-sites = { workspace = true }
 lynceus-utils = { workspace = true }
 docking-run = { workspace = true }
 surrogate-model = { workspace = true }
 rebalance-candidates = { workspace = true }
 generate-conformers = { workspace = true }
+feature-generation = { workspace = true }
 
 [dependency-groups]
 dev = [
