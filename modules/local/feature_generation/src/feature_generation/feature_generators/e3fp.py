@@ -21,6 +21,12 @@ class E3FPFeature(FeatureGenerator):
         self._fp = E3FPFingerprint(fp_size=fp_size, n_jobs=1, sparse=False, level=level)
 
     def compute_batch(self, batch: list[Mol]) -> list[list[float] | None]:
+        for idx, mol in enumerate(batch):
+            if mol is not None and (
+                not mol.HasProp("_Name") or not mol.GetProp("_Name").strip()
+            ):
+                mol.SetProp("_Name", f"mol_{idx}")
+
         fingerprints = self._fp.transform(batch)
         if not isinstance(fingerprints, np.ndarray):
             raise RuntimeError(
