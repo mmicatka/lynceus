@@ -9,6 +9,7 @@ dependencies = [
     "lightgbm>=4.7.0",
     "numpy>=2.5.1",
     "polars>=1.42.1",
+    "pydantic>=2.13.5",
     "scikit-learn>=1.9.0",
 ]
 
@@ -18,3 +19,9 @@ surrogate-sample-candidates = "surrogate_model:sample"
 [build-system]
 requires = ["uv_build>=0.12.1,<0.13.0"]
 build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "matplotlib>=3.11.2",
+    "seaborn>=0.13.2",
+]

@@ -23,7 +23,7 @@ spec:
                   - key: kubernetes.io/hostname
                     operator: In
                     values:
-                      - k3s-agent-menoetius
+                      - k3s-agent-blackhole
       containers:
         - name: nextflow
           image: registry.nebula.lan:5000/lynceus/nf-driver:0.1.0

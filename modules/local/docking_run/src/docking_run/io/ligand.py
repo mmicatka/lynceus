@@ -56,11 +56,6 @@ def iter_ligand_records(
     for id, molblock in rel.fetchall():
         if not molblock:
             n_skipped_empty += 1
-            logger.warning(
-                "Skipping candidate '%s': empty %s.",
-                id,
-                sdf_col,
-            )
             continue
 
         mol = _mol_from_molblock(molblock)
