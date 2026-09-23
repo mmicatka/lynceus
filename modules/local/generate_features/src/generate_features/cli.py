@@ -7,12 +7,16 @@ from concurrent.futures import ProcessPoolExecutor
 import click
 import pyarrow as pa
 import pyarrow.parquet as pq
-from feature_generators import FEATURE_GENERATOR_REGISTRY, FeatureGenerator
 from lynceus_utils.cli import NumWorkers
 from lynceus_utils.storage.blob_storage import get_blob_storage_settings
 from lynceus_utils.storage.filesystem import get_filesystem
 from rdkit import rdBase
 from rdkit.Chem import Mol, MolFromMolBlock
+
+from generate_features.feature_generators import (
+    FEATURE_GENERATOR_REGISTRY,
+    FeatureGenerator,
+)
 
 logging.basicConfig(
     level=logging.INFO,
