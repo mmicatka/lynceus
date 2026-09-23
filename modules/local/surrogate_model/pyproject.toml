@@ -11,6 +11,7 @@ dependencies = [
     "polars>=1.42.1",
     "pydantic>=2.13.5",
     "scikit-learn>=1.9.0",
+    "torch>=2.14.0",
 ]
 
 [project.scripts]

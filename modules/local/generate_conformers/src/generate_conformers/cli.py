@@ -93,11 +93,6 @@ def _output_matches_input_row_count(fs, output: str, expected_rows: int) -> bool
     "--output", type=str, required=True, help="Path to the output Parquet file."
 )
 @click.option(
-    "--use-blob-storage",
-    is_flag=True,
-    help="Read input and write output via blob storage.",
-)
-@click.option(
     "--bucket", type=str, default="lynceus", help="S3-compatible bucket name."
 )
 @click.option("--batch-size", default=10_000, type=int, help="Parquet read batch size.")
@@ -117,7 +112,6 @@ def _output_matches_input_row_count(fs, output: str, expected_rows: int) -> bool
 def generate_conformers(
     input: str,
     output: str,
-    use_blob_storage: bool,
     bucket: str,
     batch_size: int,
     chunk_size: int,
@@ -125,11 +119,11 @@ def generate_conformers(
 ):
     logger.info("generating conformers for %s", input)
 
-    blob_storage_settings = get_blob_storage_settings() if use_blob_storage else None
+    blob_storage_settings = get_blob_storage_settings() if bucket else None
     fs = get_filesystem(blob_storage_settings)
 
-    input = f"s3://{bucket}/{input}" if use_blob_storage else input
-    output = f"s3://{bucket}/{output}" if use_blob_storage else output
+    input = f"s3://{bucket}/{input}" if bucket else input
+    output = f"s3://{bucket}/{output}" if bucket else output
 
     parquet_file = pq.ParquetFile(input, filesystem=fs)
 

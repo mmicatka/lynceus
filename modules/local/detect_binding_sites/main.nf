@@ -6,15 +6,19 @@ process DETECT_BINDING_SITES {
     label 'cpu_low'
 
     input:
-    tuple val(ensemble_id), path(ensemble_manifest, stageAs: 'ensemble/manifest.json'), path(ensemble_members, stageAs: 'ensemble/members/*')
+    tuple val(ensemble_id), val(ensemble_path)
 
     output:
-    tuple val(ensemble_id), path("sites.json"), emit: sites
+    tuple val(ensemble_id), val(out_path), emit: sites
 
     script:
+    out_path = "${ensemble_path}/sites.json"
+    def bucket_opt = params.bucket ? "--bucket ${params.bucket}" : ""
+
     """
     detect-binding-sites \\
-    --ensemble ensemble \\
-    --out sites.json
+    --ensemble ${ensemble_path} \\
+    --out ${out_path} \\
+    ${bucket_opt}
     """
 }

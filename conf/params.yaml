@@ -42,31 +42,8 @@ candidates:
   shard_output_prefix: candidates/shards
   conformers_output_prefix: candidates/conformers
 
-  filter_config:
-    pains:
-      enabled: true
-
-    cns_mpo:
-      enabled: true
-      min_score: 4.0
-
-surrogate:
-  train:
-    sample:
-      seed: 1000
-      num_samples: 250000
-      fields:
-        - name: morgan_fingerprint
-          kind: array
-          reduced_dims: 32
-        - name: molecular_weight
-          kind: scalar
-        - name: calculated_distribution_coefficient
-          kind: scalar
-        - name: topological_polar_surface_area
-          kind: scalar
-
 target:
-  ensemble_id: "T4_lysozyme_L99"
-  ensemble_path: "s3://lynceus/targets/protein_ensembles/T4_lysozyme_L99"
+  ensemble_prefix: targets/protein_ensembles
   bucket: lynceus
+  ensembles:
+    - T4_lysozyme_L99

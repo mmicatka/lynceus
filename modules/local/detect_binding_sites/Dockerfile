@@ -22,6 +22,7 @@ WORKDIR /app
 
 COPY pyproject.toml uv.lock ./
 
+COPY libs/lynceus-utils ./libs/lynceus-utils
 COPY modules/local/detect_binding_sites ./modules/local/detect_binding_sites
 
 WORKDIR /app/modules/local/detect_binding_sites

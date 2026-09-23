@@ -16,7 +16,7 @@ dependencies = [
     "surrogate-model",
     "rebalance-candidates",
     "generate-conformers",
-    "feature-generation",
+    "generate-features",
 ]
 
 [tool.uv.workspace]
@@ -25,12 +25,12 @@ members = [
     "libs/lynceus-utils",
     # utils
     "modules/local/detect_binding_sites",
-    "modules/local/feature_generation",
     "modules/local/physiochemical_filter",
     "modules/local/docking_run",
     "modules/local/surrogate_model",
     "modules/local/rebalance_candidates",
     "modules/local/generate_conformers",
+    "modules/local/generate_features",
 ]
 
 [tool.uv.sources]
@@ -42,7 +42,7 @@ docking-run = { workspace = true }
 surrogate-model = { workspace = true }
 rebalance-candidates = { workspace = true }
 generate-conformers = { workspace = true }
-feature-generation = { workspace = true }
+generate-features = { workspace = true }
 
 [dependency-groups]
 dev = [

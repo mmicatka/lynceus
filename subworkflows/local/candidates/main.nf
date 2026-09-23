@@ -1,4 +1,4 @@
-// subworkflows/candidate/main.nf
+// subworkflows/candidates/main.nf
 
 include { COUNT_CANDIDATES ; MERGE_CANDIDATE_COUNTS ; ALLOCATE_CANDIDATE_SAMPLES ; SAMPLE_CANDIDATES ; SHARD_SAMPLES } from '../../../modules/local/rebalance_candidates'
 include { GENERATE_CONFORMERS } from '../../../modules/local/generate_conformers'
@@ -13,23 +13,28 @@ workflow CANDIDATES {
     config
   )
 
+  bucket = config.bucket
+
   ch_shards = _REBALANCE_CANDIDATES.out.shard_manifest
-    .map { key -> file("s3://${config.bucket}/${key}") }
+    .map { key -> bucket ? file("s3://${bucket}/${key}") : file(key) }
     .splitText()
     .map { line -> new groovy.json.JsonSlurper().parseText(line.trim()) }
     .map { row ->
-      def input_key = row.output_path.replaceFirst("^s3://${config.bucket}/", "")
+      def s3_prefix = "s3://${bucket}/"
+      def input_key = bucket && row.output_path.startsWith(s3_prefix)
+        ? row.output_path.replaceFirst("^${s3_prefix}", "")
+        : row.output_path
       def output_key = "${config.conformers_output_prefix}/shard_${row.shard_id}_conformers.parquet"
       return tuple(input_key, output_key)
     }
 
   GENERATE_CONFORMERS(
     ch_shards,
-    config.bucket,
+    bucket,
   )
 
   emit:
-  conformers_done = GENERATE_CONFORMERS.out.done.collect()
+  done = GENERATE_CONFORMERS.out.done.collect()
 }
 
 workflow _REBALANCE_CANDIDATES {
@@ -62,7 +67,7 @@ workflow _REBALANCE_CANDIDATES {
   ch_parquet_dirs = COUNT_CANDIDATES.out.parquet.map { parquet_key -> tuple(parquet_key.tokenize('/').last(), parquet_key) }
 
   ch_source_allocations = ALLOCATE_CANDIDATE_SAMPLES.out.manifest_key
-    .map { key -> file("s3://${bucket}/${key}") }
+    .map { key -> bucket ? file("s3://${bucket}/${key}") : file(key) }
     .splitCsv(header: true)
     .map { row ->
       tuple(row.folder, row.target_count as Long, row.source_count as Long)

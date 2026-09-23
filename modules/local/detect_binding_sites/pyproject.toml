@@ -5,7 +5,12 @@ name = "detect-binding-sites"
 version = "0.1.0"
 description = "Add your description here"
 requires-python = ">=3.12"
-dependencies = ["click>=8.4.2", "gemmi>=0.7.5", "protein-ensemble"]
+dependencies = [
+    "click>=8.4.2",
+    "gemmi>=0.7.5",
+    "protein-ensemble",
+    "lynceus-utils[s3]",
+]
 
 [project.scripts]
 detect-binding-sites = "detect_binding_sites.detect_binding_sites:detect_binding_sites"
@@ -17,3 +22,4 @@ build-backend = "uv_build"
 
 [tool.uv.sources]
 protein-ensemble = { git = "https://github.com/proteinensemble/python-sdk.git" }
+lynceus-utils = { workspace = true }
