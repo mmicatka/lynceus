@@ -3,7 +3,7 @@
 import pyarrow as pa
 from rdkit.Chem import Mol, rdMolDescriptors
 
-from feature_generation.feature_generators.feature_generator import FeatureGenerator
+from generate_features.feature_generators.feature_generator import FeatureGenerator
 
 
 def _lerp(v: float, lo: float, hi: float, s_lo: float, s_hi: float) -> float:

@@ -12,22 +12,19 @@ NF_DRIVER_DEPLOYMENT ?= nf-driver
 
 .PHONY: build push build-* run-dev run-k8s driver-exec driver-restart clean reset lint
 
-build: build-preprocess-candidates build-generate-conformers build-physiochemical-filter build-rebalance-candidates build-sample-candidates build-detect-binding-sites build-docking-run-gpu build-nf-driver
+build: build-generate-conformers build-generate-features build-rebalance-candidates build-sample-candidates build-detect-binding-sites build-docking-run-gpu build-nf-driver
 
 build-generate-conformers:
 	docker buildx build --platform linux/amd64,linux/arm64 --push -f modules/local/generate_conformers/Dockerfile -t $(IMAGE_PREFIX)/generate-conformers:$(VERSION) .
 
-build-preprocess-candidates:
-	docker buildx build --platform linux/amd64,linux/arm64 --push -f modules/local/preprocess_candidates/Dockerfile -t $(IMAGE_PREFIX)/preprocess-candidates:$(VERSION) .
+build-generate-features:
+	docker buildx build --platform linux/amd64,linux/arm64 --push -f modules/local/generate_features/Dockerfile -t $(IMAGE_PREFIX)/generate-features:$(VERSION) .
 
 build-physiochemical-filter:
 	docker buildx build --platform linux/amd64,linux/arm64 --push -f modules/local/physiochemical_filter/Dockerfile -t $(IMAGE_PREFIX)/physiochemical-filter:$(VERSION) .
 
 build-rebalance-candidates:
 	docker buildx build --platform linux/amd64,linux/arm64 --push -f modules/local/rebalance_candidates/Dockerfile -t $(IMAGE_PREFIX)/rebalance-candidates:$(VERSION) .
-
-build-sample-candidates:
-	docker buildx build --platform linux/amd64,linux/arm64 --push -f modules/local/sample_candidates/Dockerfile -t $(IMAGE_PREFIX)/sample-candidates:$(VERSION) .
 
 build-detect-binding-sites:
 	docker buildx build --platform linux/amd64,linux/arm64 --push -f modules/local/detect_binding_sites/Dockerfile -t $(IMAGE_PREFIX)/detect-binding-sites:$(VERSION) .

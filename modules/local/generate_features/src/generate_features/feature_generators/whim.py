@@ -1,26 +1,27 @@
-# modules/local/feature_generation/src/feature_generation/feature_generators/morse.py
+# modules/local/feature_generation/src/feature_generation/feature_generators/whim.py
 
 import numpy as np
 import pyarrow as pa
 from rdkit.Chem import Mol
-from skfp.fingerprints import MORSEFingerprint
+from skfp.fingerprints import WHIMFingerprint
 
-from feature_generation.feature_generators.feature_generator import FeatureGenerator
+from generate_features.feature_generators.feature_generator import FeatureGenerator
 
 
-class MORSEFeature(FeatureGenerator):
-    name = "morse"
+class WHIMFeature(FeatureGenerator):
+    name = "whim"
 
-    N_FEATURES = 224
+    N_FEATURES = 114
+    DEFAULT_CLIP_VAL = 1e6
 
-    def __init__(self) -> None:
-        self._fp = MORSEFingerprint(n_jobs=1)
+    def __init__(self, clip_val: float = DEFAULT_CLIP_VAL) -> None:
+        self._fp = WHIMFingerprint(clip_val=clip_val, n_jobs=1)
 
     def compute_batch(self, batch: list[Mol]) -> list[list[float] | None]:
         fingerprints = self._fp.transform(batch)
         if not isinstance(fingerprints, np.ndarray):
             raise RuntimeError(
-                "expected dense ndarray from MORSEFingerprint.transform,"
+                "expected dense ndarray from WHIMFingerprint.transform,"
                 f" got {type(fingerprints)}"
             )
         return [row.tolist() for row in fingerprints]

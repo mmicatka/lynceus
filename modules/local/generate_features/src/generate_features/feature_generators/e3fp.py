@@ -5,7 +5,7 @@ import pyarrow as pa
 from rdkit.Chem import Mol
 from skfp.fingerprints import E3FPFingerprint
 
-from feature_generation.feature_generators.feature_generator import FeatureGenerator
+from generate_features.feature_generators.feature_generator import FeatureGenerator
 
 
 class E3FPFeature(FeatureGenerator):

@@ -20,5 +20,6 @@ process GENERATE_CONFORMERS {
         --output ${output} \\
         --use-blob-storage \\
         --bucket ${bucket} \\
+        --num-workers ${task.cpus}
     """
 }

@@ -1,5 +1,5 @@
 [project]
-name = "feature-generation"
+name = "generate-features"
 version = "0.1.0"
 description = "Add your description here"
 authors = [{ name = "Mike Micatka", email = "mike.micatka@gmail.com" }]
@@ -12,7 +12,7 @@ dependencies = [
 ]
 
 [project.scripts]
-generate-features = "feature_generation:generate_features"
+generate-features = "generate_features:generate_features"
 
 
 [build-system]
