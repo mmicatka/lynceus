@@ -7,13 +7,14 @@ process DETECT_BINDING_SITES {
 
     input:
     tuple val(ensemble_id), val(ensemble_path)
+    val bucket
 
     output:
     tuple val(ensemble_id), val(out_path), emit: sites
 
     script:
     out_path = "${ensemble_path}/sites.json"
-    def bucket_opt = params.bucket ? "--bucket ${params.bucket}" : ""
+    def bucket_opt = bucket ? "--bucket ${bucket}" : ""
 
     """
     detect-binding-sites \\

@@ -47,3 +47,19 @@ target:
   bucket: lynceus
   ensembles:
     - T4_lysozyme_L99
+
+filter:
+  bucket: lynceus
+  input_prefix: candidates/conformers
+  output_prefix: filter/features
+  features:
+    - atom_pair
+    - autocorr
+    - descriptors
+    - ecfp
+    - functional_groups
+    - morse
+    - rdf
+    - topological_torsion
+    - usrcat
+    - whim

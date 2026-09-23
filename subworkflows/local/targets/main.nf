@@ -27,7 +27,7 @@ workflow TARGETS {
 
   ch_valid_ensemble = channel.fromList(valid_ensembles)
 
-  DETECT_BINDING_SITES(ch_valid_ensemble)
+  DETECT_BINDING_SITES(ch_valid_ensemble, bucket)
 
   ch_target_surfaces = DETECT_BINDING_SITES.out.sites
     .join(ch_valid_ensemble)
@@ -38,7 +38,6 @@ workflow TARGETS {
   ch_done = DETECT_BINDING_SITES.out.sites
     .collect()
     .map { true }
-    .first()
 
   emit:
   done = ch_done

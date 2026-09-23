@@ -82,7 +82,6 @@ workflow _REBALANCE_CANDIDATES {
   ch_all_samples_done = SAMPLE_CANDIDATES.out.done
     .collect()
     .map { true }
-    .first()
 
   sample_glob = "${config.candidate_samples_prefix.toString().replaceAll('/$', '')}/*_sample.parquet"
 

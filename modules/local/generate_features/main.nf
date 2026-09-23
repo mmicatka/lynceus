@@ -1,31 +1,30 @@
-// modules/local/feature_generation/main.nf
+// modules/local/generate_features/main.nf
 
-process FEATURE_GENERATION {
-    container "${params.registry}/lynceus/feature-generation:0.1.0"
+process GENERATE_FEATURES {
+    container "${params.registry}/lynceus/generate-features:0.1.0"
 
     label 'cpu_high'
 
     input:
     tuple val(input), val(output)
     val bucket
+    val features
+
+    output:
+    val true, emit: done
 
     script:
+    if (!features) {
+        error("GENERATE_FEATURES: 'features' list must not be empty")
+    }
+    def features_args = features.collect { feature -> "--features ${feature}" }.join(' ')
     """
     generate-features \\
         --input ${input} \\
         --output ${output} \\
         --use-blob-storage \\
         --bucket ${bucket} \\
-        --features atom_pair \\
-        --features autocorr \\
-        --features descriptors \\
-        --features ecfp \\
-        --features functional_groups \\
-        --features morse \\
-        --features rdf \\
-        --features topological_torsion \\
-        --features usrcat \\
-        --features whim \\
+        ${features_args} \\
         --num-workers ${task.cpus}
     """
 }

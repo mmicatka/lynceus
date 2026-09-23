@@ -1,4 +1,4 @@
-# modules/local/feature_generation/src/feature_generation/feature_generators/feature_generator.py # noqa: E501
+# modules/local/generate_features/src/generate_features/feature_generators/feature_generator.py # noqa: E501
 
 from abc import ABC, abstractmethod
 from typing import Any

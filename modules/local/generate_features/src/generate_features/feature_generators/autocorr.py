@@ -1,4 +1,4 @@
-# modules/local/feature_generation/src/feature_generation/feature_generators/autocorr.py
+# modules/local/generate_features/src/generate_features/feature_generators/autocorr.py
 
 import numpy as np
 import pyarrow as pa
