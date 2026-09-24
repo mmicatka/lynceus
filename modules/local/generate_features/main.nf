@@ -3,7 +3,7 @@
 process GENERATE_FEATURES {
     container "${params.registry}/lynceus/generate-features:0.1.0"
 
-    label 'cpu_high'
+    label 'cpu_medium'
 
     input:
     tuple val(input), val(output)

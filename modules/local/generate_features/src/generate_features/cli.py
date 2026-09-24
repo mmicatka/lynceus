@@ -1,5 +1,6 @@
 # modules/local/generate_features/src/generate_features/generate_features.py
 
+import gc
 import logging
 import sys
 from concurrent.futures import ProcessPoolExecutor
@@ -176,11 +177,14 @@ def generate_features(
 
     logger.info("processed 0 of %d", num_rows)
 
-    with ProcessPoolExecutor(
-        max_workers=num_workers,
-        initializer=_init_worker,
-        initargs=(features,),
-    ) as executor:
+    with (
+        ProcessPoolExecutor(
+            max_workers=num_workers,
+            initializer=_init_worker,
+            initargs=(features,),
+            max_tasks_per_child=10,  # Forces worker recycling to clear RDKit/C++ memory bloat
+        ) as executor
+    ):
         for i, batch in enumerate(parquet_file.iter_batches(batch_size=batch_size)):
             conformers = batch["conformer"].to_pylist()
             chunks = list(_chunk_list(conformers, chunk_size))
@@ -202,6 +206,8 @@ def generate_features(
                 generator, chunk_index = futures[future]
                 results_by_generator[generator.name][chunk_index] = future.result()
 
+            flattened = []
+
             new_batch = batch.drop_columns(["conformer", "smiles"])
             for generator in feature_generators:
                 chunk_results = results_by_generator[generator.name]
@@ -213,8 +219,10 @@ def generate_features(
                 flattened = [
                     row
                     for chunk_result in chunk_results
-                    for row in chunk_result  # type: ignore[union-attr]
+                    if chunk_result is not None
+                    for row in chunk_result
                 ]
+
                 for field_name, field_type in generator.output_fields():
                     column_values = [row[field_name] for row in flattened]
                     new_batch = new_batch.append_column(
@@ -226,6 +234,15 @@ def generate_features(
 
             writer.write_batch(new_batch)
             logger.info("processed %d of %d", (i + 1) * batch_size, num_rows)
+
+            del conformers
+            del chunks
+            del futures
+            del results_by_generator
+            del flattened
+            del new_batch
+            del batch
+            gc.collect()
 
     if writer is not None:
         writer.close()
