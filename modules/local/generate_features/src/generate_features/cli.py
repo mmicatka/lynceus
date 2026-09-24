@@ -1,6 +1,5 @@
 # modules/local/generate_features/src/generate_features/generate_features.py
 
-import gc
 import logging
 import sys
 from concurrent.futures import ProcessPoolExecutor
@@ -55,8 +54,11 @@ def _chunk_list(input_list: list, size: int):
 
 
 def _generate_feature_chunk(
-    generator: FeatureGenerator, conformer_chunk: list[str]
+    generator_name: str, conformer_chunk: list[str]
 ) -> list[dict]:
+    if _WORKER_GENERATORS is None:
+        raise RuntimeError("worker not initialized: _WORKER_GENERATORS is None")
+    generator = _WORKER_GENERATORS[generator_name]
     mols: list[Mol | None] = [
         MolFromMolBlock(conformer, removeHs=False) if conformer else None
         for conformer in conformer_chunk
@@ -177,20 +179,18 @@ def generate_features(
 
     logger.info("processed 0 of %d", num_rows)
 
-    with (
-        ProcessPoolExecutor(
-            max_workers=num_workers,
-            initializer=_init_worker,
-            initargs=(features,),
-            max_tasks_per_child=10,  # Forces worker recycling to clear RDKit/C++ memory bloat
-        ) as executor
-    ):
+    with ProcessPoolExecutor(
+        max_workers=num_workers,
+        initializer=_init_worker,
+        initargs=(features,),
+        max_tasks_per_child=10,
+    ) as executor:
         for i, batch in enumerate(parquet_file.iter_batches(batch_size=batch_size)):
             conformers = batch["conformer"].to_pylist()
             chunks = list(_chunk_list(conformers, chunk_size))
 
             futures = {
-                executor.submit(_generate_feature_chunk, generator, chunk): (
+                executor.submit(_generate_feature_chunk, generator.name, chunk): (
                     generator,
                     chunk_index,
                 )
@@ -205,8 +205,6 @@ def generate_features(
             for future in futures:
                 generator, chunk_index = futures[future]
                 results_by_generator[generator.name][chunk_index] = future.result()
-
-            flattened = []
 
             new_batch = batch.drop_columns(["conformer", "smiles"])
             for generator in feature_generators:
@@ -234,15 +232,6 @@ def generate_features(
 
             writer.write_batch(new_batch)
             logger.info("processed %d of %d", (i + 1) * batch_size, num_rows)
-
-            del conformers
-            del chunks
-            del futures
-            del results_by_generator
-            del flattened
-            del new_batch
-            del batch
-            gc.collect()
 
     if writer is not None:
         writer.close()

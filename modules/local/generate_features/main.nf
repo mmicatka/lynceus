@@ -25,6 +25,7 @@ process GENERATE_FEATURES {
         --use-blob-storage \\
         --bucket ${bucket} \\
         ${features_args} \\
-        --num-workers ${task.cpus}
+        --num-workers ${task.cpus} \\
+        --batch-size 1000
     """
 }
