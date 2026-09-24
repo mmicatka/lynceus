@@ -902,6 +902,7 @@ source = { editable = "modules/local/detect_binding_sites" }
 dependencies = [
     { name = "click" },
     { name = "gemmi" },
+    { name = "lynceus-utils", extra = ["s3"] },
     { name = "protein-ensemble" },
 ]
 
@@ -909,6 +910,7 @@ dependencies = [
 requires-dist = [
     { name = "click", specifier = ">=8.4.2" },
     { name = "gemmi", specifier = ">=0.7.5" },
+    { name = "lynceus-utils", extras = ["s3"], editable = "libs/lynceus-utils" },
     { name = "protein-ensemble", git = "https://github.com/proteinensemble/python-sdk.git" },
 ]
 

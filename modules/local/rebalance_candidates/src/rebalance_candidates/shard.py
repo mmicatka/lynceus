@@ -2,10 +2,12 @@
 
 import json
 import logging
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass
 
 import click
 import duckdb
+from lynceus_utils.cli import NumWorkers
 from lynceus_utils.duckdb import export_parquet, get_connection
 from lynceus_utils.storage.blob_storage import get_blob_storage_settings
 from lynceus_utils.storage.filesystem import get_filesystem
@@ -104,7 +106,6 @@ def _plan_balanced_shards(
         while remaining_file_rows > 0:
             available_in_shard = rows_per_shard - current_shard_rows
 
-            # Move to the next shard if the current one is full
             if available_in_shard == 0:
                 current_shard_id += 1
                 current_shard_rows = 0
@@ -189,6 +190,49 @@ def _manifest_is_valid(
     return True
 
 
+def _write_shard(
+    shard_id: int,
+    assignments: list[ShardAssignment],
+    output_path: str,
+    use_blob_storage: bool,
+) -> dict:
+    """Worker function to process and write a single shard."""
+    # Re-initialize the connection per-process, constraining internal threads to prevent CPU thrashing
+    blob_storage_settings = get_blob_storage_settings() if use_blob_storage else None
+    conn = get_connection(blob_storage_settings, threads=2)
+
+    union_parts = []
+    for assignment in assignments:
+        if assignment.full_file:
+            union_parts.append(f"SELECT * FROM read_parquet('{assignment.source_key}')")
+        else:
+            union_parts.append(
+                f"""
+                SELECT * EXCLUDE (rn)
+                FROM (
+                    SELECT *, row_number() OVER () - 1 AS rn
+                    FROM read_parquet('{assignment.source_key}')
+                )
+                WHERE rn >= {assignment.row_start} AND rn < {assignment.row_end}
+                """
+            )
+    shard_rel = conn.sql(" UNION ALL ".join(union_parts))
+
+    export_parquet(conn, shard_rel, output_path)
+
+    row_count = conn.read_parquet(output_path).count("*").fetchone()
+    if row_count is None or row_count[0] == 0:
+        raise RuntimeError(
+            f"shard_id={shard_id} produced empty output at {output_path}"
+        )
+
+    return {
+        "shard_id": shard_id,
+        "output_path": output_path,
+        "row_count": row_count[0],
+    }
+
+
 @click.command()
 @click.option(
     "--input",
@@ -218,22 +262,30 @@ def _manifest_is_valid(
 @click.option(
     "--bucket", type=str, default="lynceus", help="S3-compatible bucket name."
 )
+@click.option(
+    "--num-workers",
+    default="auto",
+    type=NumWorkers(),
+    show_default=True,
+    help="Number of parallel workers (integer >= 1 or 'auto').",
+)
 def shard_candidate_samples(
     input_glob: str,
     candidates_per_shard: int,
     output: str,
     use_blob_storage: bool,
     bucket: str,
+    num_workers: int,
 ) -> None:
     output_key = output.rstrip("/")
 
     if use_blob_storage:
         blob_storage_settings = get_blob_storage_settings()
-        conn = get_connection(blob_storage_settings)
+        conn = get_connection(blob_storage_settings, threads=num_workers)
         input_glob = f"s3://{bucket}/{input_glob.lstrip('/')}"
         output = f"s3://{bucket}/{output_key.lstrip('/')}"
     else:
-        conn = get_connection()
+        conn = get_connection(threads=num_workers)
 
     manifest_key = f"{output_key}/shard_manifest.jsonl"
 
@@ -268,48 +320,35 @@ def shard_candidate_samples(
         assignments_by_shard[assignment.shard_id].append(assignment)
 
     manifest_rows = []
-    for shard_id, assignments in assignments_by_shard.items():
-        if not assignments:
-            raise RuntimeError(f"shard_id={shard_id} received zero assignments")
 
-        output_path = f"{output.rstrip('/')}/shard_{shard_id}.parquet"
+    with ProcessPoolExecutor(max_workers=num_workers) as executor:
+        futures = {}
+        for shard_id, assignments in assignments_by_shard.items():
+            if not assignments:
+                raise RuntimeError(f"shard_id={shard_id} received zero assignments")
 
-        union_parts = []
-        for assignment in assignments:
-            if assignment.full_file:
-                union_parts.append(
-                    f"SELECT * FROM read_parquet('{assignment.source_key}')"
+            output_path = f"{output.rstrip('/')}/shard_{shard_id}.parquet"
+
+            futures[
+                executor.submit(
+                    _write_shard, shard_id, assignments, output_path, use_blob_storage
                 )
-            else:
-                union_parts.append(
-                    f"""
-                    SELECT * EXCLUDE (rn)
-                    FROM (
-                        SELECT *, row_number() OVER () - 1 AS rn
-                        FROM read_parquet('{assignment.source_key}')
-                    )
-                    WHERE rn >= {assignment.row_start} AND rn < {assignment.row_end}
-                    """
+            ] = shard_id
+
+        for future in as_completed(futures):
+            shard_id = futures[future]
+            try:
+                result = future.result()
+                logger.info(
+                    "shard_id=%d wrote %d rows to %s",
+                    result["shard_id"],
+                    result["row_count"],
+                    result["output_path"],
                 )
-        shard_rel = conn.sql(" UNION ALL ".join(union_parts))
+                manifest_rows.append(result)
+            except Exception:
+                logger.exception("Failed processing shard_id=%d", shard_id)
+                raise
 
-        export_parquet(conn, shard_rel, output_path)
-
-        row_count = conn.read_parquet(output_path).count("*").fetchone()
-        if row_count is None or row_count[0] == 0:
-            raise RuntimeError(
-                f"shard_id={shard_id} produced empty output at {output_path}"
-            )
-
-        logger.info(
-            "shard_id=%d wrote %d rows to %s", shard_id, row_count[0], output_path
-        )
-        manifest_rows.append(
-            {
-                "shard_id": shard_id,
-                "output_path": output_path,
-                "row_count": row_count[0],
-            }
-        )
-
+    manifest_rows.sort(key=lambda x: x["shard_id"])
     _write_manifest(manifest_key, manifest_rows, use_blob_storage, bucket)
