@@ -4,6 +4,7 @@ process GENERATE_FEATURES {
     container "${params.registry}/lynceus/generate-features:0.1.0"
 
     label 'cpu_medium'
+    label 'pvc_io_retry'
 
     input:
     tuple val(input), val(output)
@@ -26,6 +27,5 @@ process GENERATE_FEATURES {
         --bucket ${bucket} \\
         ${features_args} \\
         --num-workers ${task.cpus} \\
-        --batch-size 1000
     """
 }

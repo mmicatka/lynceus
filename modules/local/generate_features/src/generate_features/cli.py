@@ -1,6 +1,7 @@
 # modules/local/generate_features/src/generate_features/generate_features.py
 
 import logging
+import os
 import sys
 from concurrent.futures import ProcessPoolExecutor
 
@@ -17,6 +18,12 @@ from generate_features.feature_generators import (
     FEATURE_GENERATOR_REGISTRY,
     FeatureGenerator,
 )
+
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["NUMEXPR_NUM_THREADS"] = "1"
+os.environ["VECLIB_MAXIMUM_THREADS"] = "1"
 
 logging.basicConfig(
     level=logging.INFO,
@@ -183,7 +190,7 @@ def generate_features(
         max_workers=num_workers,
         initializer=_init_worker,
         initargs=(features,),
-        max_tasks_per_child=10,
+        max_tasks_per_child=100,
     ) as executor:
         for i, batch in enumerate(parquet_file.iter_batches(batch_size=batch_size)):
             conformers = batch["conformer"].to_pylist()
