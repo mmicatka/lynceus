@@ -196,8 +196,6 @@ def _write_shard(
     output_path: str,
     use_blob_storage: bool,
 ) -> dict:
-    """Worker function to process and write a single shard."""
-    # Re-initialize the connection per-process, constraining internal threads to prevent CPU thrashing
     blob_storage_settings = get_blob_storage_settings() if use_blob_storage else None
     conn = get_connection(blob_storage_settings, threads=2)
 
