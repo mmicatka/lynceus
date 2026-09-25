@@ -63,3 +63,10 @@ filter:
     - topological_torsion
     - usrcat
     - whim
+  surrogate:
+    holdout: 100000
+    rounds:
+      - active: 0
+        uniform: 100000
+      - active: 50000
+        uniform: 50000
