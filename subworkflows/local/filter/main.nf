@@ -19,7 +19,7 @@ workflow FILTER {
     ch_shards = channel.fromPath(bucket ? "s3://${bucket}/${input_glob}" : input_glob)
         .map { f ->
             def input_key = "${config.input_prefix}/${f.name}"
-            def output_key = "${config.output_prefix}/${f.name.replaceFirst(/\.parquet$/, '_features.parquet')}"
+            def output_key = "${config.output_prefix}/${f.name}"
             tuple(input_key, output_key)
         }
 

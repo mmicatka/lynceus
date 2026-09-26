@@ -24,7 +24,7 @@ workflow CANDIDATES {
       def input_key = bucket && row.output_path.startsWith(s3_prefix)
         ? row.output_path.replaceFirst("^${s3_prefix}", "")
         : row.output_path
-      def output_key = "${config.conformers_output_prefix}/shard_${row.shard_id}_conformers.parquet"
+      def output_key = "${config.conformers_output_prefix}/shard_${row.shard_id}.parquet"
       return tuple(input_key, output_key)
     }
 
@@ -83,7 +83,7 @@ workflow _REBALANCE_CANDIDATES {
     .collect()
     .map { true }
 
-  sample_glob = "${config.candidate_samples_prefix.toString().replaceAll('/$', '')}/*_sample.parquet"
+  sample_glob = "${config.candidate_samples_prefix.toString().replaceAll('/$', '')}/*.parquet"
 
   SHARD_SAMPLES(
     ch_all_samples_done,

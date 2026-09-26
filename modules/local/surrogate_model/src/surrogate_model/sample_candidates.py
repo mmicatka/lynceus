@@ -1,7 +1,5 @@
 # modules/local/surrogate_model/src/surrogate_model/sample_candidates.py
 
-# modules/local/surrogate_sampling/sample_surrogate_candidates.py
-
 import heapq
 import json
 import os
@@ -19,6 +17,7 @@ from lynceus_utils.storage import BlobStorageSettings
 
 
 def _blob_path(use_blob_storage: bool, bucket: str, key: str) -> str:
+    key = f"{key.rstrip('/')}/*.parquet"
     return f"s3://{bucket}/{key}" if use_blob_storage else key
 
 
@@ -220,8 +219,8 @@ def _write_docking_input(
 
 
 @click.command()
-@click.option("--features-glob", required=True)
-@click.option("--conformer-glob", required=True)
+@click.option("--features", required=True)
+@click.option("--conformers", required=True)
 @click.option("--model-path", "model_key", default=None)
 @click.option("--output", "output_key", required=True)
 @click.option("--id-column", default="id", show_default=True)
@@ -232,8 +231,8 @@ def _write_docking_input(
 @click.option("--use-blob-storage", is_flag=True, default=False)
 @click.option("--bucket", default="lynceus", show_default=True)
 def sample_candidates(
-    features_glob: str,
-    conformer_glob: str,
+    features: str,
+    conformers: str,
     model_key: str | None,
     output_key: str,
     id_column: str,
@@ -267,8 +266,8 @@ def sample_candidates(
         if model_key is not None
         else None
     )
-    resolved_features_glob = _blob_path(use_blob_storage, bucket, features_glob)
-    resolved_conformer_glob = _blob_path(use_blob_storage, bucket, conformer_glob)
+    resolved_features_glob = _blob_path(use_blob_storage, bucket, features)
+    resolved_conformer_glob = _blob_path(use_blob_storage, bucket, conformers)
 
     if _output_is_valid(filesystem, output_path, model_path, top_k, uniform_k):
         click.echo(
@@ -328,6 +327,6 @@ def sample_candidates(
         )
     else:
         click.echo(
-            f"sample_surrogate_candidates: wrote {uniform_k} uniform docking-input rows "
-            f"({rows_scanned} rows scanned) to {output_path}"
+            f"sample_surrogate_candidates: wrote {uniform_k} uniform docking-input"
+            f" rows ({rows_scanned} rows scanned) to {output_path}"
         )

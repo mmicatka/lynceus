@@ -79,10 +79,18 @@ def _source_filename(path: str) -> str:
     return path.rstrip("/").split("/")[-1]
 
 
-def _parquet_output_path(source_path: str, output_dir: str) -> str:
+def _parquet_output_path(source_path: str, output_dir: str, folder: str) -> str:
     filename = _source_filename(source_path)
     stem = filename[: -len(".smi.gz")] if filename.endswith(".smi.gz") else filename
-    return f"{output_dir.rstrip('/')}/{stem}.parquet"
+    return f"{output_dir.rstrip('/')}/{folder}_{stem}.parquet"
+
+
+def _json_output_path(output_path: str, folder: str) -> str:
+    """Prefixes the basename of the JSON output path with the folder name."""
+    if "/" in output_path:
+        directory, filename = output_path.rsplit("/", 1)
+        return f"{directory}/{folder}_{filename}"
+    return f"{folder}_{output_path}"
 
 
 def _parse_smi_line(line: str) -> tuple[str, str] | None:
@@ -159,12 +167,13 @@ def _write_parquet_from_smi(
 def _write_parquet_worker(
     source_path: str,
     output_dir: str,
+    folder: str,
     use_blob_storage: bool,
     bucket: str,
     chunk_size: int,
     batch_rows: int,
 ) -> tuple[str, int]:
-    output_path = _parquet_output_path(source_path, output_dir)
+    output_path = _parquet_output_path(source_path, output_dir, folder)
     resolved_output = _resolve_path(output_path, use_blob_storage, bucket)
 
     blob_storage_settings = get_blob_storage_settings() if use_blob_storage else None
@@ -187,6 +196,7 @@ def _write_parquet_worker(
 def _write_parquet_parallel(
     source_paths: list[str],
     output_dir: str,
+    folder: str,
     use_blob_storage: bool,
     bucket: str,
     chunk_size: int,
@@ -200,6 +210,7 @@ def _write_parquet_parallel(
                 _write_parquet_worker,
                 path,
                 output_dir,
+                folder,
                 use_blob_storage,
                 bucket,
                 chunk_size,
@@ -294,6 +305,7 @@ def count_candidates(
     row_count = _write_parquet_parallel(
         source_paths,
         parquet_output_dir,
+        folder,
         use_blob_storage,
         bucket,
         chunk_size,
@@ -306,16 +318,21 @@ def count_candidates(
 
     logger.info("folder=%s count=%d", folder, row_count)
 
-    existing = _read_json(output_path, use_blob_storage, bucket)
+    final_output_path = _json_output_path(output_path, folder)
+
+    existing = _read_json(final_output_path, use_blob_storage, bucket)
     if existing is not None and existing.get("count") == row_count:
         logger.info(
             "folder=%s count unchanged (count=%d), leaving %s as-is",
             folder,
             row_count,
-            output_path,
+            final_output_path,
         )
         return
 
     _write_json(
-        output_path, {"folder": folder, "count": row_count}, use_blob_storage, bucket
+        final_output_path,
+        {"folder": folder, "count": row_count},
+        use_blob_storage,
+        bucket,
     )

@@ -24,7 +24,8 @@ process COUNT_CANDIDATES {
     folder = parts.last()
     output_dir = parts[0..-3].join('/')
     output_key = "${output_dir}/${folder}_count.json"
-    parquet_output_key = "${parquet_prefix.toString().replaceAll('/$', '')}/${folder}"
+    parquet_output_key = "${parquet_prefix.toString().replaceAll('/$', '')}"
+
     """
     count-candidates \\
         --input ${source} \\

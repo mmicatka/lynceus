@@ -36,11 +36,11 @@ candidates:
     - H26
     - H27
     - H28
-  target_total: 100000000
-  floor_per_source: 2000000
-  candidate_samples_prefix: candidates/sampled
-  shard_output_prefix: candidates/shards
-  conformers_output_prefix: candidates/conformers
+  target_total: 10000000
+  floor_per_source: 200000
+  candidate_samples_prefix: candidates/10m/sampled
+  shard_output_prefix: candidates/10m/shards
+  conformers_output_prefix: candidates/10m/conformers
 
 target:
   ensemble_prefix: targets/protein_ensembles
@@ -50,8 +50,8 @@ target:
 
 filter:
   bucket: lynceus
-  input_prefix: candidates/conformers
-  output_prefix: filter/features
+  input_prefix: candidates/10m/conformers
+  output_prefix: candidates/10m/features
   features:
     - atom_pair
     - autocorr
