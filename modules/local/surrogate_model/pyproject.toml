@@ -6,16 +6,19 @@ authors = [{ name = "Mike Micatka", email = "mike.micatka@gmail.com" }]
 requires-python = ">=3.12"
 dependencies = [
     "click>=8.4.2",
+    "duckdb>=1.5.4",
+    "joblib>=1.5.3",
     "lightgbm>=4.7.0",
     "numpy>=2.5.1",
     "polars>=1.42.1",
+    "pyarrow>=24.0.0",
+    "lynceus-utils[s3]",
     "pydantic>=2.13.5",
     "scikit-learn>=1.9.0",
-    "torch>=2.14.0",
 ]
 
 [project.scripts]
-surrogate-sample-candidates = "surrogate_model:sample"
+surrogate-sample-candidates = "surrogate_model:sample_candidates"
 
 [build-system]
 requires = ["uv_build>=0.12.1,<0.13.0"]
@@ -23,3 +26,6 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = ["matplotlib>=3.11.2", "seaborn>=0.13.2"]
+
+[tool.uv.sources]
+lynceus-utils = { workspace = true }

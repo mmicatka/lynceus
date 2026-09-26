@@ -12,13 +12,16 @@ NF_DRIVER_DEPLOYMENT ?= nf-driver
 
 .PHONY: build push build-* run-dev run-k8s driver-exec driver-restart clean reset lint
 
-build: build-generate-conformers build-generate-features build-rebalance-candidates build-sample-candidates build-detect-binding-sites build-docking-run-gpu build-nf-driver
+build: build-generate-conformers build-generate-features build-surrogate-model build-rebalance-candidates build-sample-candidates build-detect-binding-sites build-docking-run-gpu build-nf-driver
 
 build-generate-conformers:
 	docker buildx build --platform linux/amd64,linux/arm64 --push -f modules/local/generate_conformers/Dockerfile -t $(IMAGE_PREFIX)/generate-conformers:$(VERSION) .
 
 build-generate-features:
 	docker buildx build --platform linux/amd64,linux/arm64 --push -f modules/local/generate_features/Dockerfile -t $(IMAGE_PREFIX)/generate-features:$(VERSION) .
+
+build-surrogate-model:
+	docker buildx build --platform linux/amd64,linux/arm64 --push -f modules/local/surrogate_model/Dockerfile -t $(IMAGE_PREFIX)/surrogate-model:$(VERSION) .
 
 build-physiochemical-filter:
 	docker buildx build --platform linux/amd64,linux/arm64 --push -f modules/local/physiochemical_filter/Dockerfile -t $(IMAGE_PREFIX)/physiochemical-filter:$(VERSION) .
