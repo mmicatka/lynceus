@@ -82,15 +82,11 @@ def _source_filename(path: str) -> str:
 def _parquet_output_path(source_path: str, output_dir: str, folder: str) -> str:
     filename = _source_filename(source_path)
     stem = filename[: -len(".smi.gz")] if filename.endswith(".smi.gz") else filename
-    return f"{output_dir.rstrip('/')}/{folder}_{stem}.parquet"
+    return f"{output_dir.rstrip('/')}/{folder}/{stem}.parquet"
 
 
-def _json_output_path(output_path: str, folder: str) -> str:
-    """Prefixes the basename of the JSON output path with the folder name."""
-    if "/" in output_path:
-        directory, filename = output_path.rsplit("/", 1)
-        return f"{directory}/{folder}_{filename}"
-    return f"{folder}_{output_path}"
+def _json_output_path(output_dir: str, folder: str) -> str:
+    return f"{output_dir.rstrip('/')}/{folder}/count.json"
 
 
 def _parse_smi_line(line: str) -> tuple[str, str] | None:
@@ -228,24 +224,15 @@ def _write_parquet_parallel(
 @click.command()
 @click.option(
     "--input",
-    "input_path",
     required=True,
     type=str,
     help="Input folder",
 )
 @click.option(
     "--output",
-    "output_path",
     required=True,
     type=str,
     help="Output path for the candidate count JSON.",
-)
-@click.option(
-    "--parquet-output",
-    "parquet_output_dir",
-    required=True,
-    type=str,
-    help="Output folder for the per-file Parquet files.",
 )
 @click.option(
     "--use-blob-storage",
@@ -275,20 +262,19 @@ def _write_parquet_parallel(
     help="Number of parallel workers (integer >= 1 or 'auto').",
 )
 def count_candidates(
-    input_path: str,
-    output_path: str,
-    parquet_output_dir: str,
+    input: str,
+    output: str,
     use_blob_storage: bool,
     bucket: str,
     chunk_size: int,
     batch_rows: int,
     num_workers: int,
 ) -> None:
-    folder = input_path.rstrip("/").split("/")[-1]
+    folder = input.rstrip("/").split("/")[-1]
 
     blob_storage_settings = get_blob_storage_settings() if use_blob_storage else None
     fs = get_filesystem(blob_storage_settings)
-    source_glob = _resolve_source_glob(input_path, use_blob_storage, bucket)
+    source_glob = _resolve_source_glob(input, use_blob_storage, bucket)
     source_paths = _resolve_glob_paths(fs, source_glob)
 
     if not source_paths:
@@ -298,13 +284,13 @@ def count_candidates(
         "Streaming folder=%s across %d files to parquet at %s with %d workers",
         folder,
         len(source_paths),
-        parquet_output_dir,
+        output,
         num_workers,
     )
 
     row_count = _write_parquet_parallel(
         source_paths,
-        parquet_output_dir,
+        output,
         folder,
         use_blob_storage,
         bucket,
@@ -318,7 +304,7 @@ def count_candidates(
 
     logger.info("folder=%s count=%d", folder, row_count)
 
-    final_output_path = _json_output_path(output_path, folder)
+    final_output_path = _json_output_path(output, folder)
 
     existing = _read_json(final_output_path, use_blob_storage, bucket)
     if existing is not None and existing.get("count") == row_count:

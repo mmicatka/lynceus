@@ -5,19 +5,21 @@ import json
 import os
 import random
 import tempfile
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import PurePosixPath
 
 import click
 import duckdb
 import joblib
+import numpy as np
 import pyarrow as pa
 import pyarrow.parquet as pq
 from lynceus_utils import get_blob_storage_settings, get_connection, get_filesystem
+from lynceus_utils.cli import NumWorkers
 from lynceus_utils.storage import BlobStorageSettings
 
 
 def _blob_path(use_blob_storage: bool, bucket: str, key: str) -> str:
-    key = f"{key.rstrip('/')}/*.parquet"
     return f"s3://{bucket}/{key}" if use_blob_storage else key
 
 
@@ -110,19 +112,83 @@ def _resolve_shard_pairs(
     ]
 
 
-def _reservoir_add(
-    reservoir: list, reservoir_size: int, rows_scanned: int, row, rng: random.Random
-) -> None:
-    if len(reservoir) < reservoir_size:
-        reservoir.append(row)
-    else:
-        j = rng.randint(0, rows_scanned)
-        if j < reservoir_size:
-            reservoir[j] = row
+def _process_single_shard(
+    shard_pair: tuple[str, str],
+    id_column: str,
+    feature_columns: list[str],
+    model,
+    top_k: int | None,
+    uniform_k: int,
+    seed: int,
+    batch_size: int,
+) -> tuple[list[tuple[float, dict]], list[tuple[float, dict]], int]:
+    feature_path, conformer_path = shard_pair
+
+    rng = random.Random(seed + hash(feature_path))
+    local_con = duckdb.connect()
+
+    local_active_heap: list[tuple[float, dict]] = []
+    local_uniform_heap: list[
+        tuple[float, dict]
+    ] = []  # Changed to heap for easy merging
+    rows_scanned = 0
+
+    feature_schema_columns = local_con.sql(
+        f"SELECT * FROM read_parquet('{feature_path}') LIMIT 0"
+    ).columns
+    conformer_schema_columns = local_con.sql(
+        f"SELECT * FROM read_parquet('{conformer_path}') LIMIT 0"
+    ).columns
+    conformer_overlap = [
+        c for c in conformer_schema_columns if c in feature_schema_columns
+    ]
+    exclude_clause = ", ".join(conformer_overlap) if conformer_overlap else id_column
+
+    relation = local_con.sql(f"""
+        SELECT f.*, c.* EXCLUDE ({exclude_clause}), c.{id_column} AS _conformer_id
+        FROM read_parquet('{feature_path}') AS f
+        LEFT JOIN read_parquet('{conformer_path}') AS c ON f.id = c.id
+    """)
+
+    reader = relation.fetch_arrow_reader(batch_size=batch_size)
+    output_columns = [c for c in relation.columns if c != "_conformer_id"]
+
+    for batch in reader:
+        output_batch = batch.select(output_columns)
+        batch_num_rows = batch.num_rows
+
+        if model is not None:
+            feature_frame = batch.select(feature_columns).to_pandas()
+            scores = model.predict_proba(feature_frame)[:, 1]
+
+            k_batch = min(top_k, batch_num_rows) if top_k else 0
+            if k_batch > 0:
+                top_indices = np.argpartition(scores, -k_batch)[-k_batch:]
+                for idx in top_indices:
+                    score = float(scores[idx])
+                    if top_k and len(local_active_heap) < top_k:
+                        row = output_batch.slice(int(idx), 1).to_pylist()[0]
+                        heapq.heappush(local_active_heap, (score, row))
+                    elif score > local_active_heap[0][0]:
+                        row = output_batch.slice(int(idx), 1).to_pylist()[0]
+                        heapq.heapreplace(local_active_heap, (score, row))
+
+        for i in range(batch_num_rows):
+            rand_val = rng.random()
+            if len(local_uniform_heap) < uniform_k:
+                row = output_batch.slice(i, 1).to_pylist()[0]
+                heapq.heappush(local_uniform_heap, (rand_val, row))
+            elif rand_val > local_uniform_heap[0][0]:
+                row = output_batch.slice(i, 1).to_pylist()[0]
+                heapq.heapreplace(local_uniform_heap, (rand_val, row))
+
+        rows_scanned += batch_num_rows
+
+    local_con.close()
+    return local_active_heap, local_uniform_heap, rows_scanned
 
 
-def _sample_candidates(
-    con: duckdb.DuckDBPyConnection,
+def _sample_candidates_parallel(
     shard_pairs: list[tuple[str, str]],
     id_column: str,
     feature_columns: list[str],
@@ -131,61 +197,56 @@ def _sample_candidates(
     uniform_k: int,
     seed: int,
     batch_size: int,
+    max_workers: int,
 ) -> tuple[list[tuple[float, dict]], list[dict], int]:
-    rng = random.Random(seed)
 
-    heap: list[tuple[float, dict]] = []
-    reservoir: list[dict] = []
-    rows_scanned = 0
+    global_active_heap = []
+    global_uniform_heap = []
+    total_rows_scanned = 0
+    total_shards = len(shard_pairs)
 
-    for feature_path, conformer_path in shard_pairs:
-        # LEFT JOIN so a feature row with no matching conformer surfaces as
-        # a NULL conformer id in the stream, rather than requiring a
-        # separate full-shard count(*) pass to detect
-        relation = con.sql(
-            f"""
-            SELECT f.*, c.* EXCLUDE ({id_column}), c.{id_column} AS _conformer_id
-            FROM read_parquet('{feature_path}') AS f
-            LEFT JOIN read_parquet('{conformer_path}') AS c
-                ON f.{id_column} = c.{id_column}
-            """
-        )
+    with ProcessPoolExecutor(max_workers=max_workers) as executor:
+        futures = [
+            executor.submit(
+                _process_single_shard,
+                shard_pair,
+                id_column,
+                feature_columns,
+                model,
+                top_k,
+                uniform_k,
+                seed,
+                batch_size,
+            )
+            for shard_pair in shard_pairs
+        ]
 
-        reader = relation.fetch_arrow_reader(batch_size=batch_size)
+        for idx, future in enumerate(as_completed(futures), start=1):
+            local_active, local_uniform, rows_scanned = future.result()
+            total_rows_scanned += rows_scanned
 
-        for batch in reader:
-            rows = batch.to_pylist()
+            click.echo(
+                f"sample_surrogate_candidates: finished shard {idx}/{total_shards} "
+                f"({rows_scanned} rows in this shard)"
+            )
 
-            missing = [row[id_column] for row in rows if row["_conformer_id"] is None]
-            if missing:
-                raise RuntimeError(
-                    f"sample_surrogate_candidates: {len(missing)} ids in "
-                    f"{feature_path} have no matching conformer in "
-                    f"{conformer_path} (e.g. {missing[:5]})"
-                )
+            if top_k:
+                for item in local_active:
+                    if len(global_active_heap) < top_k:
+                        heapq.heappush(global_active_heap, item)
+                    elif item[0] > global_active_heap[0][0]:
+                        heapq.heapreplace(global_active_heap, item)
 
-            for row in rows:
-                del row["_conformer_id"]
+            # Merge Uniform Random Heaps
+            for item in local_uniform:
+                if len(global_uniform_heap) < uniform_k:
+                    heapq.heappush(global_uniform_heap, item)
+                elif item[0] > global_uniform_heap[0][0]:
+                    heapq.heapreplace(global_uniform_heap, item)
 
-            if model is not None:
-                feature_batch = batch.select(feature_columns)
-                feature_frame = feature_batch.to_pandas()
-                scores = model.predict_proba(feature_frame)[:, 1]
-            else:
-                scores = [None] * len(rows)
+    final_reservoir = [row for _, row in global_uniform_heap]
 
-            for row, score in zip(rows, scores):
-                if score is not None:
-                    score = float(score)
-                    if top_k and len(heap) < top_k:
-                        heapq.heappush(heap, (score, row))
-                    elif score > heap[0][0]:
-                        heapq.heapreplace(heap, (score, row))
-
-                _reservoir_add(reservoir, uniform_k, rows_scanned, row, rng)
-                rows_scanned += 1
-
-    return heap, reservoir, rows_scanned
+    return global_active_heap, final_reservoir, total_rows_scanned
 
 
 def _write_docking_input(
@@ -230,6 +291,13 @@ def _write_docking_input(
 @click.option("--batch-size", type=int, default=100_000, show_default=True)
 @click.option("--use-blob-storage", is_flag=True, default=False)
 @click.option("--bucket", default="lynceus", show_default=True)
+@click.option(
+    "--num-workers",
+    default="auto",
+    type=NumWorkers(),
+    show_default=True,
+    help="Number of parallel workers (integer >= 1 or 'auto').",
+)
 def sample_candidates(
     features: str,
     conformers: str,
@@ -242,6 +310,7 @@ def sample_candidates(
     batch_size: int,
     use_blob_storage: bool,
     bucket: str,
+    num_workers: int,
 ):
     if model_key is None and top_k is not None:
         raise click.UsageError(
@@ -258,7 +327,7 @@ def sample_candidates(
         get_blob_storage_settings() if use_blob_storage else None
     )
     filesystem = get_filesystem(blob_storage_settings)
-    con = get_connection(blob_storage_settings)
+    con = get_connection(blob_storage_settings, num_workers)
 
     output_path = _blob_path(use_blob_storage, bucket, output_key)
     model_path = (
@@ -266,13 +335,16 @@ def sample_candidates(
         if model_key is not None
         else None
     )
-    resolved_features_glob = _blob_path(use_blob_storage, bucket, features)
-    resolved_conformer_glob = _blob_path(use_blob_storage, bucket, conformers)
+
+    features_glob = f"{features.rstrip('/')}/*.parquet"
+    conformers_glob = f"{conformers.rstrip('/')}/*.parquet"
+
+    resolved_features_glob = _blob_path(use_blob_storage, bucket, features_glob)
+    resolved_conformer_glob = _blob_path(use_blob_storage, bucket, conformers_glob)
 
     if _output_is_valid(filesystem, output_path, model_path, top_k, uniform_k):
         click.echo(
-            f"sample_surrogate_candidates: valid output already at {output_path},"
-            " skipping"
+            f"sample_surrogate_candidates: valid output already at {output_path}"
         )
         return
 
@@ -280,8 +352,6 @@ def sample_candidates(
         filesystem, resolved_features_glob, resolved_conformer_glob
     )
 
-    # schema is assumed identical across all feature shards; taken once
-    # from the first shard rather than re-derived per shard
     first_feature_path, _ = shard_pairs[0]
     feature_columns = [
         c
@@ -294,8 +364,7 @@ def sample_candidates(
         with filesystem.open(model_path, "rb") as f:
             model = joblib.load(f)
 
-    heap, reservoir, rows_scanned = _sample_candidates(
-        con=con,
+    heap, reservoir, rows_scanned = _sample_candidates_parallel(
         shard_pairs=shard_pairs,
         id_column=id_column,
         feature_columns=feature_columns,
@@ -304,6 +373,7 @@ def sample_candidates(
         uniform_k=uniform_k,
         seed=seed,
         batch_size=batch_size,
+        max_workers=num_workers,  # Pass the CLI argument here
     )
 
     if model is not None and top_k and len(heap) < top_k:

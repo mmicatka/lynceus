@@ -8,8 +8,8 @@ s3_url_style: path
 candidates:
   bucket: lynceus
   candidates_per_shard: 2000000
-  source_prefix: candidates/raw
-  parquet_prefix: candidates/parquet
+  source_prefix: candidates/raw/smiles
+  parquet_prefix: candidates/raw/parquet
   sources:
     - H04
     - H05

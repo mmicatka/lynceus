@@ -52,9 +52,11 @@ workflow _REBALANCE_CANDIDATES {
 
   COUNT_CANDIDATES(ch_candidate_sources, config.parquet_prefix, bucket)
 
-  ch_count_keys = COUNT_CANDIDATES.out.count.collect()
+  ch_parquet_prefix_ready = COUNT_CANDIDATES.out.done
+    .collect()
+    .map { config.parquet_prefix }
 
-  MERGE_CANDIDATE_COUNTS(ch_count_keys, bucket)
+  MERGE_CANDIDATE_COUNTS(ch_parquet_prefix_ready, bucket)
 
   ALLOCATE_CANDIDATE_SAMPLES(
     MERGE_CANDIDATE_COUNTS.out.counts_json,
@@ -64,30 +66,24 @@ workflow _REBALANCE_CANDIDATES {
     bucket,
   )
 
-  ch_parquet_dirs = COUNT_CANDIDATES.out.parquet.map { parquet_key -> tuple(parquet_key.tokenize('/').last(), parquet_key) }
-
   ch_source_allocations = ALLOCATE_CANDIDATE_SAMPLES.out.manifest_key
     .map { key -> bucket ? file("s3://${bucket}/${key}") : file(key) }
     .splitCsv(header: true)
     .map { row ->
-      tuple(row.folder, row.target_count as Long, row.source_count as Long)
-    }
-    .combine(ch_parquet_dirs, by: 0)
-    .map { folder, target_count, source_count, parquet_dir ->
-      tuple(folder, parquet_dir, target_count, source_count)
+      def parquet_dir = "${config.parquet_prefix}/${row.folder}"
+      tuple(row.folder, parquet_dir, row.target_count as Long, row.source_count as Long)
     }
 
   SAMPLE_CANDIDATES(ch_source_allocations, config.candidate_samples_prefix, bucket)
 
-  ch_all_samples_done = SAMPLE_CANDIDATES.out.done
-    .collect()
-    .map { true }
-
   sample_glob = "${config.candidate_samples_prefix.toString().replaceAll('/$', '')}/*.parquet"
 
+  ch_sample_glob_ready = SAMPLE_CANDIDATES.out.done
+    .collect()
+    .map { sample_glob }
+
   SHARD_SAMPLES(
-    ch_all_samples_done,
-    sample_glob,
+    ch_sample_glob_ready,
     config.candidates_per_shard,
     config.shard_output_prefix,
     bucket,

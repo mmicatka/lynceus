@@ -5,32 +5,24 @@ process COUNT_CANDIDATES {
     tag { folder }
 
     label 'pvc_io_retry'
-    label 'cpu_medium'
+    label 'cpu_high'
 
     input:
     val source
-    val parquet_prefix
+    val output
     val bucket
 
     output:
-    val output_key, emit: count
-    val parquet_output_key, emit: parquet
+    val true, emit: done
 
     script:
     def parts = source.toString().tokenize('/')
-    if (parts.size() < 3) {
-        throw new IllegalArgumentException("source=${source} has no grandparent directory")
-    }
     folder = parts.last()
-    output_dir = parts[0..-3].join('/')
-    output_key = "${output_dir}/${folder}_count.json"
-    parquet_output_key = "${parquet_prefix.toString().replaceAll('/$', '')}"
 
     """
     count-candidates \\
         --input ${source} \\
-        --output ${output_key} \\
-        --parquet-output ${parquet_output_key} \\
+        --output ${output} \\
         --use-blob-storage \\
         --bucket ${bucket} \\
         --num-workers ${task.cpus}
@@ -44,18 +36,18 @@ process MERGE_CANDIDATE_COUNTS {
     label 'cpu_low'
 
     input:
-    val count_keys
+    val parquet_prefix
     val bucket
 
     output:
     val output_key, emit: counts_json
 
     script:
-    output_key = "candidates/candidate_counts.json"
-    def keys_arg = count_keys.join(',')
+    output_key = "${parquet_prefix}/counts.json"
+
     """
     merge-candidate-counts \\
-        --input ${keys_arg} \\
+        --input ${parquet_prefix} \\
         --output ${output_key} \\
         --use-blob-storage \\
         --bucket ${bucket}
@@ -130,7 +122,6 @@ process SHARD_SAMPLES {
     label 'cpu_high'
 
     input:
-    val ready
     val source_glob
     val candidates_per_shard
     val output
