@@ -192,14 +192,14 @@ def _allocate_candidate_samples(
     "source_prefix",
     required=True,
     type=str,
-    help="Key prefix under which each folder lives, e.g. 'raw/zinc22'.",
+    help="Key prefix under which each folder lives",
 )
 @click.option(
     "--target-total",
     "target_total",
     required=True,
     type=int,
-    help="Total number of compounds desired in the sampled POC dataset.",
+    help="Total number of compounds desired in the sampled dataset.",
 )
 @click.option(
     "--floor-per-source",
@@ -220,9 +220,7 @@ def _allocate_candidate_samples(
     is_flag=True,
     help="Read input and write output via blob storage.",
 )
-@click.option(
-    "--bucket", type=str, default="lynceus", help="S3-compatible bucket name."
-)
+@click.option("--bucket", type=str, help="S3-compatible bucket name.")
 def allocate_candidate_samples(
     counts_path: str,
     source_prefix: str,

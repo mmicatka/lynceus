@@ -12,10 +12,14 @@ from .storage import BlobStorageSettings
 def get_connection(
     blob_storage_settings: Optional[BlobStorageSettings] = None,
     threads: Optional[int] = None,
+    memory_limit: Optional[str] = None,
 ) -> duckdb.DuckDBPyConnection:
     con = duckdb.connect()
 
     con.execute("SET threads = ?", [threads or _detect_available_threads()])
+
+    if memory_limit:
+        con.execute("SET memory_limit = ?", [memory_limit])
 
     if blob_storage_settings:
         con.execute("LOAD httpfs")
@@ -46,25 +50,24 @@ def export_parquet(
     data: pa.Table | pa.RecordBatch | duckdb.DuckDBPyRelation,
     file_path: str,
     compression: str = "zstd",
+    file_size_bytes: int | None = None,
 ):
     safe_path = file_path.replace("'", "''")
+    copy_options = f"FORMAT PARQUET, COMPRESSION '{compression}'"
+
+    if file_size_bytes is not None:
+        copy_options += f", FILE_SIZE_BYTES {file_size_bytes}"
 
     if isinstance(data, duckdb.DuckDBPyRelation):
-        con.execute(
-            f"COPY ({data.sql_query()}) TO '{safe_path}' "
-            f"(FORMAT PARQUET, COMPRESSION '{compression}')"
-        )
+        con.execute(f"COPY ({data.sql_query()}) TO '{safe_path}' ({copy_options})")
     else:
         con.register("_tmp_export_view", data)
         try:
-            con.execute(
-                f"COPY _tmp_export_view TO '{safe_path}' "
-                f"(FORMAT PARQUET, COMPRESSION '{compression}')"
-            )
+            con.execute(f"COPY _tmp_export_view TO '{safe_path}' ({copy_options})")
         finally:
             con.unregister("_tmp_export_view")
 
-    if not file_exists(con, file_path):
+    if file_size_bytes is None and not file_exists(con, file_path):
         raise RuntimeError(
             f"export_parquet: COPY reported success but {file_path} "
             "is not readable back via read_parquet"
@@ -74,6 +77,13 @@ def export_parquet(
 def file_exists(con: duckdb.DuckDBPyConnection, file_path: str) -> bool:
     try:
         con.execute("SELECT 1 FROM read_parquet(?) LIMIT 1", [file_path])
+        return True
+    except duckdb.Error:
+        pass
+
+    try:
+        glob_path = f"{file_path.rstrip('/')}/**/*.parquet"
+        con.execute("SELECT 1 FROM read_parquet(?) LIMIT 1", [glob_path])
         return True
     except duckdb.Error:
         return False

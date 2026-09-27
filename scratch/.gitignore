@@ -1,6 +1,8 @@
-large_dataset/
 conformers/
-parquet/
-docking_run/
 features/
-active_round_1/
+parquets/
+sampled/
+shards/
+smiles/
+targets/
+training/

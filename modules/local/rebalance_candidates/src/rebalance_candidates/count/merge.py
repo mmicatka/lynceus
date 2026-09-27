@@ -7,7 +7,11 @@ import click
 from lynceus_utils.storage.blob_storage import get_blob_storage_settings
 from lynceus_utils.storage.filesystem import get_filesystem
 
-from rebalance_candidates.count.count import _read_json, _resolve_path, _write_json
+from rebalance_candidates.count.load_candidates import (
+    _read_json,
+    _resolve_path,
+    _write_json,
+)
 
 logging.basicConfig(
     level=logging.INFO,

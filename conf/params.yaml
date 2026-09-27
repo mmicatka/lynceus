@@ -7,7 +7,7 @@ s3_url_style: path
 
 candidates:
   bucket: lynceus
-  candidates_per_shard: 2000000
+  initial_shard_size_bytes: 2GB
   source_prefix: candidates/raw/smiles
   parquet_prefix: candidates/raw/parquet
   sources:
@@ -38,6 +38,8 @@ candidates:
     - H28
   target_total: 10000000
   floor_per_source: 200000
+  num_shards: 16
+  allocation_path: candidates/10m/allocation.csv
   candidate_samples_prefix: candidates/10m/sampled
   shard_output_prefix: candidates/10m/shards
   conformers_output_prefix: candidates/10m/conformers

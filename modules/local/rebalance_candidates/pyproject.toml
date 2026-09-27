@@ -15,12 +15,12 @@ dependencies = [
 ]
 
 [project.scripts]
-resolve-pending-candidate-folders = "rebalance_candidates:resolve_pending_candidate_folders"
-count-candidates = "rebalance_candidates:count_candidates"
+load-candidates = "rebalance_candidates:load_candidates"
 merge-candidate-counts = "rebalance_candidates:merge_candidate_counts"
 allocate-candidate-samples = "rebalance_candidates:allocate_candidate_samples"
 sample-candidates = "rebalance_candidates:sample_candidates"
-shard-candidate-samples = "rebalance_candidates:shard_candidate_samples"
+shard-candidates = "rebalance_candidates:shard_candidates"
+concat-candidate-shards = "rebalance_candidates:concat_shards"
 
 [build-system]
 requires = ["uv_build>=0.12.5,<0.13.0"]
