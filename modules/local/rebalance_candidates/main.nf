@@ -4,12 +4,11 @@ process LOAD_CANDIDATES {
     container "${params.registry}/lynceus/rebalance-candidates:0.1.0"
 
     label 'pvc_io_retry'
-    label 'mem_med'
+    label 'cpu_high'
 
     input:
     val input
     val output
-    val file_size_bytes
     val bucket
 
     output:
@@ -20,7 +19,6 @@ process LOAD_CANDIDATES {
     load-candidates \\
         --input ${input} \\
         --output ${output} \\
-        --file-size-bytes ${file_size_bytes} \\
         --use-blob-storage \\
         --bucket ${bucket} \\
         --num-workers ${task.cpus}

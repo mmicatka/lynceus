@@ -53,7 +53,6 @@ workflow _REBALANCE_CANDIDATES {
   LOAD_CANDIDATES(
     ch_candidate_sources,
     config.parquet_prefix,
-    config.initial_shard_size_bytes,
     bucket,
   )
 
