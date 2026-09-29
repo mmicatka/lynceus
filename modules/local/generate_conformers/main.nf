@@ -18,7 +18,6 @@ process GENERATE_CONFORMERS {
     generate-conformers \\
         --input ${input} \\
         --output ${output} \\
-        --bucket ${bucket} \\
-        --num-workers ${task.cpus}
+        --bucket ${bucket}
     """
 }

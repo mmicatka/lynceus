@@ -8,13 +8,15 @@ def resolveUri(bucket: String, key: String) {
   bucket ? "s3://${bucket}/${key}" : key
 }
 
+def toKey(bucket: String, path: Path) {
+  bucket
+    ? path.toUriString().replaceFirst("^s3://${bucket}/", "")
+    : path.toString()
+}
+
 def toShardTuple(shardPath: Path, config: Map, bucket: String) {
-  def shardId = "${shardPath.parent.name}_${shardPath.baseName}"
-  def inputKey = bucket
-    ? shardPath.toString().replaceFirst("^s3://${bucket}/", "")
-    : shardPath.toString()
-  def outputKey = "${config.conformers_output_prefix}/shard_${shardId}.parquet"
-  tuple(inputKey, outputKey)
+  def outputKey = "${config.conformers_output_prefix}/${shardPath.baseName}.parquet"
+  tuple(toKey(bucket, shardPath), outputKey)
 }
 
 workflow CANDIDATES {

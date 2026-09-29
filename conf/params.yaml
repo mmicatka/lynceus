@@ -38,11 +38,11 @@ candidates:
     - H28
   target_total: 10000000
   floor_per_source: 200000
-  num_shards: 16
+  num_shards: 64
   allocation_path: candidates/10m/allocation.csv
   candidate_samples_prefix: candidates/10m/sampled
   shard_staging_prefix: candidates/10m/shards/staging
-  shard_output_prefix: candidates/10m/shards
+  shard_output_prefix: candidates/10m/shards/merged
   conformers_output_prefix: candidates/10m/conformers
 
 target:
