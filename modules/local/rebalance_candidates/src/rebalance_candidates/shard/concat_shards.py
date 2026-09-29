@@ -1,5 +1,6 @@
 # modules/local/rebalance_candidates/src/rebalance_candidates/shard/concat_shards.py
 
+import json
 import logging
 
 import click
@@ -18,20 +19,78 @@ def _resolve_path(use_blob_storage: bool, bucket: str, key: str) -> str:
     return f"s3://{bucket}/{key.lstrip('/')}" if use_blob_storage else key
 
 
+def _with_scheme(use_blob_storage: bool, path: str) -> str:
+    if use_blob_storage and not path.startswith("s3://"):
+        return f"s3://{path}"
+    return path
+
+
+def _list_inputs(
+    filesystem, use_blob_storage: bool, input_pattern: str, output_file: str
+) -> list[str]:
+    matches = sorted(
+        path
+        for path in (
+            _with_scheme(use_blob_storage, str(raw))
+            for raw in filesystem.glob(input_pattern)
+        )
+        if path != output_file
+    )
+    if not matches:
+        raise RuntimeError(f"no parquet files match {input_pattern}")
+    return matches
+
+
+def _manifest_path(output_file: str) -> str:
+    return f"{output_file}.inputs.json"
+
+
+def _read_manifest(filesystem, manifest_path: str) -> list[str] | None:
+    if not filesystem.exists(manifest_path):
+        return None
+    with filesystem.open(manifest_path, "r") as f:
+        return json.load(f)["inputs"]
+
+
+def _write_manifest(filesystem, manifest_path: str, inputs: list[str]) -> None:
+    with filesystem.open(manifest_path, "w") as f:
+        json.dump({"inputs": inputs}, f)
+
+
+def _output_is_valid(filesystem, output_file: str, inputs: list[str]) -> bool:
+    return filesystem.exists(output_file) and (
+        _read_manifest(filesystem, _manifest_path(output_file)) == inputs
+    )
+
+
+def _concat(conn, inputs: list[str], output_file: str) -> None:
+    file_list_sql = "[" + ", ".join(f"'{path}'" for path in inputs) + "]"
+    conn.sql(
+        f"""
+        COPY (
+            SELECT *
+            FROM read_parquet({file_list_sql}, hive_partitioning = false)
+        )
+        TO '{output_file}'
+        (FORMAT parquet, COMPRESSION zstd)
+        """
+    )
+
+
 @click.command()
 @click.option(
     "--input",
-    "input_path",
+    "input_pattern",
     required=True,
     type=str,
-    help="Input folder",
+    help="Glob matching the parquet files to concatenate.",
 )
 @click.option(
     "--output",
     "output_path",
     required=True,
     type=str,
-    help="Output folder.",
+    help="Output parquet file.",
 )
 @click.option(
     "--use-blob-storage",
@@ -47,52 +106,33 @@ def _resolve_path(use_blob_storage: bool, bucket: str, key: str) -> str:
     help="Number of parallel workers (integer >= 1 or 'auto').",
 )
 def concat_shards(
-    input_path: str,
+    input_pattern: str,
     output_path: str,
     use_blob_storage: bool,
     bucket: str,
     num_workers: int,
 ) -> None:
+    if use_blob_storage and not bucket:
+        raise click.UsageError("--bucket is required with --use-blob-storage")
+
     blob_storage_settings = get_blob_storage_settings() if use_blob_storage else None
     conn = get_connection(blob_storage_settings, threads=num_workers)
     filesystem = get_filesystem(blob_storage_settings)
 
-    resolved_input = _resolve_path(use_blob_storage, bucket, input_path)
+    resolved_input = _resolve_path(use_blob_storage, bucket, input_pattern)
     resolved_output = _resolve_path(use_blob_storage, bucket, output_path)
 
-    search_pattern = f"{resolved_input.rstrip('/')}/*.parquet"
-    raw_files = filesystem.glob(search_pattern)
+    inputs = _list_inputs(filesystem, use_blob_storage, resolved_input, resolved_output)
 
-    if not raw_files:
-        logger.error("No parquet files found in %s", input_path)
+    if _output_is_valid(filesystem, resolved_output, inputs):
+        logger.info(
+            "%s already concatenated from %d inputs, skipping",
+            resolved_output,
+            len(inputs),
+        )
         return
 
-    files: list[str] = [str(f) for f in raw_files]
-    resolved_files = [
-        _resolve_path(use_blob_storage, bucket, f.replace(f"s3://{bucket}/", ""))
-        for f in files
-    ]
-    resolved_files.sort()
-
-    logger.info(
-        "Found %d files in %s. Concatenating in deterministic order...",
-        len(resolved_files),
-        input_path,
-    )
-    for f in resolved_files:
-        logger.info(" - %s", f)
-
-    file_list_sql = "[" + ", ".join([f"'{f}'" for f in resolved_files]) + "]"
-
-    conn.sql(
-        f"""
-        COPY (
-            SELECT *
-            FROM read_parquet({file_list_sql})
-        )
-        TO '{resolved_output}'
-        (FORMAT parquet, COMPRESSION zstd, OVERWRITE_OR_IGNORE)
-        """
-    )
-
-    logger.info("Successfully concatenated files into %s", resolved_output)
+    logger.info("concatenating %d files into %s", len(inputs), resolved_output)
+    _concat(conn, inputs, resolved_output)
+    _write_manifest(filesystem, _manifest_path(resolved_output), inputs)
+    logger.info("finished concatenating into %s", resolved_output)

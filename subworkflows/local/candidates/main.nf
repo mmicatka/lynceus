@@ -4,34 +4,34 @@ include { LOAD_CANDIDATES ; MERGE_CANDIDATE_COUNTS ; ALLOCATE_CANDIDATE_SAMPLES 
 include { GENERATE_CONFORMERS } from '../../../modules/local/generate_conformers'
 
 
+def resolveUri(bucket: String, key: String) {
+  bucket ? "s3://${bucket}/${key}" : key
+}
+
+def toShardTuple(shardPath: Path, config: Map, bucket: String) {
+  def shardId = "${shardPath.parent.name}_${shardPath.baseName}"
+  def inputKey = bucket
+    ? shardPath.toString().replaceFirst("^s3://${bucket}/", "")
+    : shardPath.toString()
+  def outputKey = "${config.conformers_output_prefix}/shard_${shardId}.parquet"
+  tuple(inputKey, outputKey)
+}
+
 workflow CANDIDATES {
   take:
   config
 
   main:
-  _REBALANCE_CANDIDATES(
-    config
-  )
+  _REBALANCE_CANDIDATES(config)
 
   bucket = config.bucket
+  shardGlob = resolveUri(bucket, "${config.shard_output_prefix}/*.parquet")
 
   ch_shards = _REBALANCE_CANDIDATES.out.concat_done
-    .map { file("${bucket ? "s3://${bucket}/" : ''}${config.shard_output_prefix}/*/*.parquet") }
-    .flatMap { pattern -> file(pattern) }
-    .map { shard_path ->
-      def folder = shard_path.parent.name
-      def shard_id = "${folder}_${shard_path.baseName}"
-      def input_key = bucket
-        ? shard_path.toString().replaceFirst("^s3://${bucket}/", "")
-        : shard_path.toString()
-      def output_key = "${config.conformers_output_prefix}/${shard_id}.parquet"
-      return tuple(input_key, output_key)
-    }
+    .flatMap { files(shardGlob) }
+    .map { shardPath -> toShardTuple(shardPath, config, bucket) }
 
-  GENERATE_CONFORMERS(
-    ch_shards,
-    bucket,
-  )
+  GENERATE_CONFORMERS(ch_shards, bucket)
 
   emit:
   done = GENERATE_CONFORMERS.out.done.collect()
@@ -86,28 +86,25 @@ workflow _REBALANCE_CANDIDATES {
 
   SAMPLE_CANDIDATES(ch_sample_inputs, config.initial_shard_size_bytes, bucket)
 
-  ch_folders_for_sharding = ch_source_allocations.map { folder, _parquet_dir, sample_dir, _target_count, _source_count ->
-    tuple(folder, sample_dir)
-  }
-
-  ch_samples_ready = SAMPLE_CANDIDATES.out.done.collect().map { true }.first()
-
-  ch_shard_inputs = ch_folders_for_sharding
-    .combine(ch_samples_ready)
-    .map { folder, sample_dir, _ready ->
-      def shard_dir = "${config.shard_output_prefix}/${folder}"
-      tuple(sample_dir, shard_dir)
+  ch_shard_inputs = ch_source_allocations
+    .map { folder, _parquet_dir, sample_dir, _target_count, _source_count ->
+      tuple(folder, sample_dir)
+    }
+    .combine(SAMPLE_CANDIDATES.out.done.collect().map { true })
+    .map { _folder, sample_dir, _ready ->
+      tuple(sample_dir, config.shard_staging_prefix)
     }
 
   SHARD_CANDIDATES(ch_shard_inputs, config.num_shards, bucket)
 
-  ch_shard_dirs = ch_shard_inputs.map { _sample_dir, shard_dir -> shard_dir }
-
-  ch_shards_ready = SHARD_CANDIDATES.out.done.collect().map { true }.first()
-
-  ch_concat_inputs = ch_shard_dirs
-    .combine(ch_shards_ready)
-    .map { shard_dir, _ready -> tuple(shard_dir, shard_dir) }
+  ch_concat_inputs = channel.fromList((0..<config.num_shards).toList())
+    .combine(SHARD_CANDIDATES.out.done.collect().map { true })
+    .map { shard_id, _ready ->
+      tuple(
+        "${config.shard_staging_prefix}/shard_id=${shard_id}/*.parquet",
+        "${config.shard_output_prefix}/shard_${shard_id}.parquet",
+      )
+    }
 
   CONCAT_CANDIDATE_SHARDS(ch_concat_inputs, bucket)
 

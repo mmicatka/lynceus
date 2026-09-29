@@ -1,5 +1,6 @@
 # modules/local/rebalance_candidates/src/rebalance_candidates/shard/shard.py
 
+import json
 import logging
 
 import click
@@ -16,10 +17,36 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def _marker_path(output_path: str, input_name: str) -> str:
+    return f"{output_path.rstrip('/')}/_SUCCESS_{input_name}"
+
+
+def _partition_is_valid(
+    filesystem, output_path: str, num_shards: int, input_name: str
+) -> bool:
+    marker_path = _marker_path(output_path, input_name)
+    if not filesystem.exists(marker_path):
+        return False
+    with filesystem.open(marker_path, "r") as f:
+        return json.load(f).get("num_shards") == num_shards
+
+
+def _write_success_marker(
+    filesystem, output_path: str, num_shards: int, input_name: str
+) -> None:
+    with filesystem.open(_marker_path(output_path, input_name), "w") as f:
+        json.dump({"num_shards": num_shards}, f)
+
+
+def _is_explicit_parquet_source(path: str) -> bool:
+    basename = path.rstrip("/").split("/")[-1]
+    return basename.endswith(".parquet") or "*" in basename
+
+
 def _get_input_name(input_path: str) -> str:
     clean_path = input_path.rstrip("/")
     basename = clean_path.split("/")[-1]
-    if basename.endswith(".parquet") or "*" in basename:
+    if _is_explicit_parquet_source(clean_path):
         parts = clean_path.split("/")
         if len(parts) > 1:
             return parts[-2]
@@ -27,29 +54,19 @@ def _get_input_name(input_path: str) -> str:
     return basename
 
 
+def _resolve_parquet_source(filesystem, input_path: str) -> str:
+    source = (
+        input_path
+        if _is_explicit_parquet_source(input_path)
+        else f"{input_path.rstrip('/')}/*.parquet"
+    )
+    if not filesystem.glob(source):
+        raise RuntimeError(f"no parquet files match {source}")
+    return source
+
+
 def _resolve_path(use_blob_storage: bool, bucket: str, key: str) -> str:
     return f"s3://{bucket}/{key.lstrip('/')}" if use_blob_storage else key
-
-
-def _partition_is_valid(
-    filesystem, output_path: str, num_shards: int, input_name: str
-) -> bool:
-    marker_path = f"{output_path.rstrip('/')}/_SUCCESS_{input_name}"
-    if not filesystem.exists(marker_path):
-        return False
-
-    for shard_id in range(num_shards):
-        shard_dir = f"{output_path.rstrip('/')}/shard_id={shard_id}"
-        if not filesystem.exists(shard_dir):
-            return False
-
-    return True
-
-
-def _write_success_marker(filesystem, output_path: str, input_name: str) -> None:
-    marker_path = f"{output_path.rstrip('/')}/_SUCCESS_{input_name}"
-    with filesystem.open(marker_path, "w") as f:
-        f.write("")
 
 
 @click.command()
@@ -121,9 +138,11 @@ def shard_candidates(
         )
         return
 
+    resolved_source = _resolve_parquet_source(filesystem, resolved_input)
+
     logger.info(
         "input=%s hash-partitioning by %s into %d shards at %s",
-        resolved_input,
+        resolved_source,
         id_column,
         num_shards,
         resolved_output,
@@ -133,7 +152,7 @@ def shard_candidates(
         f"""
         COPY (
             SELECT *, hash({id_column}) % {num_shards} AS shard_id
-            FROM read_parquet('{resolved_input}')
+            FROM read_parquet('{resolved_source}')
         )
         TO '{resolved_output}'
         (FORMAT parquet, COMPRESSION zstd, PARTITION_BY (shard_id), OVERWRITE_OR_IGNORE,
@@ -141,7 +160,7 @@ def shard_candidates(
         """
     )
 
-    _write_success_marker(filesystem, resolved_output, input_name)
+    _write_success_marker(filesystem, resolved_output, num_shards, input_name)
 
     logger.info(
         "input=%s finished hash-partitioning into %d shards at %s",

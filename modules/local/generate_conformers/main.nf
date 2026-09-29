@@ -18,7 +18,6 @@ process GENERATE_CONFORMERS {
     generate-conformers \\
         --input ${input} \\
         --output ${output} \\
-        --use-blob-storage \\
         --bucket ${bucket} \\
         --num-workers ${task.cpus}
     """

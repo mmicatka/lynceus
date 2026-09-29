@@ -41,6 +41,7 @@ candidates:
   num_shards: 16
   allocation_path: candidates/10m/allocation.csv
   candidate_samples_prefix: candidates/10m/sampled
+  shard_staging_prefix: candidates/10m/shards/staging
   shard_output_prefix: candidates/10m/shards
   conformers_output_prefix: candidates/10m/conformers
 
