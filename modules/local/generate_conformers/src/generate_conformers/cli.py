@@ -32,6 +32,7 @@ MAX_PROTONATION_VARIANTS = 4
 EMBED_PARAMS = AllChem.ETKDGv3()
 EMBED_PARAMS.randomSeed = 1000
 EMBED_PARAMS.maxIterations = 50
+EMBED_PARAMS.numThreads = 1
 
 OPTIMIZE_MAX_ITERS = 50
 
@@ -62,7 +63,7 @@ def _process_chunk(
         if AllChem.EmbedMolecule(_mol, EMBED_PARAMS) != -1:
             if AllChem.MMFFOptimizeMolecule(_mol, maxIters=OPTIMIZE_MAX_ITERS) != -1:
                 _mol.SetIntProp("conf_id", 0)
-                _mol.SetProp("_Name", id)
+                _mol.SetProp("_Name", str(id))
 
                 res.append(MolToMolBlock(_mol))
                 continue

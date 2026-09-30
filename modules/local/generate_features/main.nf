@@ -3,7 +3,7 @@
 process GENERATE_FEATURES {
     container "${params.registry}/lynceus/generate-features:0.1.0"
 
-    label 'cpu_medium'
+    label 'cpu_high'
     label 'pvc_io_retry'
 
     input:
@@ -25,7 +25,6 @@ process GENERATE_FEATURES {
         --output ${output} \\
         --use-blob-storage \\
         --bucket ${bucket} \\
-        ${features_args} \\
-        --num-workers ${task.cpus} \\
+        ${features_args}
     """
 }

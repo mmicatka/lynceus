@@ -5,6 +5,8 @@ s3_endpoint: 192.168.1.4:3900
 s3_region: garage
 s3_url_style: path
 
+outdir: results
+
 candidates:
   bucket: lynceus
   initial_shard_size_bytes: 2GB

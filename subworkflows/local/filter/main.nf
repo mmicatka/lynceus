@@ -9,19 +9,15 @@ workflow FILTER {
     target_ready
 
     main:
-    candidate_ready.collect()
-    target_ready.collect()
-
     bucket = config.bucket
+    prefix = config.input_prefix.toString().replaceAll('/$', '')
+    input_glob = bucket ? "s3://${bucket}/${prefix}/*.parquet" : "${prefix}/*.parquet"
 
-    input_glob = "${config.input_prefix.toString().replaceAll('/$', '')}/*.parquet"
-
-    ch_shards = channel.fromPath(bucket ? "s3://${bucket}/${input_glob}" : input_glob)
-        .map { f ->
-            def input_key = "${config.input_prefix}/${f.name}"
-            def output_key = "${config.output_prefix}/${f.name}"
-            tuple(input_key, output_key)
-        }
+    ch_shards = candidate_ready
+        .collect()
+        .combine(target_ready.collect())
+        .flatMap { files(input_glob) }
+        .map { f -> tuple("${config.input_prefix}/${f.name}", "${config.output_prefix}/${f.name}") }
 
     GENERATE_FEATURES(
         ch_shards,

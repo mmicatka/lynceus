@@ -4,7 +4,7 @@
 process SAMPLE_SURROGATE_CANDIDATES {
     container "${params.registry}/lynceus/surrogate-model:0.1.0"
 
-    label 'cpu_medium'
+    label 'cpu_med'
     label 'pvc_io_retry'
 
     input:
