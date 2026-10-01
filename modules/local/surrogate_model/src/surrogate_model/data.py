@@ -19,7 +19,7 @@ def load_and_clean_data(
     return df
 
 
-def flatten_features(df, feature_cols=None) -> np.ndarray:
+def flatten_features(df: pl.DataFrame, feature_cols=None) -> np.ndarray:
     if feature_cols is None:
         feature_cols = []
 

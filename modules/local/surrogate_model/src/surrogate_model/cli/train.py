@@ -6,10 +6,11 @@ import time
 
 import click
 import fsspec
+import joblib
 import lightgbm as lgb
 import polars as pl
 from lynceus_utils.storage.blob_storage import get_blob_storage_settings
-from lynceus_utils.storage.filesystem import get_filesystem
+from lynceus_utils.storage.filesystem import get_filesystem, resolve_path
 from sklearn.model_selection import train_test_split
 
 from surrogate_model.data import flatten_features, label, load_and_clean_data
@@ -39,12 +40,46 @@ FEATURE_COLS = [
 ]
 
 
-def qualify_path(path: str, bucket: str) -> str:
-    return f"s3://{bucket}/{path}" if bucket else path
-
-
-def read_parquet(path: str, fs: fsspec.AbstractFileSystem) -> pl.DataFrame:
+def _read_parquet(path: str, fs: fsspec.AbstractFileSystem) -> pl.DataFrame:
     return pl.read_parquet(fs.cat_file(path))
+
+
+def _prepare_dataset(
+    features_path: str,
+    labels_path: str,
+    fs: fsspec.AbstractFileSystem,
+    features: list[str],
+    percentile: float = None,
+    threshold: float = None,
+) -> tuple:
+    raw_features = _read_parquet(features_path, fs)
+    raw_labels = _read_parquet(labels_path, fs)
+
+    df_cleaned = load_and_clean_data(raw_features, raw_labels)
+
+    x = flatten_features(df_cleaned, features)
+    y_raw = df_cleaned["affinity_kcal_mol"]
+
+    # "top" 1% (most negative == strongest binder) or use provided threshold
+    y_label, computed_threshold = label(
+        y_raw, percentile=percentile, threshold=threshold
+    )
+
+    return x, y_label, computed_threshold
+
+
+def _evaluate_and_log(model, x, y_true, dataset_name: str) -> pl.DataFrame:
+    y_predict = predict_active(model=model, x=x)
+    metrics = evaluation_metrics(y_true, y_predict)
+    logger.info(f"{dataset_name} Evaluation Metrics:\n{metrics}")
+    return metrics
+
+
+def _save_model(model, path: str, fs: fsspec.AbstractFileSystem):
+    logger.info("Saving model to %s...", path)
+    with fs.open(path, "wb") as f:
+        joblib.dump(model, f)
+    logger.info("Model saved successfully.")
 
 
 @click.command()
@@ -91,7 +126,7 @@ def read_parquet(path: str, fs: fsspec.AbstractFileSystem) -> pl.DataFrame:
     type=click.Choice(list(FEATURE_COLS), case_sensitive=False),
     default=list(FEATURE_COLS),
     show_default=True,
-    help="Features to generate.",
+    help="Features to use.",
 )
 @click.option("--active-percentile", type=float, default=1.0, help="Active percentile.")
 def train_model(
@@ -104,6 +139,11 @@ def train_model(
     bucket: str,
     active_percentile: float,
 ):
+    train_features_path = resolve_path(train_features_path, bucket)
+    train_labels_path = resolve_path(train_labels_path, bucket)
+    validation_features_path = resolve_path(validation_features_path, bucket)
+    validation_labels_path = resolve_path(validation_labels_path, bucket)
+
     logger.info(
         "training surrogate model using features: %s\tlabels: %s",
         train_features_path,
@@ -119,31 +159,13 @@ def train_model(
     blob_storage_settings = get_blob_storage_settings() if bucket else None
     fs = get_filesystem(blob_storage_settings)
 
-    train_features_path = (
-        f"s3://{bucket}/{train_features_path}" if bucket else train_features_path
+    x_initial, y_initial_label, threshold = _prepare_dataset(
+        train_features_path,
+        train_labels_path,
+        fs,
+        features,
+        percentile=active_percentile,
     )
-    train_labels_path = (
-        f"s3://{bucket}/{train_labels_path}" if bucket else train_labels_path
-    )
-    validation_features_path = (
-        f"s3://{bucket}/{validation_features_path}"
-        if bucket
-        else validation_features_path
-    )
-    validation_labels_path = (
-        f"s3://{bucket}/{validation_labels_path}" if bucket else validation_labels_path
-    )
-
-    train_features = read_parquet(train_features_path, fs)
-    train_labels = read_parquet(train_labels_path, fs)
-
-    df_train = load_and_clean_data(train_features, train_labels)
-
-    x_initial = flatten_features(df_train, features)
-    y_initial_raw = df_train["affinity_kcal_mol"]
-
-    # "top" 1% (most negative == strongest binder)
-    y_initial_label, threshold = label(y_initial_raw, percentile=active_percentile)
 
     x_initial_train, x_initial_test, y_initial_train, y_initial_test = train_test_split(
         x_initial, y_initial_label, train_size=0.8, random_state=RANDOM_SEED
@@ -161,32 +183,28 @@ def train_model(
     )
 
     time_start = time.perf_counter()
-
     model.fit(x_initial_train, y_initial_train)
 
     logger.info(
-        "trained model with: %d samples in %f",
+        "trained model with: %d samples in %.3fs",
         len(x_initial_train),
         time.perf_counter() - time_start,
     )
 
-    y_predict_initial = predict_active(model=model, x=x_initial_test)
-    df_metrics_initial = evaluation_metrics(y_initial_test, y_predict_initial)
+    _evaluate_and_log(
+        model, x_initial_test, y_initial_test, dataset_name="Initial Split"
+    )
 
-    print(df_metrics_initial)
+    x_validation, y_validation_label, _ = _prepare_dataset(
+        validation_features_path,
+        validation_labels_path,
+        fs,
+        features,
+        threshold=threshold,
+    )
 
-    validation_features = read_parquet(validation_features_path, fs)
-    validation_labels = read_parquet(validation_labels_path, fs)
+    _evaluate_and_log(
+        model, x_validation, y_validation_label, dataset_name="Validation"
+    )
 
-    df_validation = load_and_clean_data(validation_features, validation_labels)
-
-    x_validation = flatten_features(df_validation, features)
-    y_validation_raw = df_validation["affinity_kcal_mol"]
-
-    # "top" 1% (most negative == strongest binder)
-    y_validation_label, threshold = label(y_validation_raw, threshold=threshold)
-
-    y_predict_validation = predict_active(model=model, x=x_validation)
-    df_metrics_initial = evaluation_metrics(y_validation_label, y_predict_validation)
-
-    print(df_metrics_initial)
+    _save_model(model, model_path, fs)
