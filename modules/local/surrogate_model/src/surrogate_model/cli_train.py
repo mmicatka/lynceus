@@ -2,6 +2,7 @@
 
 import logging
 import sys
+import time
 
 import click
 import fsspec
@@ -62,15 +63,15 @@ def read_parquet(path: str, fs: fsspec.AbstractFileSystem) -> pl.DataFrame:
     help="Path to the input label file.",
 )
 @click.option(
-    "--validate-features",
-    "validate_features_path",
+    "--validation-features",
+    "validation_features_path",
     type=str,
     required=True,
     help="Path to the input features file.",
 )
 @click.option(
-    "--validate-labels",
-    "validate_labels_path",
+    "--validation-labels",
+    "validation_labels_path",
     type=str,
     required=True,
     help="Path to the input label file.",
@@ -92,14 +93,16 @@ def read_parquet(path: str, fs: fsspec.AbstractFileSystem) -> pl.DataFrame:
     show_default=True,
     help="Features to generate.",
 )
+@click.option("--active-percentile", type=float, default=1.0, help="Active percentile.")
 def train_model(
     train_features_path: str,
     train_labels_path: str,
-    validate_features_path: str,
-    validate_labels_path: str,
+    validation_features_path: str,
+    validation_labels_path: str,
     features: list[str],
     model_path: str,
     bucket: str,
+    active_percentile: float,
 ):
     logger.info(
         "training surrogate model using features: %s\tlabels: %s",
@@ -109,8 +112,8 @@ def train_model(
 
     logger.info(
         "validating using features: %s\tlabels: %s",
-        validate_features_path,
-        validate_labels_path,
+        validation_features_path,
+        validation_labels_path,
     )
 
     blob_storage_settings = get_blob_storage_settings() if bucket else None
@@ -122,6 +125,14 @@ def train_model(
     train_labels_path = (
         f"s3://{bucket}/{train_labels_path}" if bucket else train_labels_path
     )
+    validation_features_path = (
+        f"s3://{bucket}/{validation_features_path}"
+        if bucket
+        else validation_features_path
+    )
+    validation_labels_path = (
+        f"s3://{bucket}/{validation_labels_path}" if bucket else validation_labels_path
+    )
 
     train_features = read_parquet(train_features_path, fs)
     train_labels = read_parquet(train_labels_path, fs)
@@ -132,7 +143,7 @@ def train_model(
     y_initial_raw = df_train["affinity_kcal_mol"]
 
     # "top" 1% (most negative == strongest binder)
-    y_initial_label, threshold = label(y_initial_raw, percentile=1.0)
+    y_initial_label, threshold = label(y_initial_raw, percentile=active_percentile)
 
     x_initial_train, x_initial_test, y_initial_train, y_initial_test = train_test_split(
         x_initial, y_initial_label, train_size=0.8, random_state=RANDOM_SEED
@@ -140,7 +151,7 @@ def train_model(
 
     model = lgb.LGBMClassifier(
         objective="binary",
-        n_estimators=500,
+        n_estimators=100,
         learning_rate=0.05,
         num_leaves=31,
         min_child_samples=10,
@@ -149,9 +160,33 @@ def train_model(
         force_row_wise=True,
     )
 
+    time_start = time.perf_counter()
+
     model.fit(x_initial_train, y_initial_train)
+
+    logger.info(
+        "trained model with: %d samples in %f",
+        len(x_initial_train),
+        time.perf_counter() - time_start,
+    )
 
     y_predict_initial = predict_active(model=model, x=x_initial_test)
     df_metrics_initial = evaluation_metrics(y_initial_test, y_predict_initial)
+
+    print(df_metrics_initial)
+
+    validation_features = read_parquet(validation_features_path, fs)
+    validation_labels = read_parquet(validation_labels_path, fs)
+
+    df_validation = load_and_clean_data(validation_features, validation_labels)
+
+    x_validation = flatten_features(df_validation, features)
+    y_validation_raw = df_validation["affinity_kcal_mol"]
+
+    # "top" 1% (most negative == strongest binder)
+    y_validation_label, threshold = label(y_validation_raw, threshold=threshold)
+
+    y_predict_validation = predict_active(model=model, x=x_validation)
+    df_metrics_initial = evaluation_metrics(y_validation_label, y_predict_validation)
 
     print(df_metrics_initial)
