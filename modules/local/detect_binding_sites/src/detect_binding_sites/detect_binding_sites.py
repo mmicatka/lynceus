@@ -1,18 +1,19 @@
 # modules/local/detect_binding_sites/src/detect_binding_sites/detect_binding_sites.py
-
 import csv
 import json
 import logging
-import os
-import shutil
 import subprocess
 import sys
 import tempfile
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
+from typing import Optional
 
 import click
 import gemmi
+from lynceus_utils.cli import NumWorkers
+from lynceus_utils.storage.blob_storage import get_blob_storage_settings
+from lynceus_utils.storage.filesystem import get_filesystem
 from protein_ensemble import Manifest
 
 from .models import BindingSite, Sphere
@@ -42,16 +43,20 @@ _P2RANK_PREDICTIONS_HEADER = (
 )
 
 
-def _member_to_local_cif(manifest: Manifest, member_id: str, workdir: Path) -> Path:
-    source_path = manifest.structure_path(member_id)
+def _member_to_local_cif(
+    manifest: Manifest, member_id: str, workdir: Path, fs, ensemble_uri: str
+) -> Path:
+    source_path = Path(manifest.structure_path(member_id))
     local_path = (workdir / source_path.name).with_suffix(".cif")
-    shutil.copy(source_path, local_path)
+
+    remote_path = f"{ensemble_uri}/members/{source_path.name}"
+    fs.get(remote_path, str(local_path))
+
     return local_path
 
 
 def _run_p2rank(local_input: Path, workdir: Path) -> Path:
     out_dir = workdir / "p2rank_out"
-
     subprocess.run(
         ["prank", "predict", "-f", str(local_input), "-o", str(out_dir)],
         check=True,
@@ -86,8 +91,8 @@ def _parse_predictions_csv(predictions_csv: Path) -> list[dict[str, str]]:
 
 def _resolve_atom_coords(structure_path: Path) -> dict[int, tuple[float, float, float]]:
     parsed = gemmi.read_structure(str(structure_path))
-
     coords_by_serial: dict[int, tuple[float, float, float]] = {}
+
     for model in parsed:
         for chain in model:
             for residue in chain:
@@ -128,8 +133,8 @@ def _pocket_row_to_binding_site(
         float(row["center_y"]),
         float(row["center_z"]),
     )
-
     surf_atom_ids = [int(_s) for _s in row["surf_atom_ids"].split()]
+
     points = [
         coords_by_serial[_serial]
         for _serial in surf_atom_ids
@@ -157,10 +162,7 @@ def _pocket_row_to_binding_site(
         )
         return None
 
-    # Radius of gyration about p2rank's own reported pocket center (a centroid
-    # of SAS points, not of surf_atom_ids), for consistency with the fpocket
-    # path this replaces, which also derives radius from real pocket geometry
-    # rather than a fixed/configurable constant.
+    # Radius of gyration about p2rank's own reported pocket center
     radius = _radius_of_gyration(points, center)
 
     return BindingSite(
@@ -192,8 +194,8 @@ def _pockets_to_binding_sites(
         return []
 
     coords_by_serial = _resolve_atom_coords(structure_path)
-
     binding_sites: list[BindingSite] = []
+
     for row in rows:
         binding_site = _pocket_row_to_binding_site(row, member_id, coords_by_serial)
         if binding_site is not None:
@@ -202,29 +204,44 @@ def _pockets_to_binding_sites(
     return binding_sites
 
 
-def _detect_binding_sites(manifest: Manifest, member_id: str) -> list[BindingSite]:
+def _detect_binding_sites(
+    manifest: Manifest, member_id: str, ensemble_uri: str, bucket: Optional[str]
+) -> list[BindingSite]:
     logger.info("detecting sites for member: %s", member_id)
+
+    blob_storage_settings = get_blob_storage_settings() if bucket else None
+    fs = get_filesystem(blob_storage_settings)
 
     with tempfile.TemporaryDirectory(prefix="p2rank_") as _tmp:
         workdir = Path(_tmp)
-        local_input = _member_to_local_cif(manifest, member_id, workdir)
+        local_input = _member_to_local_cif(
+            manifest, member_id, workdir, fs, ensemble_uri
+        )
         predictions_csv = _run_p2rank(local_input, workdir)
         return _pockets_to_binding_sites(predictions_csv, local_input, member_id)
 
 
 def _detect_binding_sites_ensemble(
-    ensemble_path: Path, num_workers: int
+    ensemble_uri: str, num_workers: int, bucket: Optional[str], fs
 ) -> list[BindingSite]:
-    manifest = Manifest.load(str(ensemble_path / "manifest.json"))
-    member_ids = list(manifest.members)
+    manifest_uri = f"{ensemble_uri}/manifest.json"
 
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        local_manifest_path = Path(tmp_dir) / "manifest.json"
+        fs.get(manifest_uri, str(local_manifest_path))
+        manifest = Manifest.load(str(local_manifest_path))
+
+    member_ids = list(manifest.members)
     binding_sites: list[BindingSite] = []
 
     with ProcessPoolExecutor(max_workers=num_workers) as pool:
         futures = {
-            pool.submit(_detect_binding_sites, manifest, _member_id): _member_id
+            pool.submit(
+                _detect_binding_sites, manifest, _member_id, ensemble_uri, bucket
+            ): _member_id
             for _member_id in member_ids
         }
+
         for future in as_completed(futures):
             member_id = futures[future]
             try:
@@ -239,41 +256,40 @@ def _detect_binding_sites_ensemble(
     return binding_sites
 
 
-def _write_binding_sites(binding_sites: list[BindingSite], output_file: Path):
-    with open(output_file, "w") as _f:
+def _write_binding_sites(binding_sites: list[BindingSite], output_uri: str, fs):
+    with fs.open(output_uri, "w") as _f:
         json.dump([_b.to_dict() for _b in binding_sites], _f)
 
 
-def _parse_num_workers(value: str) -> int:
-    if value == "auto":
-        return os.cpu_count() or 1
-    n = int(value)
-    if n < 1:
-        raise click.BadParameter("workers must be >= 1")
-    return n
-
-
-@click.command(help=__doc__)
+@click.command()
+@click.option("--ensemble", type=str, required=True, help="Path to the input ensemble.")
+@click.option("--out", type=str, required=True, help="Path to the output JSON file.")
 @click.option(
-    "--ensemble",
-    required=True,
-    type=click.Path(exists=True, path_type=Path),
-    help="Protein conformational ensemble package directory.",
+    "--bucket", type=str, default="lynceus", help="S3-compatible bucket name."
 )
 @click.option(
-    "--out",
-    required=True,
-    type=click.Path(path_type=Path),
-    help="Output path for combined raw BindingSite JSON list.",
-)
-@click.option(
-    "--workers",
+    "--num-workers",
     default="auto",
+    type=NumWorkers(),
     show_default=True,
-    type=str,
-    callback=lambda ctx, param, value: _parse_num_workers(value),
-    help="Number of parallel p2rank workers, or 'auto' for os.cpu_count()",
+    help="Number of parallel workers (integer >= 1 or 'auto').",
 )
-def detect_binding_sites(ensemble: Path, out: Path, workers: int):
-    binding_sites: list[BindingSite] = _detect_binding_sites_ensemble(ensemble, workers)
-    _write_binding_sites(binding_sites, out)
+def detect_binding_sites(
+    ensemble: str,
+    out: str,
+    bucket: str,
+    num_workers: int,
+):
+    logger.info("detecting binding sites for %s", ensemble)
+
+    blob_storage_settings = get_blob_storage_settings() if bucket else None
+    fs = get_filesystem(blob_storage_settings)
+
+    ensemble_uri = f"s3://{bucket}/{ensemble}" if bucket else ensemble
+    out_uri = f"s3://{bucket}/{out}" if bucket else out
+
+    binding_sites = _detect_binding_sites_ensemble(
+        ensemble_uri, num_workers, bucket, fs
+    )
+
+    _write_binding_sites(binding_sites, out_uri, fs)

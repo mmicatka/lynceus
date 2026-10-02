@@ -1,4 +1,5 @@
-.venv/
-.ruff_cache/
-results/
-scratch/
+.venv
+.ruff_cache
+results
+scratch
+**/data

@@ -5,11 +5,13 @@ s3_endpoint: 192.168.1.4:3900
 s3_region: garage
 s3_url_style: path
 
+outdir: results
+
 candidates:
   bucket: lynceus
-  num_per_shard: 2000000
-  source_prefix: candidates/raw
-  parquet_prefix: candidates/parquet
+  initial_shard_size_bytes: 2GB
+  source_prefix: candidates/raw/smiles
+  parquet_prefix: candidates/raw/parquet
   sources:
     - H04
     - H05
@@ -36,37 +38,55 @@ candidates:
     - H26
     - H27
     - H28
-  target_total: 100000000
-  floor_per_source: 2000000
-  candidate_samples_prefix: candidates/sampled
-  shard_output_prefix: candidates/shards
-  conformers_output_prefix: candidates/conformers
-
-  filter_config:
-    pains:
-      enabled: true
-
-    cns_mpo:
-      enabled: true
-      min_score: 4.0
-
-surrogate:
-  train:
-    sample:
-      seed: 1000
-      num_samples: 250000
-      fields:
-        - name: morgan_fingerprint
-          kind: array
-          reduced_dims: 32
-        - name: molecular_weight
-          kind: scalar
-        - name: calculated_distribution_coefficient
-          kind: scalar
-        - name: topological_polar_surface_area
-          kind: scalar
+  target_total: 10000000
+  floor_per_source: 200000
+  num_shards: 64
+  allocation_path: candidates/10m/allocation.csv
+  candidate_samples_prefix: candidates/10m/sampled
+  shard_staging_prefix: candidates/10m/shards/staging
+  shard_output_prefix: candidates/10m/shards/merged
+  conformers_output_prefix: candidates/10m/conformers
 
 target:
-  ensemble_id: "T4_lysozyme_L99"
-  ensemble_path: "s3://lynceus/targets/protein_ensembles/T4_lysozyme_L99"
+  ensemble_prefix: targets/protein_ensembles
   bucket: lynceus
+  ensembles:
+    - T4_lysozyme_L99
+
+filter:
+  bucket: lynceus
+  features:
+    conformer_prefix: candidates/10m/conformers
+    feature_prefix: candidates/10m/features
+    feature_list:
+      - atom_pair
+      - autocorr
+      - descriptors
+      - ecfp
+      - functional_groups
+      - morse
+      - rdf
+      - topological_torsion
+      - usrcat
+      - whim
+  surrogate:
+    model_prefix: candidates/10m/models
+    # These are *almost* always the same as the features from the filter,
+    # but are technically a subset
+    feature_list:
+      - atom_pair
+      - autocorr
+      - descriptors
+      - ecfp
+      - functional_groups
+      - morse
+      - rdf
+      - topological_torsion
+      - usrcat
+      - whim
+    validation: 100000
+    rounds:
+      - active: 0 # first round has to be 0 "active"
+        uniform: 10000
+      - active: 5000
+        uniform: 5000

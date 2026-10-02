@@ -43,3 +43,7 @@ def get_filesystem(
         if blob_storage_settings
         else fsspec.filesystem("file")
     )
+
+
+def resolve_path(path: str, bucket: str) -> str:
+    return f"s3://{bucket}/{path}" if bucket else path

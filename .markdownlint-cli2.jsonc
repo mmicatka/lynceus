@@ -4,9 +4,7 @@
         "venv/",
         ".venv/",
         "env/",
-        ".env/",
-        ".agents/skills/dagster-expert/",
-        ".agents/skills/dignified-python/"
+        ".env/"
     ],
     "config": {
         "default": true,
