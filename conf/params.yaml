@@ -55,23 +55,38 @@ target:
 
 filter:
   bucket: lynceus
-  input_prefix: candidates/10m/conformers
-  output_prefix: candidates/10m/features
   features:
-    - atom_pair
-    - autocorr
-    - descriptors
-    - ecfp
-    - functional_groups
-    - morse
-    - rdf
-    - topological_torsion
-    - usrcat
-    - whim
+    conformer_prefix: candidates/10m/conformers
+    feature_prefix: candidates/10m/features
+    feature_list:
+      - atom_pair
+      - autocorr
+      - descriptors
+      - ecfp
+      - functional_groups
+      - morse
+      - rdf
+      - topological_torsion
+      - usrcat
+      - whim
   surrogate:
-    holdout: 100000
+    model_prefix: candidates/10m/models
+    # These are *almost* always the same as the features from the filter,
+    # but are technically a subset
+    feature_list:
+      - atom_pair
+      - autocorr
+      - descriptors
+      - ecfp
+      - functional_groups
+      - morse
+      - rdf
+      - topological_torsion
+      - usrcat
+      - whim
+    validation: 100000
     rounds:
-      - active: 0
-        uniform: 100000
-      - active: 50000
-        uniform: 50000
+      - active: 0 # first round has to be 0 "active"
+        uniform: 10000
+      - active: 5000
+        uniform: 5000
