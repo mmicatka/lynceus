@@ -11,7 +11,6 @@ workflow LYNCEUS {
 
   TARGETS(params.target)
   ch_target_done = TARGETS.out.done
-  ch_target_surfaces = TARGETS.out.surfaces
 
-  FILTER(params.filter, ch_candidate_done, ch_target_done, ch_target_surfaces)
+  FILTER(params.filter, ch_candidate_done, ch_target_done)
 }
