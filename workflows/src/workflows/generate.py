@@ -16,6 +16,7 @@ def build_echo_workflow() -> Workflow:
     with Workflow(
         generate_name="hera-example-",
         entrypoint="main-dag",
+        service_account_name="argo-workflow",
     ) as w:
         with DAG(name="main-dag"):
             task_a = echo(
