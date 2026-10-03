@@ -1,13 +1,5 @@
 .vscode/
 
-data/
-results/
-.nextflow.log*
-.nextflow/
-work/
-
-assets/.local
-
 **__pycache__**
 
 *.mdb

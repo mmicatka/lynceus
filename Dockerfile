@@ -1,3 +1,5 @@
+ARG DEV_BASE=base
+
 FROM ubuntu:24.04 AS base
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -13,13 +15,8 @@ RUN apt-get update && apt-get install -y \
     sudo \
     unzip \
     zip \
-    openjdk-25-jdk  \
     python3-dev \
     && rm -rf /var/lib/apt/lists/*
-
-RUN curl -s https://get.nextflow.io | bash \
-    && mv nextflow /usr/local/bin/ \
-    && chmod +x /usr/local/bin/nextflow
 
 FROM base AS base-gpu
 RUN apt-get update && apt-get install -y gnupg wget \
@@ -50,7 +47,9 @@ RUN curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey \
     && apt-get install -y nvidia-container-toolkit \
     && rm -rf /var/lib/apt/lists/*
 
-FROM base AS dev-cpu
+
+FROM ${DEV_BASE} AS dev
+
 ARG USERNAME=appuser
 ARG USER_UID=1000
 ARG USER_GID=1000
@@ -67,24 +66,5 @@ RUN apt-get update \
 USER ${USERNAME}
 RUN curl -LsSf https://astral.sh/uv/install.sh | bash
 
-WORKDIR /workspaces/lynceus
-RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
-
-FROM base-gpu AS dev-gpu
-ARG USERNAME=appuser
-ARG USER_UID=1000
-ARG USER_GID=1000
-
-RUN groupadd --gid ${USER_GID} ${USERNAME} || groupmod -n ${USERNAME} $(getent group ${USER_GID} | cut -d: -f1) \
-    && useradd --uid ${USER_UID} --gid ${USER_GID} -m ${USERNAME} || usermod -l ${USERNAME} -m -d /home/${USERNAME} $(getent passwd ${USER_UID} | cut -d: -f1) \
-    && echo "${USERNAME} ALL=(root) NOPASSWD:ALL" > /etc/sudoers.d/${USERNAME} \
-    && chmod 0440 /etc/sudoers.d/${USERNAME}
-
-RUN apt-get update \
-    && apt-get install -y tree graphviz zsh \
-    && rm -rf /var/lib/apt/lists/*
-
-USER ${USERNAME}
-RUN curl -LsSf https://astral.sh/uv/install.sh | bash
-WORKDIR /workspaces/lynceus
+WORKDIR /workspaces/app
 RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
