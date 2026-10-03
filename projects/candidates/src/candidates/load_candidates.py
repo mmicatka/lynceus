@@ -4,8 +4,8 @@ import sys
 
 import click
 import structlog
-from lynceus_utils.cli import NumWorkers
-from lynceus_utils.logging import wide_log
+from lynceus_core.cli import NumWorkers
+from lynceus_core.logging import wide_log
 
 
 def configure_logging():

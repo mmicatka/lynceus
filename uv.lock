@@ -20,6 +20,7 @@ members = [
     "docking-run",
     "generate-conformers",
     "generate-features",
+    "lynceus-core",
     "lynceus-dev",
     "lynceus-utils",
     "physiochemical-filter",
@@ -491,11 +492,15 @@ name = "candidates"
 version = "0.1.0"
 source = { editable = "projects/candidates" }
 dependencies = [
+    { name = "lynceus-core" },
     { name = "structlog" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "structlog", specifier = ">=26.1.0" }]
+requires-dist = [
+    { name = "lynceus-core", editable = "libs/lynceus-core" },
+    { name = "structlog", specifier = ">=26.1.0" },
+]
 
 [[package]]
 name = "certifi"
@@ -1947,6 +1952,23 @@ wheels = [
 ]
 
 [[package]]
+name = "lynceus-core"
+version = "0.1.0"
+source = { editable = "libs/lynceus-core" }
+dependencies = [
+    { name = "click" },
+    { name = "pydantic" },
+    { name = "structlog" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "click", specifier = ">=8.4.2" },
+    { name = "pydantic", specifier = ">=2.13.5" },
+    { name = "structlog", specifier = ">=26.1.0" },
+]
+
+[[package]]
 name = "lynceus-dev"
 version = "0.1.0"
 source = { virtual = "." }
@@ -1956,10 +1978,12 @@ dependencies = [
     { name = "docking-run" },
     { name = "generate-conformers" },
     { name = "generate-features" },
+    { name = "lynceus-core" },
     { name = "lynceus-utils" },
     { name = "physiochemical-filter" },
     { name = "rebalance-candidates" },
     { name = "surrogate-model" },
+    { name = "workflows" },
 ]
 
 [package.dev-dependencies]
@@ -1980,10 +2004,12 @@ requires-dist = [
     { name = "docking-run", editable = "modules/local/docking_run" },
     { name = "generate-conformers", editable = "modules/local/generate_conformers" },
     { name = "generate-features", editable = "modules/local/generate_features" },
+    { name = "lynceus-core", editable = "libs/lynceus-core" },
     { name = "lynceus-utils", editable = "libs/lynceus-utils" },
     { name = "physiochemical-filter", editable = "modules/local/physiochemical_filter" },
     { name = "rebalance-candidates", editable = "modules/local/rebalance_candidates" },
     { name = "surrogate-model", editable = "modules/local/surrogate_model" },
+    { name = "workflows", editable = "workflows" },
 ]
 
 [package.metadata.requires-dev]

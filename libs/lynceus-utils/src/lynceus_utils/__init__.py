@@ -1,7 +1,6 @@
 # libs/lynceus-utils/src/lynceus-utils/__init__.py
 
 from .duckdb import export_parquet, file_exists, get_connection
-from .logging import wide_log
 from .storage import (
     BlobStorageSettings,
     get_blob_storage_settings,
@@ -17,5 +16,4 @@ __all__ = [
     "get_connection",
     "BlobStorageSettings",
     "resolve_path",
-    "wide_log",
 ]

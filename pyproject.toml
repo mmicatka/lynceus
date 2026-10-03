@@ -8,6 +8,7 @@ requires-python = ">=3.12"
 
 dependencies = [
     # libs
+    "lynceus-core",
     "lynceus-utils",
     "candidates",
     # utils
@@ -18,12 +19,14 @@ dependencies = [
     "rebalance-candidates",
     "generate-conformers",
     "generate-features",
+    "workflows",
 ]
 
 [tool.uv.workspace]
 members = [
     # libs
     "libs/lynceus-utils",
+    "libs/lynceus-core",
     # projects
     "projects/candidates",
     "modules/local/detect_binding_sites",
@@ -48,6 +51,8 @@ surrogate-model = { workspace = true }
 rebalance-candidates = { workspace = true }
 generate-conformers = { workspace = true }
 generate-features = { workspace = true }
+workflows = { workspace = true }
+lynceus-core = { workspace = true }
 
 [dependency-groups]
 dev = [

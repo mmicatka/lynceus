@@ -1,2 +1,5 @@
-def main() -> None:
-    print("Hello from workflows!")
+# workflows/src/worksflows/__init__.py
+
+from .generate import generate
+
+__all__ = ["generate"]
