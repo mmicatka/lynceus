@@ -63,6 +63,13 @@ RUN apt-get update \
     && apt-get install -y tree graphviz zsh \
     && rm -rf /var/lib/apt/lists/*
 
+ARG ARGO_VERSION="v4.1.4"
+RUN TARGETARCH=$(dpkg --print-architecture) \
+    && curl -sSfLO "https://github.com/argoproj/argo-workflows/releases/download/${ARGO_VERSION}/argo-linux-${TARGETARCH}.gz" \
+    && gunzip "argo-linux-${TARGETARCH}.gz" \
+    && chmod +x "argo-linux-${TARGETARCH}" \
+    && mv "argo-linux-${TARGETARCH}" /usr/local/bin/argo
+
 USER ${USERNAME}
 RUN curl -LsSf https://astral.sh/uv/install.sh | bash
 

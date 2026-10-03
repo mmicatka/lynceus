@@ -24,7 +24,6 @@ dependencies = [
 members = [
     # libs
     "libs/lynceus-utils",
-
     # projects
     "projects/candidates",
     "modules/local/detect_binding_sites",
@@ -35,6 +34,7 @@ members = [
     "modules/local/generate_conformers",
     "modules/local/generate_features",
     "projects/candidates",
+    "workflows",
 ]
 
 [tool.uv.sources]
