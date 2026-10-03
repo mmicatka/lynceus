@@ -2,7 +2,7 @@
   "name": "lynceus-cpu",
   "build": {
     "dockerfile": "../../Dockerfile",
-    "target": "dev-cpu"
+    "target": "dev"
   },
   "features": {
     "ghcr.io/devcontainers/features/kubectl-helm-minikube:1": {}

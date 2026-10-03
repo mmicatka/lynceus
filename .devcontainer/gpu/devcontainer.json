@@ -2,11 +2,12 @@
   "name": "lynceus-gpu",
   "build": {
     "dockerfile": "../../Dockerfile",
-    "target": "dev-gpu"
+    "target": "dev",
+    "args": {
+      "DEV_BASE": "base-gpu"
+    }
   },
-  "runArgs": [
-    "--gpus=all"
-  ],
+  "runArgs": ["--gpus=all"],
   "features": {
     "ghcr.io/devcontainers/features/kubectl-helm-minikube:1": {}
   },
