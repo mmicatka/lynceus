@@ -1,58 +1,38 @@
 # workflows/src/workflows/pipelines/__init__.py
 
-from hera.workflows import DAG, Parameter, Workflow, script
+import os
 
-from workflows.utils.artifact import ArtifactSpec
+from hera.workflows import DAG, Workflow, script
 
-WORKFLOW_NAMESPACE = "workflows"
-
-SMOKE_MESSAGE = ArtifactSpec(
-    name="smoke-message",
-    path="/tmp/artifacts/smoke_message.txt",
-)
+from workflows.utils import LYNCEUS_VOLUME
 
 
-@script(outputs=SMOKE_MESSAGE.output())
-def write_message(message: str, output_path: str):
-    from pathlib import Path
-
+@script(volumes=[LYNCEUS_VOLUME])
+def echo(message: str, mount_path: str = ""):
     print(message)
 
-    path = Path(output_path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(f"Latest message: {message}\n")
-
-
-@script(inputs=SMOKE_MESSAGE.input())
-def read_message(input_path: str):
-    from pathlib import Path
-
-    print(Path(input_path).read_text())
+    if mount_path:
+        test_file = os.path.join(mount_path, "hera_smoke_test.txt")
+        with open(test_file, "w") as f:
+            f.write(f"Latest message: {message}\n")
 
 
 def build_smoke_test_workflow() -> Workflow:
     """Builds and returns the smoke test workflow."""
     with Workflow(
         generate_name="hera-example-",
-        namespace=WORKFLOW_NAMESPACE,
         entrypoint="main-dag",
         service_account_name="argo-workflow",
     ) as w:
         with DAG(name="main-dag"):
-            task_a = write_message(
+            task_a = echo(
                 name="task-a",
                 arguments={
                     "message": "Starting the workflow...",
-                    "output_path": SMOKE_MESSAGE.path,
+                    "mount_path": LYNCEUS_VOLUME.mount_path,
                 },
             )
-            task_b = read_message(
-                name="task-b",
-                arguments=[
-                    Parameter(name="input_path", value=SMOKE_MESSAGE.path),
-                    task_a.get_artifact(SMOKE_MESSAGE.name),
-                ],
-            )
+            task_b = echo(name="task-b", arguments={"message": "Workflow complete!"})
 
             task_a >> task_b  # type: ignore
     return w

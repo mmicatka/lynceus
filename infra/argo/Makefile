@@ -25,7 +25,8 @@ bootstrap:
 	./scripts/bootstrap.sh
 
 rbac:
-	kubectl apply -f resources/rbac.yaml
+	sed -e 's|REPLACE_ME_NAMESPACE|$(WORKFLOW_NAMESPACE)|g' \
+		resources/rbac.yaml | kubectl apply -f -
 
 require-region:
 	@test -n "$(S3_REGION)" || { echo 'S3_REGION is not set in .env' >&2; exit 1; }
