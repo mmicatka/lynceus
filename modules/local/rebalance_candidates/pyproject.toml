@@ -15,7 +15,6 @@ dependencies = [
 ]
 
 [project.scripts]
-load-candidates = "rebalance_candidates:load_candidates"
 merge-candidate-counts = "rebalance_candidates:merge_candidate_counts"
 allocate-candidate-samples = "rebalance_candidates:allocate_candidate_samples"
 sample-candidates = "rebalance_candidates:sample_candidates"

@@ -8,7 +8,9 @@ requires-python = ">=3.12"
 
 dependencies = [
     # libs
+    "lynceus-core",
     "lynceus-utils",
+    "candidates",
     # utils
     "detect-binding-sites",
     "physiochemical-filter",
@@ -17,13 +19,16 @@ dependencies = [
     "rebalance-candidates",
     "generate-conformers",
     "generate-features",
+    "workflows",
 ]
 
 [tool.uv.workspace]
 members = [
     # libs
     "libs/lynceus-utils",
-    # utils
+    "libs/lynceus-core",
+    # projects
+    "projects/candidates",
     "modules/local/detect_binding_sites",
     "modules/local/physiochemical_filter",
     "modules/local/docking_run",
@@ -31,10 +36,13 @@ members = [
     "modules/local/rebalance_candidates",
     "modules/local/generate_conformers",
     "modules/local/generate_features",
+    "projects/candidates",
+    "workflows",
 ]
 
 [tool.uv.sources]
 
+candidates = { workspace = true }
 physiochemical-filter = { workspace = true }
 detect-binding-sites = { workspace = true }
 lynceus-utils = { workspace = true }
@@ -43,6 +51,8 @@ surrogate-model = { workspace = true }
 rebalance-candidates = { workspace = true }
 generate-conformers = { workspace = true }
 generate-features = { workspace = true }
+workflows = { workspace = true }
+lynceus-core = { workspace = true }
 
 [dependency-groups]
 dev = [

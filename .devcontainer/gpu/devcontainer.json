@@ -2,13 +2,13 @@
   "name": "lynceus-gpu",
   "build": {
     "dockerfile": "../../Dockerfile",
-    "target": "dev-gpu"
+    "target": "dev",
+    "args": {
+      "DEV_BASE": "base-gpu"
+    }
   },
-  "runArgs": [
-    "--gpus=all"
-  ],
+  "runArgs": ["--gpus=all"],
   "features": {
-    "ghcr.io/devcontainers/features/docker-in-docker:4": {},
     "ghcr.io/devcontainers/features/kubectl-helm-minikube:1": {}
   },
   "customizations": {
@@ -22,7 +22,6 @@
         "ms-python.python",
         "ms-toolsai.datawrangler",
         "ms-toolsai.jupyter",
-        "nextflow.nextflow",
         "redhat.vscode-yaml",
         "tamasfe.even-better-toml"
       ],
@@ -47,7 +46,6 @@
     }
   },
   "mounts": [
-    "source=${localWorkspaceFolder}/results,target=/workspaces/lynceus/results,type=bind",
     "source=${localEnv:HOME}${localEnv:USERPROFILE}/.kube,target=/home/appuser/.kube,type=bind"
   ],
   "remoteUser": "appuser"

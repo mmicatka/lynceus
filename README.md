@@ -5,7 +5,7 @@
 > [!WARNING]
 > **Active Development / Work in Progress**
 > This project is currently in early-stage development (**Alpha**). Features and APIs are unstable and subject to breaking changes without notice. **Not suitable for production use yet.**
-git status
+> Major refactor in progress
 
 ## Overview
 
@@ -21,7 +21,7 @@ Lynceus is built around the premise that **conformational state is itself the de
 
 ## Architecture
 
-A single run carries one target ensemble. Ensemble members fan out for binding-site detection, which runs once per member (internal parallelism is handled in Python, not at the Nextflow level, since it isn't computationally expensive enough to warrant per-member tasks). Per-member sites are then deduplicated into a distinct set of physical binding sites, each carrying a site identifier and the member(s) it was found in. From that point forward, every stage - surrogate training, the eventual full-library filter pass, and docking - runs once per deduplicated binding site as an independent fan-out, not once per run.
+A single run carries one target ensemble. Ensemble members fan out for binding-site detection, which runs once per member (internal parallelism is handled in Python, since it isn't computationally expensive enough to warrant per-member tasks). Per-member sites are then deduplicated into a distinct set of physical binding sites, each carrying a site identifier and the member(s) it was found in. From that point forward, every stage - surrogate training, the eventual full-library filter pass, and docking - runs once per deduplicated binding site as an independent fan-out, not once per run.
 
 ```mermaid
 
@@ -74,4 +74,16 @@ flowchart TD
     ComplexGeneration --> Complexes@{shape: st-rect, label: "Complexes"}
   end
 
+```
+
+## Development Environment
+
+To test these workflows, you need an existing Kubernetes cluster (like k3s, minikube, or kind) with Argo Workflows installed.
+
+If you don't have Argo set up yet, you can use the included helper script:
+
+```bash
+cd scripts/setup-argo
+cp .env.example .env
+make all
 ```

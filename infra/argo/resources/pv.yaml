@@ -1,0 +1,23 @@
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: lynceus-bucket-pv
+spec:
+  accessModes:
+    - ReadWriteMany
+  capacity:
+    storage: 1000Gi
+  storageClassName: ""
+  claimRef:
+    namespace: workflows
+    name: lynceus-bucket-pvc
+  mountOptions:
+    - endpoint-url REPLACE_ME_S3_ENDPOINT_URL
+    - region REPLACE_ME_S3_REGION
+    - force-path-style
+  csi:
+    driver: s3.csi.aws.com
+    volumeHandle: lynceus-bucket-pv
+    volumeAttributes:
+      bucketName: REPLACE_ME_S3_BUCKET

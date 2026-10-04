@@ -1,73 +1,50 @@
-# Lynceus pipeline
-#
-# Each `run-<env>` target wraps `nextflow run main.nf -params-file conf/examples/<env>.yaml`
+# Makefile
 
-# --- Configuration Variables ---
 REGISTRY ?= registry.nebula.lan:5000
-NAMESPACE ?= lynceus
+IMAGE_PREFIX := $(REGISTRY)/lynceus
+
+NAMESPACE ?= workflows
 VERSION ?= 0.1.0
-IMAGE_PREFIX := $(REGISTRY)/$(NAMESPACE)
-K8S_NAMESPACE ?= lynceus
-NF_DRIVER_DEPLOYMENT ?= nf-driver
 
-.PHONY: build push build-* run-dev run-k8s driver-exec driver-restart clean reset lint
 
-build: build-generate-conformers build-generate-features build-surrogate-model build-rebalance-candidates build-detect-binding-sites build-docking-run-gpu build-nf-driver
+WORKFLOWS ?= echo
+OUT_DIR ?= workflows/manifests
 
-build-generate-conformers:
-	docker buildx build --platform linux/amd64,linux/arm64 --push -f modules/local/generate_conformers/Dockerfile -t $(IMAGE_PREFIX)/generate-conformers:$(VERSION) .
+.PHONY: build push build-* clean lint lint-python lint-argo generate generate-workflows submit run logs
 
-build-generate-features:
-	docker buildx build --platform linux/amd64,linux/arm64 --push -f modules/local/generate_features/Dockerfile -t $(IMAGE_PREFIX)/generate-features:$(VERSION) .
+build-candidates:
+	docker buildx build --platform linux/amd64,linux/arm64 --push -f projects/candidates/Dockerfile -t $(IMAGE_PREFIX)/candidates:$(VERSION) .
 
-build-surrogate-model:
-	docker buildx build --platform linux/amd64,linux/arm64 --push -f modules/local/surrogate_model/Dockerfile -t $(IMAGE_PREFIX)/surrogate-model:$(VERSION) .
+setup-argo:
+	$(MAKE) -C infra/argo all WORKFLOW_NAMESPACE=$(NAMESPACE)
 
-build-physiochemical-filter:
-	docker buildx build --platform linux/amd64,linux/arm64 --push -f modules/local/physiochemical_filter/Dockerfile -t $(IMAGE_PREFIX)/physiochemical-filter:$(VERSION) .
+generate-workflows:
+	@echo "Generating workflows: $(WORKFLOWS)..."
+	generate-workflows $(foreach wf,$(WORKFLOWS),-w $(wf)) -o $(OUT_DIR)
 
-build-rebalance-candidates:
-	docker buildx build --platform linux/amd64,linux/arm64 --push -f modules/local/rebalance_candidates/Dockerfile -t $(IMAGE_PREFIX)/rebalance-candidates:$(VERSION) .
+# Alias to satisfy the lint-argo dependency
+generate: generate-workflows
 
-build-detect-binding-sites:
-	docker buildx build --platform linux/amd64,linux/arm64 --push -f modules/local/detect_binding_sites/Dockerfile -t $(IMAGE_PREFIX)/detect-binding-sites:$(VERSION) .
+lint-argo: generate
+	@echo "Linting generated manifests..."
+	@for wf in $(WORKFLOWS); do \
+		argo lint $(OUT_DIR)/$$wf.yaml; \
+	done
 
-build-docking-run-gpu:
-	docker buildx build --platform linux/amd64 --push --target gpu -f modules/local/docking_run/Dockerfile -t $(IMAGE_PREFIX)/docking-run:gpu-$(VERSION) .
+lint-python:
+	ruff check --fix .
 
-build-nf-driver:
-	docker buildx build --platform linux/amd64 --push -f driver.Dockerfile -t $(IMAGE_PREFIX)/nf-driver:$(VERSION) .
+lint-yaml:
+	yamllint .
 
-# --- Utilities ---
-# Dev environment: loads conf/examples/dev.yaml
-run-dev:
-	nextflow run main.nf -resume -params-file conf/examples/dev.yaml
+lint: lint-python lint-argo lint-yaml
 
-run-k8s-local:
-	nextflow run main.nf -resume -profile k8s-onprem -params-file conf/params.yaml
-
-# k8s-onprem environment: runs in-cluster via the nf-driver pod
-run-k8s:
-	kubectl exec -it deploy/$(NF_DRIVER_DEPLOYMENT) -n $(K8S_NAMESPACE) -- \
-		bash -c "cd /app/lynceus && nextflow run main.nf -profile k8s-onprem -resume"
-
-# Drop into a shell on the driver pod
-driver-exec:
-	kubectl exec -it deploy/$(NF_DRIVER_DEPLOYMENT) -n $(K8S_NAMESPACE) -- bash
-
-# Force a fresh pull of the latest nf-driver image (after build-nf-driver + push)
-driver-restart:
-	kubectl rollout restart deployment/$(NF_DRIVER_DEPLOYMENT) -n $(K8S_NAMESPACE)
-	kubectl rollout status deployment/$(NF_DRIVER_DEPLOYMENT) -n $(K8S_NAMESPACE)
+submit: generate
+	@echo "Submitting workflows: $(WORKFLOWS) to namespace $(NAMESPACE)..."
+	@for wf in $(WORKFLOWS); do \
+		argo submit -n $(NAMESPACE) $(OUT_DIR)/$$wf.yaml; \
+	done
 
 clean:
-	rm -rf work/
-	rm -rf .nextflow*
-	rm -f nextflow.log*
-	rm -rf null/
-
-reset: clean
-	rm -rf results/*
-
-lint:
-	ruff check --fix .
+	rm -f $(OUT_DIR)/*.yaml
+	@echo "Cleaned up generated YAML files."
