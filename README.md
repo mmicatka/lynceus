@@ -5,7 +5,7 @@
 > [!WARNING]
 > **Active Development / Work in Progress**
 > This project is currently in early-stage development (**Alpha**). Features and APIs are unstable and subject to breaking changes without notice. **Not suitable for production use yet.**
-git status
+> Major refactor in progress
 
 ## Overview
 
