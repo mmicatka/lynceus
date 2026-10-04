@@ -1,14 +1,12 @@
 # Lynceus pipeline
 
 REGISTRY ?= registry.nebula.lan:5000
-NAMESPACE ?= lynceus
+NAMESPACE ?= argo
 VERSION ?= 0.1.0
 IMAGE_PREFIX := $(REGISTRY)/$(NAMESPACE)
 
 WORKFLOWS ?= echo
 OUT_DIR ?= workflows/manifests
-
-CLI_ARGS = $(foreach wf,$(WORKFLOWS),-w $(wf))
 
 .PHONY: build push build-* clean lint lint-python lint-argo generate submit run logs
 
@@ -18,7 +16,7 @@ build-candidates:
 
 generate-workflows:
 	@echo "Generating workflows: $(WORKFLOWS)..."
-	generate-workflows $(CLI_ARGS) -o $(OUT_DIR)
+	generate-workflows $(foreach wf,$(WORKFLOWS),-w $(wf)) -o $(OUT_DIR)
 
 lint-argo: generate
 	@echo "Linting generated manifests..."
