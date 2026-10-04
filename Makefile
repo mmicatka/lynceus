@@ -5,25 +5,43 @@ NAMESPACE ?= lynceus
 VERSION ?= 0.1.0
 IMAGE_PREFIX := $(REGISTRY)/$(NAMESPACE)
 
-.PHONY: build push build-* clean reset lint
+WORKFLOWS ?= echo
+OUT_DIR ?= .
 
-build-generate-conformers:
-	docker buildx build --platform linux/amd64,linux/arm64 --push -f modules/local/generate_conformers/Dockerfile -t $(IMAGE_PREFIX)/generate-conformers:$(VERSION) .
+CLI_ARGS = $(foreach wf,$(WORKFLOWS),-w $(wf))
 
-build-generate-features:
-	docker buildx build --platform linux/amd64,linux/arm64 --push -f modules/local/generate_features/Dockerfile -t $(IMAGE_PREFIX)/generate-features:$(VERSION) .
+.PHONY: build push build-* clean lint lint-python lint-argo generate submit run logs
 
-build-surrogate-model:
-	docker buildx build --platform linux/amd64,linux/arm64 --push -f modules/local/surrogate_model/Dockerfile -t $(IMAGE_PREFIX)/surrogate-model:$(VERSION) .
+build-candidates:
+	docker buildx build --platform linux/amd64,linux/arm64 --push -f projects/candidates/Dockerfile -t $(IMAGE_PREFIX)/candidates:$(VERSION) .
 
-build-rebalance-candidates:
-	docker buildx build --platform linux/amd64,linux/arm64 --push -f modules/local/rebalance_candidates/Dockerfile -t $(IMAGE_PREFIX)/rebalance-candidates:$(VERSION) .
 
-build-detect-binding-sites:
-	docker buildx build --platform linux/amd64,linux/arm64 --push -f modules/local/detect_binding_sites/Dockerfile -t $(IMAGE_PREFIX)/detect-binding-sites:$(VERSION) .
+generate-workflows:
+	@echo "Generating workflows: $(WORKFLOWS)..."
+	generate-workflows $(CLI_ARGS) -o $(OUT_DIR)
 
-build-docking-run:
-	docker buildx build --platform linux/amd64,linux/arm64 --push -f modules/local/docking_run/Dockerfile -t $(IMAGE_PREFIX)/docking-run:$(VERSION) .
+lint-argo: generate
+	@echo "Linting generated manifests..."
+	@for wf in $(WORKFLOWS); do \
+		argo lint $(OUT_DIR)/$$wf.yaml; \
+	done
 
-lint:
+submit: lint-argo
+	@echo "Submitting workflows to namespace $(NAMESPACE)..."
+	@for wf in $(WORKFLOWS); do \
+		argo submit $(OUT_DIR)/$$wf.yaml -n $(NAMESPACE); \
+	done
+
+run: submit
+
+logs:
+	argo logs @latest -n $(NAMESPACE)
+
+lint-python:
 	ruff check --fix .
+
+lint: lint-python lint-argo
+
+clean:
+	rm -f $(OUT_DIR)/*.yaml
+	@echo "Cleaned up generated YAML files."
