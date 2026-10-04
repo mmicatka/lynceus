@@ -6,7 +6,7 @@ VERSION ?= 0.1.0
 IMAGE_PREFIX := $(REGISTRY)/$(NAMESPACE)
 
 WORKFLOWS ?= echo
-OUT_DIR ?= .
+OUT_DIR ?= workflows/manifests
 
 CLI_ARGS = $(foreach wf,$(WORKFLOWS),-w $(wf))
 
@@ -39,6 +39,9 @@ logs:
 
 lint-python:
 	ruff check --fix .
+
+lint-yaml:
+	yamllint .
 
 lint: lint-python lint-argo
 

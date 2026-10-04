@@ -3,35 +3,8 @@
 import os
 
 import click
-from hera.workflows import DAG, Workflow, script
 
-
-@script()
-def echo(message: str):
-    print(message)
-
-
-def build_echo_workflow() -> Workflow:
-    """Builds and returns the echo workflow."""
-    with Workflow(
-        generate_name="hera-example-",
-        entrypoint="main-dag",
-        service_account_name="argo-workflow",
-    ) as w:
-        with DAG(name="main-dag"):
-            task_a = echo(
-                name="task-a", arguments={"message": "Starting the workflow..."}
-            )
-            task_b = echo(name="task-b", arguments={"message": "Workflow complete!"})
-
-            task_a >> task_b  # type: ignore
-    return w
-
-
-WORKFLOW_REGISTRY = {
-    "echo": build_echo_workflow,
-    # "data-pipeline": build_data_pipeline_workflow,
-}
+from workflows.registry import WORKFLOW_REGISTRY
 
 
 @click.command()
@@ -63,6 +36,10 @@ def generate(workflows, out_dir):
         file_path = os.path.join(out_dir, f"{wf_name}.yaml")
 
         with open(file_path, "w") as f:
-            f.write(workflow_obj.to_yaml())
+            f.write(
+                workflow_obj.to_yaml(
+                    explicit_start=True,
+                )
+            )
 
         click.secho(f"Successfully generated: {file_path}", fg="green")
