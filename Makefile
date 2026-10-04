@@ -13,7 +13,6 @@ OUT_DIR ?= workflows/manifests
 build-candidates:
 	docker buildx build --platform linux/amd64,linux/arm64 --push -f projects/candidates/Dockerfile -t $(IMAGE_PREFIX)/candidates:$(VERSION) .
 
-
 generate-workflows:
 	@echo "Generating workflows: $(WORKFLOWS)..."
 	generate-workflows $(foreach wf,$(WORKFLOWS),-w $(wf)) -o $(OUT_DIR)
