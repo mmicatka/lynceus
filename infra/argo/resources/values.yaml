@@ -1,0 +1,22 @@
+---
+server:
+  ingress:
+    enabled: true
+    ingressClassName: traefik
+  authModes:
+    - server
+
+controller:
+  workflowDefaults:
+    spec:
+      serviceAccountName: argo-workflow
+
+useDefaultArtifactRepo: true
+artifactRepository:
+  s3:
+    accessKeySecret:
+      name: argo-artifacts-s3
+      key: accessKey
+    secretKeySecret:
+      name: argo-artifacts-s3
+      key: secretKey

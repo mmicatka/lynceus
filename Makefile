@@ -1,7 +1,7 @@
 # Lynceus pipeline
 
 REGISTRY ?= registry.nebula.lan:5000
-NAMESPACE ?= argo
+NAMESPACE ?= lynceus
 VERSION ?= 0.1.0
 IMAGE_PREFIX := $(REGISTRY)/$(NAMESPACE)
 
@@ -13,6 +13,9 @@ OUT_DIR ?= workflows/manifests
 build-candidates:
 	docker buildx build --platform linux/amd64,linux/arm64 --push -f projects/candidates/Dockerfile -t $(IMAGE_PREFIX)/candidates:$(VERSION) .
 
+setup-argo:
+	$(MAKE) -C infra/argo all
+
 generate-workflows:
 	@echo "Generating workflows: $(WORKFLOWS)..."
 	generate-workflows $(foreach wf,$(WORKFLOWS),-w $(wf)) -o $(OUT_DIR)
@@ -22,17 +25,6 @@ lint-argo: generate
 	@for wf in $(WORKFLOWS); do \
 		argo lint $(OUT_DIR)/$$wf.yaml; \
 	done
-
-submit: lint-argo
-	@echo "Submitting workflows to namespace $(NAMESPACE)..."
-	@for wf in $(WORKFLOWS); do \
-		argo submit $(OUT_DIR)/$$wf.yaml -n $(NAMESPACE); \
-	done
-
-run: submit
-
-logs:
-	argo logs @latest -n $(NAMESPACE)
 
 lint-python:
 	ruff check --fix .

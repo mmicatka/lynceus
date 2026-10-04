@@ -75,3 +75,15 @@ flowchart TD
   end
 
 ```
+
+## Development Environment
+
+To test these workflows, you need an existing Kubernetes cluster (like k3s, minikube, or kind) with Argo Workflows installed.
+
+If you don't have Argo set up yet, you can use the included helper script:
+
+```bash
+cd scripts/setup-argo
+cp .env.example .env
+make all
+```
