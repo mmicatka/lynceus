@@ -43,7 +43,7 @@ lint-python:
 lint-yaml:
 	yamllint .
 
-lint: lint-python lint-argo
+lint: lint-python lint-argo lint-yaml
 
 clean:
 	rm -f $(OUT_DIR)/*.yaml

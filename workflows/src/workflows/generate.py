@@ -1,8 +1,10 @@
 # workflows/src/worksflows/generate_workflow.py
 
 import os
+import warnings
 
 import click
+from yamlfix import fix_files
 
 from workflows.registry import WORKFLOW_REGISTRY
 
@@ -25,21 +27,23 @@ from workflows.registry import WORKFLOW_REGISTRY
     help="Directory to save the generated YAML files.",
 )
 def generate(workflows, out_dir):
-    """Generate Argo YAML manifests from Hera Python definitions."""
     os.makedirs(out_dir, exist_ok=True)
+    generated_files = []
 
     for wf_name in workflows:
         click.echo(f"Building workflow: {wf_name}...")
 
         workflow_obj = WORKFLOW_REGISTRY[wf_name]()
-
         file_path = os.path.join(out_dir, f"{wf_name}.yaml")
 
         with open(file_path, "w") as f:
-            f.write(
-                workflow_obj.to_yaml(
-                    explicit_start=True,
-                )
-            )
+            f.write(workflow_obj.to_yaml())
 
-        click.secho(f"Successfully generated: {file_path}", fg="green")
+        generated_files.append(file_path)
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        fix_files(generated_files)
+
+    for file_path in generated_files:
+        click.secho(f"Successfully generated and formatted: {file_path}", fg="green")
