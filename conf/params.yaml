@@ -1,0 +1,85 @@
+---
+# conf/params.yaml
+
+candidates:
+  initial_shard_size_bytes: 2GB
+  source_prefix: candidates/raw/smiles
+  parquet_prefix: candidates/raw/parquet
+  sources:
+    - H04
+    - H05
+    - H06
+    - H07
+    - H08
+    - H09
+    - H10
+    - H11
+    - H12
+    - H13
+    - H14
+    - H15
+    - H16
+    - H17
+    - H18
+    - H19
+    - H20
+    - H21
+    - H22
+    - H23
+    - H24
+    - H25
+    - H26
+    - H27
+    - H28
+  target_total: 10000000
+  floor_per_source: 200000
+  num_shards: 64
+  allocation_path: candidates/10m/allocation.csv
+  candidate_samples_prefix: candidates/10m/sampled
+  shard_staging_prefix: candidates/10m/shards/staging
+  shard_output_prefix: candidates/10m/shards/merged
+  conformers_output_prefix: candidates/10m/conformers
+
+target:
+  ensemble_prefix: targets/protein_ensembles
+  bucket: lynceus
+  ensembles:
+    - T4_lysozyme_L99
+
+filter:
+  bucket: lynceus
+  features:
+    conformer_prefix: candidates/10m/conformers
+    feature_prefix: candidates/10m/features
+    feature_list:
+      - atom_pair
+      - autocorr
+      - descriptors
+      - ecfp
+      - functional_groups
+      - morse
+      - rdf
+      - topological_torsion
+      - usrcat
+      - whim
+  surrogate:
+    model_prefix: candidates/10m/models
+    # These are *almost* always the same as the features from the filter,
+    # but are technically a subset
+    feature_list:
+      - atom_pair
+      - autocorr
+      - descriptors
+      - ecfp
+      - functional_groups
+      - morse
+      - rdf
+      - topological_torsion
+      - usrcat
+      - whim
+    validation: 100000
+    rounds:
+      - active: 0 # first round has to be 0 "active"
+        uniform: 10000
+      - active: 5000
+        uniform: 5000

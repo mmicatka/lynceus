@@ -4232,12 +4232,14 @@ version = "0.1.0"
 source = { editable = "workflows" }
 dependencies = [
     { name = "hera", extra = ["yaml"] },
+    { name = "pydantic" },
     { name = "yamlfix" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "hera", extras = ["yaml"], specifier = ">=7.1.0" },
+    { name = "pydantic", specifier = ">=2.13.5" },
     { name = "yamlfix", specifier = ">=1.19.1" },
 ]
 

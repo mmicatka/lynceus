@@ -1,0 +1,11 @@
+---
+storage:
+  bucket: lynceus
+
+stages:
+  load_candidates:
+    cpu: "4"
+    memory: 4Gi
+    max_parallel: 5
+    chunk_size: 32MiB
+    batch_rows: 100000

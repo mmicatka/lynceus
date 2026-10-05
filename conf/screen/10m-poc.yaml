@@ -1,0 +1,61 @@
+---
+name: 10m-poc
+
+candidates:
+  source_prefix: candidates/raw/smiles
+  parquet_prefix: candidates/raw/parquet
+  sources:
+    [
+      H04,
+      H05,
+      H06,
+      H07,
+      H08,
+      H09,
+      H10,
+      H11,
+      H12,
+      H13,
+      H14,
+      H15,
+      H16,
+      H17,
+      H18,
+      H19,
+      H20,
+      H21,
+      H22,
+      H23,
+      H24,
+      H25,
+      H26,
+      H27,
+      H28,
+    ]
+  # target_total: 10000000
+  # floor_per_source: 200000
+  # num_shards: 64
+  initial_shard_size: 2GB
+
+# target:
+#   ensemble_prefix: targets/protein_ensembles
+#   ensembles:
+#     - T4_lysozyme_L99
+
+# filter:
+#   features:
+#     - atom_pair
+#     - autocorr
+#     - descriptors
+#     - ecfp
+#     - functional_groups
+#     - morse
+#     - rdf
+#     - topological_torsion
+#     - usrcat
+#     - whim
+#   surrogate:
+#     validation: 100000
+#     rounds:
+#       - { active: 0, uniform: 10000 }
+#       - { active: 5000, uniform: 5000 }
