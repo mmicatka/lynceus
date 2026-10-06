@@ -1,0 +1,9 @@
+---
+storage:
+  bucket: lynceus
+
+templates:
+  load_candidates:
+    cpu: "4"
+    memory: 4Gi
+    max_parallel: 5

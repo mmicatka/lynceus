@@ -1,4 +1,4 @@
-# workflows/src/workflows/utils/__init__.py
+# workflows/src/workflows/resources/__init__.py
 
 from .artifact import ArtifactSpec
 from .volumes import LYNCEUS_VOLUME

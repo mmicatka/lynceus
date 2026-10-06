@@ -13,9 +13,16 @@ spec:
     namespace: workflows
     name: lynceus-bucket-pvc
   mountOptions:
-    - endpoint-url REPLACE_ME_S3_ENDPOINT_URL
-    - region REPLACE_ME_S3_REGION
+    - endpoint-url=REPLACE_ME_S3_ENDPOINT_URL
+    - region=REPLACE_ME_S3_REGION
     - force-path-style
+    - allow-delete
+    - allow-overwrite
+    - allow-other
+    - uid=1000
+    - gid=1000
+    - file-mode=0664
+    - dir-mode=0775
   csi:
     driver: s3.csi.aws.com
     volumeHandle: lynceus-bucket-pv

@@ -3,11 +3,14 @@
 REGISTRY ?= registry.nebula.lan:5000
 IMAGE_PREFIX := $(REGISTRY)/lynceus
 
+SCREEN_CONFIG ?= conf/screen/10m-poc.yaml
+INFRA_CONFIG ?= conf/infra/dev.yaml
+
 NAMESPACE ?= workflows
 VERSION ?= 0.1.0
 
 
-WORKFLOWS ?= echo
+WORKFLOWS ?= echo candidates-workflow
 OUT_DIR ?= workflows/manifests
 
 .PHONY: build push build-* clean lint lint-python lint-argo generate generate-workflows submit run logs
@@ -20,9 +23,12 @@ setup-argo:
 
 generate-workflows:
 	@echo "Generating workflows: $(WORKFLOWS)..."
-	generate-workflows $(foreach wf,$(WORKFLOWS),-w $(wf)) -o $(OUT_DIR)
+	generate-workflows \
+		$(foreach wf,$(WORKFLOWS),-w $(wf)) \
+		-o $(OUT_DIR) \
+		-s $(SCREEN_CONFIG) \
+		-i $(INFRA_CONFIG)
 
-# Alias to satisfy the lint-argo dependency
 generate: generate-workflows
 
 lint-argo: generate
