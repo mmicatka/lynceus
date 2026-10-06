@@ -6,6 +6,7 @@ authors = [{ name = "Mike Micatka", email = "mike.micatka@gmail.com" }]
 requires-python = ">=3.14"
 dependencies = [
     "click>=8.4.2",
+    "duckdb>=1.5.4",
     "lynceus-core",
     "pyarrow>=24.0.0",
     "structlog>=26.1.0",
@@ -13,7 +14,7 @@ dependencies = [
 
 [project.scripts]
 load-candidates = "candidates:load_candidates"
-generate-candidates-subset-manifest = "candidates:generate_subset_manifest"
+shard-candidates = "candidates:shard_candidates"
 
 [build-system]
 requires = ["uv_build>=0.12.23,<0.13.0"]

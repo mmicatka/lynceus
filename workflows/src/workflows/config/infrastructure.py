@@ -2,7 +2,7 @@
 
 from typing import Annotated
 
-from pydantic import ByteSize, ConfigDict, PositiveInt, StringConstraints
+from pydantic import ConfigDict, PositiveInt, StringConstraints
 
 from workflows.config.base import StrictModel
 
@@ -15,6 +15,8 @@ StoragePrefix = Annotated[
 class CandidatePrefixes(StrictModel):
     raw_smiles: StoragePrefix
     raw_parquet: StoragePrefix
+    shards_staging: StoragePrefix
+    shards: StoragePrefix
 
 
 class FilePaths(StrictModel):
@@ -33,7 +35,6 @@ class StorageConfig(StrictModel):
 
 class CandidatesInfraConfig(StrictModel):
     num_shards: PositiveInt
-    initial_shard_size: ByteSize
 
 
 class TemplateConfig(StrictModel):

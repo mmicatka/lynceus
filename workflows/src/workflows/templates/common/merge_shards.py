@@ -1,40 +1,39 @@
-# workflows/src/workflows/templates/candidates/generate_subset_manifest.py
+# workflows/src/workflows/templates/common/merge_shards.py
 
 from hera.workflows import script
 
 from workflows.config import InfraConfig
 from workflows.config.images import CANDIDATES_IMAGE
 from workflows.resources import LYNCEUS_VOLUME
-from workflows.templates.common import template_resources
+from workflows.templates.resources import template_resources
 
-TEMPLATE_NAME = "generate_subset_manifest"
+TEMPLATE_NAME = "merge_shards"
 
 
-def generate_subset_manifest(
-    source_dir: str,
-    target_total: int,
-    min_per_source: int,
-    output: str,
+def merge_shards(
+    mount_path: str,
+    input_prefix: str,
+    output_prefix: str,
+    num_workers: str = "auto",
 ):
+    import os
     import subprocess
 
     subprocess.run(
         [
-            "generate-candidates-subset-manifest",
-            "--source-dir",
-            str(source_dir),
-            "--target-total",
-            str(target_total),
-            "--min-per-source",
-            str(min_per_source),
+            "merge-shards",
+            "--input",
+            os.path.join(mount_path, input_prefix),
             "--output",
-            str(output),
+            os.path.join(mount_path, output_prefix),
+            "--num-workers",
+            str(num_workers),
         ],
         check=True,
     )
 
 
-def build_generate_subset_manifest_template(infra_config: InfraConfig):
+def build_merge_shards_template(infra_config: InfraConfig):
     if TEMPLATE_NAME not in infra_config.templates:
         raise RuntimeError(f"Infrastructure config has no '{TEMPLATE_NAME}' template")
 
@@ -45,4 +44,4 @@ def build_generate_subset_manifest_template(infra_config: InfraConfig):
         resources=template_resources(template_config),
         volumes=[LYNCEUS_VOLUME],
         image_pull_policy="always",
-    )(generate_subset_manifest)
+    )(merge_shards)

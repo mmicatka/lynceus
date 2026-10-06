@@ -1,56 +1,102 @@
 # workflows/src/workflows/registry/candidates.py
 
-from hera.workflows import DAG, Workflow
+from hera.workflows import DAG, Parameter, Workflow
 
 from workflows.config.infrastructure import InfraConfig
 from workflows.config.screen import ScreenConfig
 from workflows.resources.volumes import LYNCEUS_VOLUME
-from workflows.templates.candidates import build_load_candidates_template
-from workflows.templates.candidates.generate_subset_manifest import (
-    build_generate_subset_manifest_template,
+from workflows.templates.candidates import (
+    build_load_candidates_template,
+    build_shard_candidates_template,
 )
+from workflows.templates.common.clean_prefix import build_clean_prefix_template
+from workflows.templates.common.merge_shards import build_merge_shards_template
+
+WORKFLOW_NAME_PARAM = "{{workflow.name}}"
+ITEM_PARAM = "{{item}}"
+
+
+def _shard_path(prefix: str) -> str:
+    return f"{prefix}/shard_id={ITEM_PARAM}"
+
+
+def _shard_ids(num_shards: int) -> list[int]:
+    return list(range(num_shards))
 
 
 def build_candidates_workflow(
     infra_config: InfraConfig, screen_config: ScreenConfig
 ) -> Workflow:
     candidates_config = screen_config.candidates
-    storage_config = infra_config.storage
+    candidate_prefixes = infra_config.storage.prefixes.candidates
+    mount_path = LYNCEUS_VOLUME.mount_path
+    num_shards = infra_config.candidates.num_shards
+    run_staging_prefix = f"{candidate_prefixes.shards_staging}/{WORKFLOW_NAME_PARAM}"
 
     load_candidates_template = build_load_candidates_template(infra_config)
-    generate_subset_manifest_template = build_generate_subset_manifest_template(
-        infra_config
-    )
+    shard_candidates_template = build_shard_candidates_template(infra_config)
+    merge_shards_template = build_merge_shards_template(infra_config)
+    clean_prefix_template = build_clean_prefix_template()
 
     with Workflow(
         generate_name=f"{screen_config.name}-candidates-",
         entrypoint="main-dag",
         service_account_name="argo-workflow",
     ) as w:
-        with DAG(name="main-dag"):
-            load_candidates_task = load_candidates_template(
+        with DAG(
+            name="process-source-dag", inputs=[Parameter(name="source")]
+        ) as process_source_dag:
+            source_parquet_prefix = (
+                f"{candidate_prefixes.raw_parquet}/{{{{inputs.parameters.source}}}}"
+            )
+
+            load_task = load_candidates_template(
                 name="load-candidates",
                 arguments={
-                    "source": "{{item}}",
-                    "mount_path": LYNCEUS_VOLUME.mount_path,
-                    "source_prefix": storage_config.prefixes.candidates.raw_smiles,
-                    "parquet_prefix": storage_config.prefixes.candidates.raw_parquet,
+                    "source": "{{inputs.parameters.source}}",
+                    "mount_path": mount_path,
+                    "source_prefix": candidate_prefixes.raw_smiles,
+                    "parquet_prefix": source_parquet_prefix,
                 },
-                with_items=candidates_config.sources,
             )
 
-            generate_subset_manifest_task = generate_subset_manifest_template(
-                name="generate-subset-manifest",
+            shard_task = shard_candidates_template(
+                name="shard-candidates",
                 arguments={
-                    "source_dir": f"{LYNCEUS_VOLUME.mount_path}/"
-                    f"{storage_config.prefixes.candidates.raw_parquet}",
-                    "target_total": candidates_config.target_total,
-                    "min_per_source": candidates_config.min_per_source,
-                    "output": f"{LYNCEUS_VOLUME.mount_path}/{screen_config.name}/"
-                    f"{storage_config.files.subset_manifest}",
+                    "mount_path": mount_path,
+                    "input_prefix": source_parquet_prefix,
+                    "output_prefix": run_staging_prefix,
+                    "num_shards": num_shards,
                 },
             )
 
-            load_candidates_task >> generate_subset_manifest_task  # type: ignore
+            load_task >> shard_task  # type: ignore
+
+        with DAG(name="main-dag"):
+            process_sources = process_source_dag(
+                name="process-sources",
+                with_items=candidates_config.sources,
+                arguments={"source": ITEM_PARAM},
+            )
+
+            merge_shards = merge_shards_template(
+                name="merge-shards",
+                with_items=_shard_ids(num_shards),
+                arguments={
+                    "mount_path": mount_path,
+                    "input_prefix": _shard_path(run_staging_prefix),
+                    "output_prefix": _shard_path(candidate_prefixes.shards),
+                },
+            )
+
+            cleanup_staging = clean_prefix_template(
+                name="cleanup-staging",
+                arguments={
+                    "mount_path": mount_path,
+                    "prefix": run_staging_prefix,
+                },
+            )
+
+            process_sources >> merge_shards >> cleanup_staging  # type: ignore
 
     return w
