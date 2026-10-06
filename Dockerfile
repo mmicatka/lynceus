@@ -3,7 +3,11 @@ ARG DEV_BASE=base
 FROM ubuntu:24.04 AS base
 ENV DEBIAN_FRONTEND=noninteractive
 
-RUN apt-get update && apt-get install -y \
+# Install software-properties-common first to enable PPA additions,
+# then add the deadsnakes PPA for Python 3.14, and install the rest.
+RUN apt-get update && apt-get install -y software-properties-common \
+    && add-apt-repository ppa:deadsnakes/ppa -y \
+    && apt-get update && apt-get install -y \
     aria2 \
     git \
     curl \
@@ -11,11 +15,12 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     cmake \
     wget \
-    software-properties-common \
     sudo \
     unzip \
     zip \
-    python3-dev \
+    python3.14 \
+    python3.14-dev \
+    python3.14-venv \
     && rm -rf /var/lib/apt/lists/*
 
 FROM base AS base-gpu
