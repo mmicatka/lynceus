@@ -67,3 +67,6 @@ dev = [
 
 [tool.ruff.lint]
 select = ["E", "F", "I"]
+
+[tool.yamlfix]
+line_length = 100

@@ -6,6 +6,7 @@ ignore: |
   .venv/
   env/
   .env/
+  workflows/manifests
 
 rules:
   comments:

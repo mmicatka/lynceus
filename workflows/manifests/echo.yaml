@@ -1,110 +1,127 @@
----
 apiVersion: argoproj.io/v1alpha1
 kind: Workflow
 metadata:
-  generateName: hera-example-
+  generateName: smoke-test-
 spec:
   entrypoint: main-dag
   serviceAccountName: argo-workflow
   templates:
-    - name: main-dag
-      dag:
-        tasks:
-          - name: task-a
-            template: echo
-            arguments:
-              parameters:
-                - name: message
-                  value: |-
-                    --- WORKFLOW CONFIGURATION ---
-                    Infra Config:
-                    {
-                      "storage": {
-                        "bucket": "lynceus"
-                      },
-                      "stages": {
-                        "load_candidates": {
-                          "cpu": "4",
-                          "memory": "4Gi",
-                          "max_parallel": 5,
-                          "chunk_size": "32MiB",
-                          "batch_rows": 100000
-                        }
-                      }
-                    }
-                    Screen Config:
-                    {
-                      "name": "10m-poc",
-                      "candidates": {
-                        "initial_shard_size": 2000000000,
-                        "source_prefix": "candidates/raw/smiles",
-                        "parquet_prefix": "candidates/raw/parquet",
-                        "sources": [
-                          "H04",
-                          "H05",
-                          "H06",
-                          "H07",
-                          "H08",
-                          "H09",
-                          "H10",
-                          "H11",
-                          "H12",
-                          "H13",
-                          "H14",
-                          "H15",
-                          "H16",
-                          "H17",
-                          "H18",
-                          "H19",
-                          "H20",
-                          "H21",
-                          "H22",
-                          "H23",
-                          "H24",
-                          "H25",
-                          "H26",
-                          "H27",
-                          "H28"
-                        ]
-                      }
-                    }
-                    ------------------------------
-                - name: mount_path
-                  value: /mnt/data
-          - name: task-b
-            depends: task-a
-            template: echo
-            arguments:
-              parameters:
-                - name: message
-                  value: Workflow complete!
-    - name: echo
-      volumes:
-        - name: lynceus-data
-          persistentVolumeClaim:
-            claimName: lynceus-bucket-pvc
-      inputs:
-        parameters:
+  - name: check-permissions
+    volumes:
+    - name: lynceus-data
+      persistentVolumeClaim:
+        claimName: lynceus-bucket-pvc
+    container:
+      image: alpine
+      command:
+      - sh
+      - -c
+      - ls -ld /mnt/data && id
+      volumeMounts:
+      - name: lynceus-data
+        mountPath: /mnt/data
+  - name: main-dag
+    dag:
+      tasks:
+      - name: check-permissions
+        template: check-permissions
+      - name: task-a
+        depends: check-permissions
+        template: echo
+        arguments:
+          parameters:
           - name: message
+            value: |-
+              --- WORKFLOW CONFIGURATION ---
+              Infra Config:
+              {
+                "storage": {
+                  "bucket": "lynceus"
+                },
+                "templates": {
+                  "load_candidates": {
+                    "cpu": "4",
+                    "memory": "4Gi",
+                    "max_parallel": 5
+                  }
+                }
+              }
+
+              Screen Config:
+              {
+                "name": "10m-poc",
+                "candidates": {
+                  "initial_shard_size": 2000000000,
+                  "source_prefix": "candidates/raw/smiles",
+                  "parquet_prefix": "candidates/raw/parquet",
+                  "sources": [
+                    "H04",
+                    "H05",
+                    "H06",
+                    "H07",
+                    "H08",
+                    "H09",
+                    "H10",
+                    "H11",
+                    "H12",
+                    "H13",
+                    "H14",
+                    "H15",
+                    "H16",
+                    "H17",
+                    "H18",
+                    "H19",
+                    "H20",
+                    "H21",
+                    "H22",
+                    "H23",
+                    "H24",
+                    "H25",
+                    "H26",
+                    "H27",
+                    "H28"
+                  ]
+                }
+              }
+              ------------------------------
           - name: mount_path
-            default: ''
-      script:
-        image: python:3.10
-        source: |-
-          import os
-          import sys
-          sys.path.append(os.getcwd())
-          import json
-          try: message = json.loads(r'''{{inputs.parameters.message}}''')
-          except: message = r'''{{inputs.parameters.message}}'''
-          try: mount_path = json.loads(r'''{{inputs.parameters.mount_path}}''')
-          except: mount_path = r'''{{inputs.parameters.mount_path}}'''
-          print(message)
-          if mount_path:
-              test_file = os.path.join(mount_path, 'hera_smoke_test.txt')
-              with open(test_file, 'w') as f:
-                  f.write(f'Latest message:\n{message}\n')
-        command: [python]
-        volumeMounts:
-          - name: lynceus-data
-            mountPath: /mnt/data
+            value: /mnt/data
+      - name: task-b
+        depends: task-a
+        template: echo
+        arguments:
+          parameters:
+          - name: message
+            value: Workflow complete!
+  - name: echo
+    volumes:
+    - name: lynceus-data
+      persistentVolumeClaim:
+        claimName: lynceus-bucket-pvc
+    inputs:
+      parameters:
+      - name: message
+      - name: mount_path
+        default: ''
+    script:
+      image: python:3.10
+      source: |-
+        import os
+        import sys
+        sys.path.append(os.getcwd())
+        import json
+        try: message = json.loads(r'''{{inputs.parameters.message}}''')
+        except: message = r'''{{inputs.parameters.message}}'''
+        try: mount_path = json.loads(r'''{{inputs.parameters.mount_path}}''')
+        except: mount_path = r'''{{inputs.parameters.mount_path}}'''
+
+        print(message)
+        if mount_path:
+            test_file = os.path.join(mount_path, 'hera_smoke_test.txt')
+            with open(test_file, 'w') as f:
+                f.write(f'Latest message:\n{message}\n')
+      command:
+      - python
+      volumeMounts:
+      - name: lynceus-data
+        mountPath: /mnt/data

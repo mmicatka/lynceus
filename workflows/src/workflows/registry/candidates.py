@@ -1,37 +1,34 @@
 # workflows/src/workflows/registry/candidates.py
 
-from hera.workflows import DAG, Parameter, Workflow
+from hera.workflows import DAG, Workflow
 
-from workflows.components import list_folders
-from workflows.resources import LYNCEUS_VOLUME
+from workflows.config.infrastructure import InfraConfig
+from workflows.config.screen import ScreenConfig
+from workflows.resources.volumes import LYNCEUS_VOLUME
+from workflows.templates.candidates import build_load_candidates_template
 
 
-def build_candidate_workflow(max_parallel: int = 50) -> Workflow:
+def build_candidates_workflow(
+    infra_config: InfraConfig, screen_config: ScreenConfig
+) -> Workflow:
+    candidates = screen_config.candidates
+    load_candidates = build_load_candidates_template(infra_config)
+
     with Workflow(
-        generate_name="candidate-",
-        entrypoint="main",
+        generate_name=f"{screen_config.name}-candidates-",
+        entrypoint="main-dag",
         service_account_name="argo-workflow",
-        parallelism=max_parallel,
-        arguments=[
-            Parameter(name="root", value=LYNCEUS_VOLUME.mount_path),
-            Parameter(name="prefix", value=""),
-        ],
     ) as w:
-        with DAG(name="main"):
-            discovered = list_folders(
-                name="list-folders",
+        with DAG(name="main-dag"):
+            load_candidates(
+                name="load-candidates",
                 arguments={
-                    "root": "{{workflow.parameters.root}}",
-                    "prefix": "{{workflow.parameters.prefix}}",
+                    "source": "{{item}}",
+                    "mount_path": LYNCEUS_VOLUME.mount_path,
+                    "source_prefix": candidates.source_prefix,
+                    "parquet_prefix": candidates.parquet_prefix,
                 },
+                with_items=candidates.sources,
             )
-            processed = process_folder(
-                name="process-folder",
-                arguments={
-                    "root": "{{workflow.parameters.root}}",
-                    "folder": "{{item}}",
-                },
-                with_param=discovered.result,
-            )
-            discovered >> processed  # type: ignore
+
     return w

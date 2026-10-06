@@ -1,11 +1,9 @@
 # workflows/src/worksflows/generate_workflow.py
 
 import os
-import warnings
 from pathlib import Path
 
 import click
-from yamlfix import fix_files
 
 from workflows.config import load_config
 from workflows.config.infrastructure import InfraConfig
@@ -70,10 +68,6 @@ def generate(
             f.write(workflow_obj.to_yaml())
 
         generated_files.append(file_path)
-
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        fix_files(generated_files)
 
     for file_path in generated_files:
         click.secho(f"Successfully generated and formatted: {file_path}", fg="green")

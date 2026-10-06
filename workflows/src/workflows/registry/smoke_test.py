@@ -2,7 +2,7 @@
 
 import os
 
-from hera.workflows import DAG, Workflow, script
+from hera.workflows import DAG, Container, Workflow, script
 
 from workflows.config.infrastructure import InfraConfig
 from workflows.config.screen import ScreenConfig
@@ -35,11 +35,20 @@ def build_smoke_test_workflow(
     )
 
     with Workflow(
-        generate_name="hera-example-",
+        generate_name="smoke-test-",
         entrypoint="main-dag",
         service_account_name="argo-workflow",
     ) as w:
+        check_permissions = Container(
+            name="check-permissions",
+            image="alpine",
+            command=["sh", "-c", "ls -ld /mnt/data && id"],
+            volumes=[LYNCEUS_VOLUME],
+        )
+
         with DAG(name="main-dag"):
+            task_check = check_permissions()
+
             task_a = echo(
                 name="task-a",
                 arguments={
@@ -49,5 +58,5 @@ def build_smoke_test_workflow(
             )
             task_b = echo(name="task-b", arguments={"message": "Workflow complete!"})
 
-            task_a >> task_b  # type: ignore
+            task_check >> task_a >> task_b  # type: ignore
     return w
