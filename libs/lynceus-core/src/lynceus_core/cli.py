@@ -11,7 +11,7 @@ class NumWorkers(click.ParamType):
     def convert(self, value, param, ctx):
         val_str = str(value).lower().strip()
         if val_str == "auto":
-            return os.cpu_count() or 1
+            return os.process_cpu_count() or 1
         try:
             n = int(val_str)
             if n < 1:
