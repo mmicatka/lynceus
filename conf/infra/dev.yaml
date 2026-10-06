@@ -1,9 +1,23 @@
 ---
 storage:
   bucket: lynceus
+  prefixes:
+    candidates:
+      raw_smiles: candidates/raw/smiles
+      raw_parquet: candidates/raw/parquet
+  files:
+    subset_manifest: candidates/subset_manifest.csv
+
+candidates:
+  num_shards: 64
+  initial_shard_size: 2GB
 
 templates:
   load_candidates:
     cpu: "4"
     memory: 4Gi
     max_parallel: 5
+  generate_subset_manifest:
+    cpu: "4"
+    memory: 4Gi
+    max_parallel: 1

@@ -47,6 +47,19 @@ spec:
             value: candidates/raw/smiles
           - name: parquet_prefix
             value: candidates/raw/parquet
+      - name: generate-subset-manifest
+        depends: load-candidates
+        template: generate-subset-manifest
+        arguments:
+          parameters:
+          - name: source_dir
+            value: /mnt/data/candidates/raw/parquet
+          - name: target_total
+            value: '10000000'
+          - name: min_per_source
+            value: '200000'
+          - name: output
+            value: /mnt/data/10m-poc/candidates/subset_manifest.csv
   - name: load-candidates
     volumes:
     - name: lynceus-data
@@ -60,6 +73,7 @@ spec:
       - name: parquet_prefix
     script:
       image: registry.nebula.lan:5000/lynceus/candidates:0.1.0
+      imagePullPolicy: Always
       source: |-
         import os
         import sys
@@ -77,6 +91,48 @@ spec:
         import os
         import subprocess
         subprocess.run(['load-candidates', '--input', os.path.join(mount_path, source_prefix, source), '--output', os.path.join(mount_path, parquet_prefix)], check=True)
+      command:
+      - python
+      volumeMounts:
+      - name: lynceus-data
+        mountPath: /mnt/data
+      resources:
+        limits:
+          cpu: '4'
+          memory: 4Gi
+        requests:
+          cpu: '4'
+          memory: 4Gi
+  - name: generate-subset-manifest
+    volumes:
+    - name: lynceus-data
+      persistentVolumeClaim:
+        claimName: lynceus-bucket-pvc
+    inputs:
+      parameters:
+      - name: source_dir
+      - name: target_total
+      - name: min_per_source
+      - name: output
+    script:
+      image: registry.nebula.lan:5000/lynceus/candidates:0.1.0
+      imagePullPolicy: Always
+      source: |-
+        import os
+        import sys
+        sys.path.append(os.getcwd())
+        import json
+        try: min_per_source = json.loads(r'''{{inputs.parameters.min_per_source}}''')
+        except: min_per_source = r'''{{inputs.parameters.min_per_source}}'''
+        try: output = json.loads(r'''{{inputs.parameters.output}}''')
+        except: output = r'''{{inputs.parameters.output}}'''
+        try: source_dir = json.loads(r'''{{inputs.parameters.source_dir}}''')
+        except: source_dir = r'''{{inputs.parameters.source_dir}}'''
+        try: target_total = json.loads(r'''{{inputs.parameters.target_total}}''')
+        except: target_total = r'''{{inputs.parameters.target_total}}'''
+
+        import subprocess
+        subprocess.run(['generate-candidates-subset-manifest', '--source-dir', str(source_dir), '--target-total', str(target_total), '--min-per-source', str(min_per_source), '--output', str(output)], check=True)
       command:
       - python
       volumeMounts:

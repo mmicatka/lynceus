@@ -13,6 +13,7 @@ dependencies = [
 
 [project.scripts]
 load-candidates = "candidates:load_candidates"
+generate-candidates-subset-manifest = "candidates:generate_subset_manifest"
 
 [build-system]
 requires = ["uv_build>=0.12.23,<0.13.0"]

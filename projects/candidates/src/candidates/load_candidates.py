@@ -3,7 +3,6 @@
 import glob
 import gzip
 import io
-import json
 import os
 import sys
 from concurrent.futures import ProcessPoolExecutor
@@ -45,53 +44,14 @@ PARQUET_SCHEMA = pa.schema(
 )
 
 
-def _read_json(path: str) -> dict | None:
-    if not os.path.exists(path):
-        return None
-
-    with open(path, "r") as f:
-        return json.load(f)
-
-
-def _write_json(output_path: str, payload: dict) -> None:
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    with open(output_path, "w") as f:
-        json.dump(payload, f)
-
-    logger.info("Wrote candidate count", path=output_path)
-
-
 def _folder_output_dir(output_dir: str, folder: str) -> str:
     return os.path.join(output_dir, folder)
-
-
-def _json_output_path(output_dir: str, folder: str) -> str:
-    return os.path.join(output_dir, folder, "count.json")
 
 
 def _parquet_output_path(source_path: str, output_dir: str) -> str:
     filename = os.path.basename(source_path)
     stem = filename[: -len(".smi.gz")] if filename.endswith(".smi.gz") else filename
     return os.path.join(output_dir, f"{stem}.parquet")
-
-
-def _clear_stale_parquet(output_dir: str) -> None:
-    pattern = os.path.join(output_dir, "*.parquet")
-    for path in glob.glob(pattern):
-        os.remove(path)
-
-
-def _folder_row_count(output_dir: str) -> int | None:
-    pattern = os.path.join(output_dir, "*.parquet")
-    paths = glob.glob(pattern)
-    if not paths:
-        return None
-
-    total = 0
-    for path in paths:
-        with open(path, "rb") as f:
-            total += pq.ParquetFile(f).metadata.num_rows
-    return total
 
 
 def _parse_smi_line(line: str) -> tuple[str, str] | None:
@@ -133,8 +93,7 @@ def _write_parquet_from_smi(
     resolved_output: str,
     chunk_size: int,
     batch_rows: int,
-) -> tuple[str, int]:
-    row_count = 0
+) -> None:
     os.makedirs(os.path.dirname(resolved_output), exist_ok=True)
 
     with open(resolved_output, "wb") as out_f:
@@ -147,11 +106,8 @@ def _write_parquet_from_smi(
                     {"smiles": smiles_batch, "id": id_batch}, schema=PARQUET_SCHEMA
                 )
                 writer.write_table(table)
-                row_count += len(smiles_batch)
         finally:
             writer.close()
-
-    return source_path, row_count
 
 
 def _write_parquet_worker(
@@ -159,24 +115,19 @@ def _write_parquet_worker(
     output_dir: str,
     chunk_size: int,
     batch_rows: int,
-) -> tuple[str, int]:
+) -> str:
     resolved_output = _parquet_output_path(source_path, output_dir)
 
+    # Idempotency check: Skip if parquet already exists
     if os.path.exists(resolved_output):
-        row_count = _parquet_row_count(resolved_output)
         logger.info(
             "Parquet already exists, skipping write",
             path=resolved_output,
-            rows=row_count,
         )
-        return source_path, row_count
+        return source_path
 
-    return _write_parquet_from_smi(source_path, resolved_output, chunk_size, batch_rows)
-
-
-def _parquet_row_count(resolved_path: str) -> int:
-    with open(resolved_path, "rb") as f:
-        return pq.ParquetFile(f).metadata.num_rows
+    _write_parquet_from_smi(source_path, resolved_output, chunk_size, batch_rows)
+    return source_path
 
 
 def _write_parquet_parallel(
@@ -185,8 +136,7 @@ def _write_parquet_parallel(
     chunk_size: int,
     batch_rows: int,
     num_workers: int,
-) -> int:
-    total = 0
+) -> None:
     with ProcessPoolExecutor(max_workers=num_workers) as executor:
         futures = [
             executor.submit(
@@ -198,11 +148,10 @@ def _write_parquet_parallel(
             )
             for path in source_paths
         ]
+        # Iterate over futures to raise any exceptions that occurred in the workers
         for future in futures:
-            path, file_count = future.result()
-            total += file_count
-            logger.info("Wrote parquet", path=path, rows=file_count)
-    return total
+            path = future.result()
+            logger.info("Processed file", path=path)
 
 
 @click.command("load_candidates")
@@ -261,40 +210,6 @@ def load_candidates(
         )
 
     folder_output_dir = _folder_output_dir(output_path, input_folder)
-    final_output_path = _json_output_path(output_path, input_folder)
-
-    existing = _read_json(final_output_path)
-    existing_row_count = (
-        _folder_row_count(folder_output_dir) if existing is not None else None
-    )
-
-    if existing is not None and existing_row_count == existing.get("count"):
-        logger.info(
-            "Folder already processed, skipping",
-            folder=input_folder,
-            rows=existing_row_count,
-            path=folder_output_dir,
-        )
-        click.echo("Done!")
-        return
-
-    if existing is None:
-        logger.warning(
-            "Manifest missing, clearing stale parquet",
-            folder=input_folder,
-            manifest_path=final_output_path,
-            parquet_dir=folder_output_dir,
-        )
-    else:
-        logger.warning(
-            "Count mismatch, clearing stale parquet",
-            folder=input_folder,
-            manifest_count=existing.get("count"),
-            actual_count=existing_row_count,
-            parquet_dir=folder_output_dir,
-        )
-
-    _clear_stale_parquet(folder_output_dir)
 
     logger.info(
         "Streaming files to parquet",
@@ -304,7 +219,7 @@ def load_candidates(
         workers=num_workers,
     )
 
-    row_count = _write_parquet_parallel(
+    _write_parquet_parallel(
         source_paths,
         folder_output_dir,
         chunk_size,
@@ -312,18 +227,5 @@ def load_candidates(
         num_workers,
     )
 
-    if row_count == 0:
-        raise RuntimeError(
-            f"folder={input_folder} resolved to zero rows at {source_glob}"
-        )
-
-    logger.info(
-        "Finished loading candidates", folder=input_folder, total_rows=row_count
-    )
-
-    _write_json(
-        final_output_path,
-        {"folder": input_folder, "count": row_count},
-    )
-
+    logger.info("Finished loading candidates", folder=input_folder)
     click.echo("Done!")

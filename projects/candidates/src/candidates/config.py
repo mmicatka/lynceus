@@ -1,4 +1,4 @@
-# modules/local/rebalance_candidates/src/rebalance_candidates/sample/sample_config.py
+# projects/candidates/src/candidates/allocate_candidates.py
 
 from pydantic import BaseModel
 
@@ -9,9 +9,9 @@ class FolderAllocation(BaseModel):
     target_count: int
 
 
-class SamplingPlan(BaseModel):
+class SubsetPlan(BaseModel):
     target_total: int
-    floor_per_folder: int
+    min_per_folder: int
     allocations: list[FolderAllocation]
 
     def to_lookup(self) -> dict[str, int]:
