@@ -31,7 +31,6 @@ def build_candidates_workflow(
     candidate_prefixes = infra_config.storage.prefixes.candidates
     mount_path = LYNCEUS_VOLUME.mount_path
     num_shards = infra_config.candidates.num_shards
-    run_staging_prefix = f"{candidate_prefixes.shards_staging}/{WORKFLOW_NAME_PARAM}"
 
     load_candidates_template = build_load_candidates_template(infra_config)
     shard_candidates_template = build_shard_candidates_template(infra_config)
@@ -65,7 +64,7 @@ def build_candidates_workflow(
                 arguments={
                     "mount_path": mount_path,
                     "input_prefix": source_parquet_prefix,
-                    "output_prefix": run_staging_prefix,
+                    "output_prefix": f"{candidate_prefixes.shards_staging}",
                     "num_shards": num_shards,
                 },
             )
@@ -84,7 +83,7 @@ def build_candidates_workflow(
                 with_items=_shard_ids(num_shards),
                 arguments={
                     "mount_path": mount_path,
-                    "input_prefix": _shard_path(run_staging_prefix),
+                    "input_prefix": _shard_path(f"{candidate_prefixes.shards_staging}"),
                     "output_prefix": _shard_path(candidate_prefixes.shards),
                 },
             )
@@ -93,7 +92,7 @@ def build_candidates_workflow(
                 name="cleanup-staging",
                 arguments={
                     "mount_path": mount_path,
-                    "prefix": run_staging_prefix,
+                    "prefix": f"{candidate_prefixes.shards_staging}",
                 },
             )
 

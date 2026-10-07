@@ -31,7 +31,7 @@ spec:
           - name: input_prefix
             value: candidates/raw/parquet/{{inputs.parameters.source}}
           - name: output_prefix
-            value: candidates/shards_staging/{{workflow.name}}
+            value: candidates/shards_staging
           - name: num_shards
             value: '1024'
     inputs:
@@ -1199,7 +1199,7 @@ spec:
           - name: mount_path
             value: /mnt/data
           - name: input_prefix
-            value: candidates/shards_staging/{{workflow.name}}/shard_id={{item}}
+            value: candidates/shards_staging/shard_id={{item}}
           - name: output_prefix
             value: candidates/shards/shard_id={{item}}
       - name: cleanup-staging
@@ -1210,7 +1210,7 @@ spec:
           - name: mount_path
             value: /mnt/data
           - name: prefix
-            value: candidates/shards_staging/{{workflow.name}}
+            value: candidates/shards_staging
   - name: merge-shards
     volumes:
     - name: lynceus-data
