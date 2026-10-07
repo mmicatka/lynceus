@@ -36,13 +36,35 @@ spec:
               Infra Config:
               {
                 "storage": {
-                  "bucket": "lynceus"
+                  "bucket": "lynceus",
+                  "prefixes": {
+                    "candidates": {
+                      "raw_smiles": "candidates/raw/smiles",
+                      "raw_parquet": "candidates/raw/parquet",
+                      "shards_staging": "candidates/.shard_staging",
+                      "shards": "candidates/shards"
+                    }
+                  },
+                  "files": {
+                    "subset_manifest": "candidates/subset_manifest.csv"
+                  }
+                },
+                "candidates": {
+                  "num_shards": 64,
+                  "initial_shard_size": 2000000000
                 },
                 "templates": {
                   "load_candidates": {
                     "cpu": "4",
-                    "memory": "4Gi",
-                    "max_parallel": 5
+                    "memory": "4Gi"
+                  },
+                  "shard_candidates": {
+                    "cpu": "4",
+                    "memory": "4Gi"
+                  },
+                  "merge_shards": {
+                    "cpu": "4",
+                    "memory": "4Gi"
                   }
                 }
               }
@@ -51,9 +73,6 @@ spec:
               {
                 "name": "10m-poc",
                 "candidates": {
-                  "initial_shard_size": 2000000000,
-                  "source_prefix": "candidates/raw/smiles",
-                  "parquet_prefix": "candidates/raw/parquet",
                   "sources": [
                     "H04",
                     "H05",
@@ -80,7 +99,9 @@ spec:
                     "H26",
                     "H27",
                     "H28"
-                  ]
+                  ],
+                  "target_total": 10000000,
+                  "min_per_source": 200000
                 }
               }
               ------------------------------

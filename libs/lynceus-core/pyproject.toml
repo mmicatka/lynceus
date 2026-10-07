@@ -5,10 +5,15 @@ description = "Add your description here"
 readme = "README.md"
 authors = [{ name = "Mike Micatka", email = "mike.micatka@gmail.com" }]
 requires-python = ">=3.14"
-dependencies = ["click>=8.4.2", "pydantic>=2.13.5", "structlog>=26.1.0"]
+dependencies = [
+    "click>=8.4.2",
+    "duckdb>=1.5.4",
+    "pydantic>=2.13.5",
+    "structlog>=26.1.0",
+]
 
 [project.scripts]
-lynceus-core = "lynceus_core:main"
+merge-shards = "lynceus_core:merge_shards"
 
 [build-system]
 requires = ["uv_build>=0.12.23,<0.13.0"]

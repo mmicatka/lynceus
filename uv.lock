@@ -21,7 +21,6 @@ members = [
     "lynceus-dev",
     "lynceus-utils",
     "physiochemical-filter",
-    "rebalance-candidates",
     "surrogate-model",
     "workflows",
 ]
@@ -410,6 +409,7 @@ version = "0.1.0"
 source = { editable = "projects/candidates" }
 dependencies = [
     { name = "click" },
+    { name = "duckdb" },
     { name = "lynceus-core" },
     { name = "pyarrow" },
     { name = "structlog" },
@@ -418,6 +418,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "click", specifier = ">=8.4.2" },
+    { name = "duckdb", specifier = ">=1.5.4" },
     { name = "lynceus-core", editable = "libs/lynceus-core" },
     { name = "pyarrow", specifier = ">=24.0.0" },
     { name = "structlog", specifier = ">=26.1.0" },
@@ -1639,6 +1640,7 @@ version = "0.1.0"
 source = { editable = "libs/lynceus-core" }
 dependencies = [
     { name = "click" },
+    { name = "duckdb" },
     { name = "pydantic" },
     { name = "structlog" },
 ]
@@ -1646,6 +1648,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "click", specifier = ">=8.4.2" },
+    { name = "duckdb", specifier = ">=1.5.4" },
     { name = "pydantic", specifier = ">=2.13.5" },
     { name = "structlog", specifier = ">=26.1.0" },
 ]
@@ -1663,7 +1666,6 @@ dependencies = [
     { name = "lynceus-core" },
     { name = "lynceus-utils" },
     { name = "physiochemical-filter" },
-    { name = "rebalance-candidates" },
     { name = "surrogate-model" },
     { name = "workflows" },
 ]
@@ -1689,7 +1691,6 @@ requires-dist = [
     { name = "lynceus-core", editable = "libs/lynceus-core" },
     { name = "lynceus-utils", editable = "libs/lynceus-utils" },
     { name = "physiochemical-filter", editable = "modules/local/physiochemical_filter" },
-    { name = "rebalance-candidates", editable = "modules/local/rebalance_candidates" },
     { name = "surrogate-model", editable = "modules/local/surrogate_model" },
     { name = "workflows", editable = "workflows" },
 ]
@@ -2760,31 +2761,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/65/5c/57bd9b2c2109bc5c749cc6d90f0ea0df9aa28a5db82a4fc2c91f9078fdff/rdkit-2026.3.5-cp314-cp314-manylinux_2_28_aarch64.whl", hash = "sha256:7fa98cb6ad79238c7a9cf0a7b42c8abbfed659e9ab5f7b2cba9b17db2915653c", size = 35929201, upload-time = "2026-08-03T09:08:06.416Z" },
     { url = "https://files.pythonhosted.org/packages/92/32/95245f5960b168ea4503529d174e48da5034ed14e8fc170f3a4ab9c3c269/rdkit-2026.3.5-cp314-cp314-manylinux_2_28_x86_64.whl", hash = "sha256:b79c185602aa21bdfd1f01daae7171598090ee4c4d984d5544905b5318d29288", size = 37451351, upload-time = "2026-08-03T09:08:10.1Z" },
     { url = "https://files.pythonhosted.org/packages/cc/e3/e6442f51afed6ed9e75468576721a7df1a64d20306d30201824dc6b8682b/rdkit-2026.3.5-cp314-cp314-win_amd64.whl", hash = "sha256:f0096fdc40ab259151a04933e8201d877f5d274966680c922cd63d3cffb330aa", size = 25241121, upload-time = "2026-08-03T09:08:13.605Z" },
-]
-
-[[package]]
-name = "rebalance-candidates"
-version = "0.1.0"
-source = { editable = "modules/local/rebalance_candidates" }
-dependencies = [
-    { name = "click" },
-    { name = "duckdb" },
-    { name = "fsspec" },
-    { name = "lynceus-utils" },
-    { name = "pyarrow" },
-    { name = "pydantic" },
-    { name = "s3fs" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "click", specifier = ">=8.4.2" },
-    { name = "duckdb", specifier = ">=1.5.4" },
-    { name = "fsspec", specifier = ">=2026.6.0" },
-    { name = "lynceus-utils", editable = "libs/lynceus-utils" },
-    { name = "pyarrow", specifier = ">=24.0.0" },
-    { name = "pydantic", specifier = ">=2.13.5" },
-    { name = "s3fs", specifier = ">=2026.6.0" },
 ]
 
 [[package]]
