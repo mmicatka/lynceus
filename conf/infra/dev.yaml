@@ -11,7 +11,7 @@ storage:
     subset_manifest: candidates/subset_manifest.csv
 
 candidates:
-  num_shards: 1024
+  num_shards: 512
 
 templates:
   load_candidates:

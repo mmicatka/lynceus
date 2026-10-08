@@ -30,8 +30,9 @@ candidates:
       H27,
       H28,
     ]
-  target_total: 10000000
-  min_per_source: 200000
+  sub_sample:
+    candidates: 10000000
+    shards: 16
 
 # target:
 #   ensemble_prefix: targets/protein_ensembles
