@@ -1,30 +1,30 @@
-# workflows/src/workflows/registry/candidates.py
+# workflows/src/workflows/register/candidates/load_candidates.py
 
-from hera.workflows import DAG, Parameter, Workflow
+from hera.workflows import Workflow
 
-from workflows.config.infrastructure import InfraConfig
-from workflows.config.screen import ScreenConfig
-from workflows.resources.volumes import LYNCEUS_VOLUME
-from workflows.templates.candidates import (
+from workflows.src.workflows.config.infrastructure import InfraConfig
+from workflows.src.workflows.config.screen import ScreenConfig
+from workflows.src.workflows.registry.candidates.common import (
+    ITEM_PARAM,
+    _shard_ids,
+    _shard_path,
+)
+from workflows.src.workflows.resources.volumes import LYNCEUS_VOLUME
+from workflows.src.workflows.templates.candidates.load import (
     build_load_candidates_template,
+)
+from workflows.src.workflows.templates.candidates.shard import (
     build_shard_candidates_template,
 )
-from workflows.templates.common.clean_prefix import build_clean_prefix_template
-from workflows.templates.common.merge_shards import build_merge_shards_template
-
-WORKFLOW_NAME_PARAM = "{{workflow.name}}"
-ITEM_PARAM = "{{item}}"
-
-
-def _shard_path(prefix: str) -> str:
-    return f"{prefix}/shard_id={ITEM_PARAM}"
+from workflows.src.workflows.templates.common.clean_prefix import (
+    build_clean_prefix_template,
+)
+from workflows.src.workflows.templates.common.merge_shards import (
+    build_merge_shards_template,
+)
 
 
-def _shard_ids(num_shards: int) -> list[int]:
-    return list(range(num_shards))
-
-
-def build_candidates_workflow(
+def build_load_candidates_workflow(
     infra_config: InfraConfig, screen_config: ScreenConfig
 ) -> Workflow:
     candidates_config = screen_config.candidates
