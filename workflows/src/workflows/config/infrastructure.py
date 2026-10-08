@@ -2,7 +2,7 @@
 
 from typing import Annotated
 
-from pydantic import ConfigDict, PositiveInt, StringConstraints
+from pydantic import PositiveInt, StringConstraints
 
 from workflows.config.base import StrictModel
 
@@ -17,10 +17,7 @@ class CandidatePrefixes(StrictModel):
     raw_parquet: StoragePrefix
     shards_staging: StoragePrefix
     shards: StoragePrefix
-
-
-class FilePaths(StrictModel):
-    subset_manifest: str
+    shards_sample: StoragePrefix
 
 
 class StoragePrefixes(StrictModel):
@@ -30,18 +27,20 @@ class StoragePrefixes(StrictModel):
 class StorageConfig(StrictModel):
     bucket: str
     prefixes: StoragePrefixes
-    files: FilePaths
 
 
 class CandidatesInfraConfig(StrictModel):
     num_shards: PositiveInt
 
 
-class TemplateConfig(StrictModel):
-    model_config = ConfigDict(extra="allow", frozen=True)
-
+class ResourcesConfig(StrictModel):
     cpu: str
     memory: str
+
+
+class TemplateConfig(StrictModel):
+    requests: ResourcesConfig
+    limits: ResourcesConfig
 
 
 class InfraConfig(StrictModel):

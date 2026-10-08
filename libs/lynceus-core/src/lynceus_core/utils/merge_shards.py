@@ -11,8 +11,6 @@ import structlog
 from lynceus_core.cli import NumWorkers
 from lynceus_core.logging import wide_log
 
-MERGED_FILENAME = "shard.parquet"
-
 
 def configure_logging():
     if sys.stdout.isatty():
@@ -62,7 +60,7 @@ def _write_merged_file(conn, input_files: list[str], output_file: str) -> None:
 )
 @click.option(
     "--output",
-    "output_path",
+    "output_file",
     required=True,
     type=str,
     help="Output folder where the merged parquet file will be written.",
@@ -77,7 +75,7 @@ def _write_merged_file(conn, input_files: list[str], output_file: str) -> None:
 @wide_log(logger)
 def merge_shards(
     input_path: str,
-    output_path: str,
+    output_file: str,
     num_workers: int,
 ) -> None:
     click.echo(f"Processing merge for {input_path}...")
@@ -88,8 +86,7 @@ def merge_shards(
         click.echo("Done!")
         return
 
-    os.makedirs(output_path, exist_ok=True)
-    output_file = os.path.join(output_path, MERGED_FILENAME)
+    os.makedirs(output_file, exist_ok=True)
 
     logger.info(
         "Merging shard into single file",

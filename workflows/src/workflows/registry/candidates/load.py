@@ -3,15 +3,22 @@
 from hera.workflows import DAG, Parameter, Workflow
 
 from workflows.config import InfraConfig, ScreenConfig
-from workflows.registry.candidates.common import ITEM_PARAM, _shard_ids, _shard_path
+from workflows.registry.common import (
+    ITEM_PARAM,
+    SERVICE_ACCOUNT_NAME,
+    shard_ids,
+)
 from workflows.resources.volumes import LYNCEUS_VOLUME
 from workflows.templates import (
     build_clean_prefix_template,
     build_template_script,
     load_candidates_template,
     merge_shards_template,
+    sample_candidates_template,
     shard_candidates_template,
 )
+
+SHARD_PREFIX = "shard_id="
 
 
 def build_load_candidates_workflow(
@@ -37,7 +44,7 @@ def build_load_candidates_workflow(
     with Workflow(
         generate_name=f"{screen_config.name}-candidates-",
         entrypoint="main-dag",
-        service_account_name="argo-workflow",
+        service_account_name=SERVICE_ACCOUNT_NAME,
     ) as w:
         with DAG(
             name="process-source-dag", inputs=[Parameter(name="source")]
@@ -77,11 +84,12 @@ def build_load_candidates_workflow(
 
             merge_task = merge_shards(
                 name="merge-shards",
-                with_items=_shard_ids(num_shards),
+                with_items=shard_ids(num_shards),
                 arguments={
                     "mount_path": mount_path,
-                    "input_prefix": _shard_path(f"{candidate_prefixes.shards_staging}"),
-                    "output_prefix": _shard_path(candidate_prefixes.shards),
+                    "input_path": f"{candidate_prefixes.shards_staging}/"
+                    f"{SHARD_PREFIX}{ITEM_PARAM}",
+                    "output_path": candidate_prefixes.shards,
                 },
             )
 
@@ -94,5 +102,31 @@ def build_load_candidates_workflow(
             )
 
             process_task >> merge_task >> cleanup_task  # type: ignore
+
+            # Moved inside main-dag to attach the sampling tasks appropriately
+            if screen_config.candidates.sub_sample:
+                subsample_candidates = build_template_script(
+                    infra_config, "subsample_candidates", sample_candidates_template
+                )
+
+                sample_per_shard = (
+                    screen_config.candidates.sub_sample
+                    // infra_config.candidates.num_shards
+                )
+
+                sample_task = subsample_candidates(
+                    name="sample-candidates",
+                    with_items=shard_ids(num_shards),
+                    arguments={
+                        "source": f"{SHARD_PREFIX}{ITEM_PARAM}.parquet",
+                        "mount_path": mount_path,
+                        "source_prefix": candidate_prefixes.shards,
+                        "parquet_prefix": f"{candidate_prefixes.shards_sample}"
+                        f"{SHARD_PREFIX}{ITEM_PARAM}",
+                        "num_samples": sample_per_shard,
+                    },
+                )
+
+                cleanup_task >> sample_task  # type: ignore
 
     return w

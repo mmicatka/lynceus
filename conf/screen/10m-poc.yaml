@@ -2,6 +2,7 @@
 name: 10m-poc
 
 candidates:
+  sub_sample: 10000000
   sources:
     [
       H04,
@@ -30,9 +31,6 @@ candidates:
       H27,
       H28,
     ]
-  sub_sample:
-    candidates: 10000000
-    shards: 16
 
 # target:
 #   ensemble_prefix: targets/protein_ensembles

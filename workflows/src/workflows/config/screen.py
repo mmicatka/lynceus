@@ -7,14 +7,9 @@ from pydantic import Field, PositiveInt
 from workflows.config.base import StrictModel
 
 
-class SubSampleConfig(StrictModel):
-    candidates: PositiveInt
-    shards: PositiveInt
-
-
 class CandidatesConfig(StrictModel):
     sources: list[str] = Field(min_length=1)
-    sub_sample: Optional[SubSampleConfig]
+    sub_sample: Optional[PositiveInt]
 
 
 class ScreenConfig(StrictModel):

@@ -12,10 +12,10 @@ from workflows.templates.resources import template_resources
 def build_template_script(
     infra_config: InfraConfig, template_name: str, func: Callable
 ) -> Callable:
-    if template_name not in infra_config.templates:
-        raise RuntimeError(f"Infrastructure config has no '{template_name}' template")
 
-    template_config = infra_config.templates[template_name]
+    template_config = infra_config.templates.get(
+        template_name, infra_config.templates.get("default")
+    )
 
     return script(
         image=CANDIDATES_IMAGE,
