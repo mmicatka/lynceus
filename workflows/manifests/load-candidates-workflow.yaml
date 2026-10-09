@@ -1215,7 +1215,7 @@ spec:
           - name: source_prefix
             value: candidates/shards
           - name: parquet_prefix
-            value: candidates/shards_sampleshard_id={{item}}
+            value: candidates/shards_sample
           - name: num_samples
             value: '19531'
   - name: merge-shards-template
@@ -1295,8 +1295,6 @@ spec:
       - name: source_prefix
       - name: parquet_prefix
       - name: num_samples
-      - name: rows_per_file
-        default: '50000'
     script:
       image: registry.nebula.lan:5000/lynceus/candidates:0.1.0
       imagePullPolicy: Always
@@ -1311,8 +1309,6 @@ spec:
         except: num_samples = r'''{{inputs.parameters.num_samples}}'''
         try: parquet_prefix = json.loads(r'''{{inputs.parameters.parquet_prefix}}''')
         except: parquet_prefix = r'''{{inputs.parameters.parquet_prefix}}'''
-        try: rows_per_file = json.loads(r'''{{inputs.parameters.rows_per_file}}''')
-        except: rows_per_file = r'''{{inputs.parameters.rows_per_file}}'''
         try: source = json.loads(r'''{{inputs.parameters.source}}''')
         except: source = r'''{{inputs.parameters.source}}'''
         try: source_prefix = json.loads(r'''{{inputs.parameters.source_prefix}}''')
@@ -1320,7 +1316,53 @@ spec:
 
         import os
         import subprocess
-        subprocess.run(['sample_reservoir', '--input', os.path.join(mount_path, source_prefix, source), '--output', os.path.join(mount_path, parquet_prefix), '--num-samples', str(num_samples), '--rows-per-file', str(rows_per_file)], check=True)
+        subprocess.run(['sample-candidates', '--input', os.path.join(mount_path, source_prefix, source), '--output', os.path.join(mount_path, parquet_prefix, source), '--num-samples', str(num_samples)], check=True)
+      command:
+      - python
+      volumeMounts:
+      - name: lynceus-data
+        mountPath: /mnt/data
+      resources:
+        limits:
+          cpu: '4'
+          memory: 4Gi
+        requests:
+          cpu: '4'
+          memory: 4Gi
+  - name: sample-candidates-template
+    volumes:
+    - name: lynceus-data
+      persistentVolumeClaim:
+        claimName: lynceus-bucket-pvc
+    inputs:
+      parameters:
+      - name: source
+      - name: mount_path
+      - name: source_prefix
+      - name: parquet_prefix
+      - name: num_samples
+    script:
+      image: registry.nebula.lan:5000/lynceus/candidates:0.1.0
+      imagePullPolicy: Always
+      source: |-
+        import os
+        import sys
+        sys.path.append(os.getcwd())
+        import json
+        try: mount_path = json.loads(r'''{{inputs.parameters.mount_path}}''')
+        except: mount_path = r'''{{inputs.parameters.mount_path}}'''
+        try: num_samples = json.loads(r'''{{inputs.parameters.num_samples}}''')
+        except: num_samples = r'''{{inputs.parameters.num_samples}}'''
+        try: parquet_prefix = json.loads(r'''{{inputs.parameters.parquet_prefix}}''')
+        except: parquet_prefix = r'''{{inputs.parameters.parquet_prefix}}'''
+        try: source = json.loads(r'''{{inputs.parameters.source}}''')
+        except: source = r'''{{inputs.parameters.source}}'''
+        try: source_prefix = json.loads(r'''{{inputs.parameters.source_prefix}}''')
+        except: source_prefix = r'''{{inputs.parameters.source_prefix}}'''
+
+        import os
+        import subprocess
+        subprocess.run(['sample-candidates', '--input', os.path.join(mount_path, source_prefix, source), '--output', os.path.join(mount_path, parquet_prefix, source), '--num-samples', str(num_samples)], check=True)
       command:
       - python
       volumeMounts:

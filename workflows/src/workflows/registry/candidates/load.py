@@ -109,20 +109,21 @@ def build_load_candidates_workflow(
                     infra_config, "subsample_candidates", sample_candidates_template
                 )
 
-                sample_per_shard = (
-                    screen_config.candidates.sub_sample
-                    // infra_config.candidates.num_shards
+                subsample_candidates = build_template_script(
+                    infra_config, "subsample_candidates", sample_candidates_template
                 )
+
+                shard_file = f"{SHARD_PREFIX}{ITEM_PARAM}.parquet"
+                sample_per_shard = screen_config.candidates.sub_sample // num_shards
 
                 sample_task = subsample_candidates(
                     name="sample-candidates",
                     with_items=shard_ids(num_shards),
                     arguments={
-                        "source": f"{SHARD_PREFIX}{ITEM_PARAM}.parquet",
+                        "source": shard_file,
                         "mount_path": mount_path,
                         "source_prefix": candidate_prefixes.shards,
-                        "parquet_prefix": f"{candidate_prefixes.shards_sample}"
-                        f"{SHARD_PREFIX}{ITEM_PARAM}",
+                        "parquet_prefix": candidate_prefixes.shards_sample,
                         "num_samples": sample_per_shard,
                     },
                 )
