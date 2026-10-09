@@ -154,14 +154,6 @@ spec:
         - H18
         - H19
         - H20
-        - H21
-        - H22
-        - H23
-        - H24
-        - H25
-        - H26
-        - H27
-        - H28
         arguments:
           parameters:
           - name: source
