@@ -1,6 +1,5 @@
 # projects/candidates/src/candidates/sample.py
 
-import glob
 import json
 import os
 import sys
@@ -31,30 +30,30 @@ configure_logging()
 logger = structlog.get_logger()
 
 
-def _marker_path(output_path: str, input_folder: str) -> str:
-    return os.path.join(output_path, f"_SUCCESS_{input_folder}")
+def _sql_literal(value: str) -> str:
+    return "'" + value.replace("'", "''") + "'"
 
 
-def _partition_is_valid(
-    output_path: str, num_samples: int, rows_per_file: int, input_folder: str
-) -> bool:
-    marker_path = _marker_path(output_path, input_folder)
-    if not os.path.exists(marker_path):
+def _marker_path(output_path: str) -> str:
+    return f"{output_path}.success"
+
+
+def _sample_is_valid(output_path: str, num_samples: int) -> bool:
+    marker_path = _marker_path(output_path)
+    if not (os.path.exists(output_path) and os.path.exists(marker_path)):
         return False
     with open(marker_path, "r") as f:
-        data = json.load(f)
-        return (
-            data.get("num_samples") == num_samples
-            and data.get("rows_per_file") == rows_per_file
-        )
+        return json.load(f).get("num_samples") == num_samples
 
 
-def _write_success_marker(
-    output_path: str, num_samples: int, rows_per_file: int, input_folder: str
-) -> None:
-    os.makedirs(output_path, exist_ok=True)
-    with open(_marker_path(output_path, input_folder), "w") as f:
-        json.dump({"num_samples": num_samples, "rows_per_file": rows_per_file}, f)
+def _write_success_marker(output_path: str, num_samples: int) -> None:
+    with open(_marker_path(output_path), "w") as f:
+        json.dump({"num_samples": num_samples}, f)
+
+
+def _ensure_parent_dir(path: str) -> None:
+    parent = os.path.dirname(os.path.abspath(path))
+    os.makedirs(parent, exist_ok=True)
 
 
 @click.command("sample_reservoir")
@@ -62,24 +61,22 @@ def _write_success_marker(
     "--input",
     "input_path",
     required=True,
-    type=str,
-    help="Input folder containing parquet files.",
+    type=click.Path(exists=True, dir_okay=False, readable=True),
+    help="Input parquet file.",
 )
-@click.option("--output", "output_path", required=True, type=str, help="Output folder.")
+@click.option(
+    "--output",
+    "output_path",
+    required=True,
+    type=click.Path(dir_okay=False, writable=True),
+    help="Output parquet file.",
+)
 @click.option(
     "--num-samples",
     "num_samples",
     required=True,
     type=click.IntRange(min=1),
     help="Approximate total number of samples to pull.",
-)
-@click.option(
-    "--rows-per-file",
-    "rows_per_file",
-    default=50000,
-    show_default=True,
-    type=click.IntRange(min=1),
-    help="Target row count per output file for partitioning.",
 )
 @click.option(
     "--num-workers",
@@ -93,64 +90,51 @@ def sample_candidates(
     input_path: str,
     output_path: str,
     num_samples: int,
-    rows_per_file: int,
     num_workers: int,
 ) -> None:
     click.echo(f"Processing {input_path}...")
 
-    conn = duckdb.connect()
-    conn.execute("SET threads = ?", [num_workers])
-
-    input_folder = os.path.basename(input_path.rstrip("/"))
-    source_glob = os.path.join(input_path, "*.parquet")
-
-    if not glob.glob(source_glob):
-        raise RuntimeError(
-            f"folder={input_folder} resolved to zero parquet files at {source_glob}"
-        )
-
-    if _partition_is_valid(output_path, num_samples, rows_per_file, input_folder):
+    if _sample_is_valid(output_path, num_samples):
         logger.info(
             "Sample already valid, skipping generation",
-            folder=input_folder,
+            source=input_path,
             num_samples=num_samples,
-            rows_per_file=rows_per_file,
             output_path=output_path,
         )
         click.echo("Done!")
         return
 
+    conn = duckdb.connect()
+    conn.execute("SET threads = ?", [num_workers])
+
     logger.info(
         "Executing reservoir sampling",
-        source=source_glob,
+        source=input_path,
         num_samples=num_samples,
-        rows_per_file=rows_per_file,
         output_path=output_path,
         workers=num_workers,
     )
 
-    os.makedirs(output_path, exist_ok=True)
+    _ensure_parent_dir(output_path)
 
     conn.sql(
         f"""
         COPY (
-            SELECT *, (row_number() OVER () / {rows_per_file})::INT AS file_id
-            FROM read_parquet('{source_glob}')
+            SELECT *
+            FROM read_parquet({_sql_literal(input_path)})
             USING SAMPLE reservoir({num_samples} ROWS)
         )
-        TO '{output_path}'
-        (FORMAT parquet, COMPRESSION zstd, PARTITION_BY (file_id), OVERWRITE_OR_IGNORE,
-        FILENAME_PATTERN '{input_folder}_{{i}}')
+        TO {_sql_literal(output_path)}
+        (FORMAT parquet, COMPRESSION zstd)
         """
     )
 
-    _write_success_marker(output_path, num_samples, rows_per_file, input_folder)
+    _write_success_marker(output_path, num_samples)
 
     logger.info(
         "Finished reservoir sampling",
-        folder=input_folder,
+        source=input_path,
         num_samples=num_samples,
-        rows_per_file=rows_per_file,
         output_path=output_path,
     )
 

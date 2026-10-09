@@ -63,7 +63,7 @@ def _write_merged_file(conn, input_files: list[str], output_file: str) -> None:
     "output_file",
     required=True,
     type=str,
-    help="Output folder where the merged parquet file will be written.",
+    help="Output merged parquet file.",
 )
 @click.option(
     "--num-workers",
@@ -86,7 +86,9 @@ def merge_shards(
         click.echo("Done!")
         return
 
-    os.makedirs(output_file, exist_ok=True)
+    output_dir = os.path.dirname(output_file)
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
 
     logger.info(
         "Merging shard into single file",
