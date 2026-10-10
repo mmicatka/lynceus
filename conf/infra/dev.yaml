@@ -36,4 +36,4 @@ volume:
 
 images:
   candidates:
-    image: registry.nebula.lan:5000/lynceus-candidates:0.1.0
+    image: registry.nebula.lan:5000/lynceus/candidates:0.1.0

@@ -56,23 +56,19 @@ def _find_input_files(input_path: str) -> list[str]:
 
 
 def _write_merged_file(conn, input_files: list[str], output_file: str) -> None:
-    temp_file = f"{output_file}.tmp"
+    if os.path.isdir(output_file):
+        shutil.rmtree(output_file)
 
     conn.execute(
         f"""
         COPY (
             SELECT * FROM read_parquet(?, hive_partitioning=true)
         )
-        TO '{temp_file}'
+        TO '{output_file}'
         (FORMAT parquet, COMPRESSION zstd)
         """,
         [input_files],
     )
-
-    if os.path.isdir(output_file):
-        shutil.rmtree(output_file)
-
-    os.replace(temp_file, output_file)
 
 
 @click.command("merge_shards")
