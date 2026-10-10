@@ -1,0 +1,176 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: 10m-poc-preprocess-candidates-
+spec:
+  entrypoint: main-dag
+  serviceAccountName: argo-workflow
+  templates:
+  - name: process-shard-dag
+    dag:
+      tasks:
+      - name: generate-conformers
+        template: generate-conformers-template
+        arguments:
+          parameters:
+          - name: source
+            value: '{{inputs.parameters.source}}'
+          - name: mount_path
+            value: /mnt/data
+          - name: input_prefix
+            value: candidates/shards
+          - name: output_prefix
+            value: candidates/conformers
+      - name: generate-features
+        depends: generate-conformers
+        template: generate-features-template
+        arguments:
+          parameters:
+          - name: source
+            value: '{{inputs.parameters.source}}'
+          - name: mount_path
+            value: /mnt/data
+          - name: input_prefix
+            value: candidates/conformers
+          - name: output_prefix
+            value: candidates/features
+          - name: features
+            value: '["atom_pair", "autocorr", "descriptors", "ecfp", "functional_groups",
+              "morse", "rdf", "topological_torsion", "usrcat", "whim"]'
+    inputs:
+      parameters:
+      - name: source
+  - name: generate-conformers-template
+    volumes:
+    - name: lynceus-data
+      persistentVolumeClaim:
+        claimName: lynceus-bucket-pvc
+    inputs:
+      parameters:
+      - name: source
+      - name: mount_path
+      - name: input_prefix
+      - name: output_prefix
+      - name: num_workers
+        default: auto
+      - name: batch_size
+        default: '10000'
+      - name: chunk_size
+        default: '25'
+    script:
+      image: registry.nebula.lan:5000/lynceus/candidates:0.1.0
+      imagePullPolicy: Always
+      source: |-
+        import os
+        import sys
+        sys.path.append(os.getcwd())
+        import json
+        try: batch_size = json.loads(r'''{{inputs.parameters.batch_size}}''')
+        except: batch_size = r'''{{inputs.parameters.batch_size}}'''
+        try: chunk_size = json.loads(r'''{{inputs.parameters.chunk_size}}''')
+        except: chunk_size = r'''{{inputs.parameters.chunk_size}}'''
+        try: input_prefix = json.loads(r'''{{inputs.parameters.input_prefix}}''')
+        except: input_prefix = r'''{{inputs.parameters.input_prefix}}'''
+        try: mount_path = json.loads(r'''{{inputs.parameters.mount_path}}''')
+        except: mount_path = r'''{{inputs.parameters.mount_path}}'''
+        try: num_workers = json.loads(r'''{{inputs.parameters.num_workers}}''')
+        except: num_workers = r'''{{inputs.parameters.num_workers}}'''
+        try: output_prefix = json.loads(r'''{{inputs.parameters.output_prefix}}''')
+        except: output_prefix = r'''{{inputs.parameters.output_prefix}}'''
+        try: source = json.loads(r'''{{inputs.parameters.source}}''')
+        except: source = r'''{{inputs.parameters.source}}'''
+
+        import os
+        import subprocess
+        subprocess.run(['generate-conformers', '--input', os.path.join(mount_path, input_prefix, source), '--output', os.path.join(mount_path, output_prefix, source), '--batch-size', str(batch_size), '--chunk-size', str(chunk_size), '--num-workers', str(num_workers)], check=True)
+      command:
+      - python
+      volumeMounts:
+      - name: lynceus-data
+        mountPath: /mnt/data
+      resources:
+        limits:
+          cpu: '4'
+          memory: 4Gi
+        requests:
+          cpu: '4'
+          memory: 4Gi
+  - name: generate-features-template
+    volumes:
+    - name: lynceus-data
+      persistentVolumeClaim:
+        claimName: lynceus-bucket-pvc
+    inputs:
+      parameters:
+      - name: source
+      - name: mount_path
+      - name: input_prefix
+      - name: output_prefix
+      - name: features
+      - name: num_workers
+        default: auto
+    script:
+      image: registry.nebula.lan:5000/lynceus/candidates:0.1.0
+      imagePullPolicy: Always
+      source: |-
+        import os
+        import sys
+        sys.path.append(os.getcwd())
+        import json
+        try: features = json.loads(r'''{{inputs.parameters.features}}''')
+        except: features = r'''{{inputs.parameters.features}}'''
+        try: input_prefix = json.loads(r'''{{inputs.parameters.input_prefix}}''')
+        except: input_prefix = r'''{{inputs.parameters.input_prefix}}'''
+        try: mount_path = json.loads(r'''{{inputs.parameters.mount_path}}''')
+        except: mount_path = r'''{{inputs.parameters.mount_path}}'''
+        try: num_workers = json.loads(r'''{{inputs.parameters.num_workers}}''')
+        except: num_workers = r'''{{inputs.parameters.num_workers}}'''
+        try: output_prefix = json.loads(r'''{{inputs.parameters.output_prefix}}''')
+        except: output_prefix = r'''{{inputs.parameters.output_prefix}}'''
+        try: source = json.loads(r'''{{inputs.parameters.source}}''')
+        except: source = r'''{{inputs.parameters.source}}'''
+
+        import os
+        import subprocess
+        cmd = ['generate-features', '--input', os.path.join(mount_path, input_prefix, source), '--output', os.path.join(mount_path, output_prefix, source), '--num-workers', str(num_workers)]
+        for feature in features:
+            cmd.extend(['--features', feature])
+        subprocess.run(cmd, check=True)
+      command:
+      - python
+      volumeMounts:
+      - name: lynceus-data
+        mountPath: /mnt/data
+      resources:
+        limits:
+          cpu: '4'
+          memory: 4Gi
+        requests:
+          cpu: '4'
+          memory: 4Gi
+  - name: main-dag
+    dag:
+      tasks:
+      - name: process-shards
+        template: process-shard-dag
+        withItems:
+        - 0
+        - 1
+        - 2
+        - 3
+        - 4
+        - 5
+        - 6
+        - 7
+        - 8
+        - 9
+        - 10
+        - 11
+        - 12
+        - 13
+        - 14
+        - 15
+        arguments:
+          parameters:
+          - name: source
+            value: shard_id={{item}}.parquet

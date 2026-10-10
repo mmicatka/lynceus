@@ -1,8 +1,9 @@
 # workflows/src/workflows/config/infrastructure.py
 
-from typing import Annotated
+from enum import StrEnum
+from typing import Annotated, Literal
 
-from pydantic import PositiveInt, StringConstraints
+from pydantic import Field, PositiveInt, StringConstraints
 
 from workflows.config.base import StrictModel
 
@@ -10,6 +11,25 @@ StoragePrefix = Annotated[
     str,
     StringConstraints(strip_whitespace=True, pattern=r"^[^/]+(/[^/]+)*$"),
 ]
+CpuQuantity = Annotated[str, StringConstraints(pattern=r"^\d+(\.\d+)?m?$")]
+MemoryQuantity = Annotated[
+    str,
+    StringConstraints(pattern=r"^\d+(\.\d+)?(Ki|Mi|Gi|Ti|Pi|Ei|k|M|G|T|P|E)?$"),
+]
+
+
+class TemplateName(StrEnum):
+    LOAD_CANDIDATES = "load_candidates"
+    SHARD_CANDIDATES = "shard_candidates"
+    MERGE_SHARDS = "merge_shards"
+    SUBSAMPLE_CANDIDATES = "subsample_candidates"
+    GENERATE_CONFORMERS = "generate_conformers"
+    GENERATE_FEATURES = "generate_features"
+
+
+class ImageConfig(StrictModel):
+    image: str
+    image_pull_policy: Literal["Always", "IfNotPresent", "Never"] = "Always"
 
 
 class CandidatePrefixes(StrictModel):
@@ -18,6 +38,8 @@ class CandidatePrefixes(StrictModel):
     shards_staging: StoragePrefix
     shards: StoragePrefix
     shards_sample: StoragePrefix
+    conformers: StoragePrefix
+    features: StoragePrefix
 
 
 class StoragePrefixes(StrictModel):
@@ -33,17 +55,37 @@ class CandidatesInfraConfig(StrictModel):
     num_shards: PositiveInt
 
 
-class ResourcesConfig(StrictModel):
-    cpu: str
-    memory: str
+class ResourceQuantities(StrictModel):
+    cpu: CpuQuantity
+    memory: MemoryQuantity
 
 
-class TemplateConfig(StrictModel):
-    requests: ResourcesConfig
-    limits: ResourcesConfig
+class ResourceSpec(StrictModel):
+    requests: ResourceQuantities
+    limits: ResourceQuantities
+
+
+class TemplatesConfig(StrictModel):
+    default: ResourceSpec
+    overrides: dict[TemplateName, ResourceSpec] = Field(default_factory=dict)
+
+    def resources_for(self, name: TemplateName) -> ResourceSpec:
+        return self.overrides.get(name, self.default)
 
 
 class InfraConfig(StrictModel):
     storage: StorageConfig
+    volume: VolumeConfig
+    images: dict[ImageName, ImageConfig]
     candidates: CandidatesInfraConfig
-    templates: dict[str, TemplateConfig]
+    templates: TemplatesConfig
+
+
+class VolumeConfig(StrictModel):
+    name: str
+    claim_name: str
+    mount_path: Annotated[str, StringConstraints(pattern=r"^/[^/\s]+(/[^/\s]+)*$")]
+
+
+class ImageName(StrEnum):
+    CANDIDATES = "candidates"

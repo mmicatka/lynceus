@@ -1,7 +1,9 @@
 # libs/lynceus_core/utils/merge_shards.py
 
 import glob
+import json
 import os
+import shutil
 import sys
 
 import click
@@ -31,12 +33,31 @@ configure_logging()
 logger = structlog.get_logger()
 
 
+def _marker_path(output_dir: str, identifier: str) -> str:
+    return os.path.join(output_dir, f"_SUCCESS_{identifier}")
+
+
+def _merge_is_valid(output_dir: str, identifier: str, num_files: int) -> bool:
+    marker_path = _marker_path(output_dir, identifier)
+    if not os.path.exists(marker_path):
+        return False
+    with open(marker_path, "r") as f:
+        return json.load(f).get("num_files") == num_files
+
+
+def _write_success_marker(output_dir: str, identifier: str, num_files: int) -> None:
+    os.makedirs(output_dir, exist_ok=True)
+    with open(_marker_path(output_dir, identifier), "w") as f:
+        json.dump({"num_files": num_files}, f)
+
+
 def _find_input_files(input_path: str) -> list[str]:
     return sorted(glob.glob(os.path.join(input_path, "*.parquet")))
 
 
 def _write_merged_file(conn, input_files: list[str], output_file: str) -> None:
     temp_file = f"{output_file}.tmp"
+
     conn.execute(
         f"""
         COPY (
@@ -47,6 +68,10 @@ def _write_merged_file(conn, input_files: list[str], output_file: str) -> None:
         """,
         [input_files],
     )
+
+    if os.path.isdir(output_file):
+        shutil.rmtree(output_file)
+
     os.replace(temp_file, output_file)
 
 
@@ -90,6 +115,18 @@ def merge_shards(
     if output_dir:
         os.makedirs(output_dir, exist_ok=True)
 
+    identifier = os.path.basename(output_file)
+
+    if _merge_is_valid(output_dir, identifier, len(input_files)):
+        logger.info(
+            "Merge already valid, skipping generation",
+            input_path=input_path,
+            output_file=output_file,
+            num_files=len(input_files),
+        )
+        click.echo("Done!")
+        return
+
     logger.info(
         "Merging shard into single file",
         input_path=input_path,
@@ -103,6 +140,7 @@ def merge_shards(
     conn.execute("SET arrow_large_buffer_size=true")
 
     _write_merged_file(conn, input_files, output_file)
+    _write_success_marker(output_dir, identifier, len(input_files))
 
     logger.info(
         "Finished merging shard", input_path=input_path, output_file=output_file

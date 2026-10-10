@@ -8,9 +8,11 @@ storage:
       shards_staging: candidates/shards_staging
       shards: candidates/shards
       shards_sample: candidates/shards_sample
+      conformers: candidates/conformers
+      features: candidates/features
 
 candidates:
-  num_shards: 512
+  num_shards: 16
 
 templates:
   default:
@@ -20,3 +22,19 @@ templates:
     limits:
       cpu: "4"
       memory: 4Gi
+  overrides:
+    shard_candidates:
+      requests:
+        cpu: "8"
+        memory: 8Gi
+      limits:
+        cpu: "8"
+        memory: 8Gi
+volume:
+  name: lynceus
+  claim_name: lynceus-workdir
+  mount_path: /mnt/lynceus
+
+images:
+  candidates:
+    image: registry.nebula.lan:5000/lynceus-candidates:0.1.0

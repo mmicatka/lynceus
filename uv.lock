@@ -412,6 +412,8 @@ dependencies = [
     { name = "duckdb" },
     { name = "lynceus-core" },
     { name = "pyarrow" },
+    { name = "rdkit" },
+    { name = "scikit-fingerprints" },
     { name = "structlog" },
 ]
 
@@ -421,6 +423,8 @@ requires-dist = [
     { name = "duckdb", specifier = ">=1.5.4" },
     { name = "lynceus-core", editable = "libs/lynceus-core" },
     { name = "pyarrow", specifier = ">=24.0.0" },
+    { name = "rdkit", specifier = ">=2026.3.5" },
+    { name = "scikit-fingerprints", specifier = ">=2.1.0" },
     { name = "structlog", specifier = ">=26.1.0" },
 ]
 
