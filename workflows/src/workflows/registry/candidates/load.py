@@ -7,7 +7,7 @@ from workflows.config.infrastructure import ImageName, TemplateName
 from workflows.registry.common import (
     ITEM_PARAM,
     SERVICE_ACCOUNT_NAME,
-    SHARD_PREFIX,
+    SHARD_FOLDER_PREFIX,
     SOURCE_PARAM,
     shard_ids,
 )
@@ -89,7 +89,7 @@ def build_load_candidates_workflow(
                 arguments={
                     "mount_path": mount_path,
                     "input_path": f"{candidate_prefixes.shards_staging}/"
-                    f"{SHARD_PREFIX}{ITEM_PARAM}",
+                    f"{SHARD_FOLDER_PREFIX}{ITEM_PARAM}",
                     "output_path": f"{candidate_prefixes.shards}/"
                     f"shard_{ITEM_PARAM}.parquet",
                 },
@@ -117,8 +117,7 @@ def build_load_candidates_workflow(
                         "source": f"shard_{ITEM_PARAM}.parquet",
                         "mount_path": mount_path,
                         "source_prefix": candidate_prefixes.shards,
-                        "parquet_prefix": f"{candidate_prefixes.shards_sample}/"
-                        f"shard_{ITEM_PARAM}",
+                        "parquet_prefix": f"{candidate_prefixes.shards_sample}/",
                         "num_samples": candidates_config.sub_sample // num_shards,
                     },
                 )

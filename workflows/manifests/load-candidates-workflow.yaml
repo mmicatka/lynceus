@@ -236,7 +236,7 @@ spec:
           - name: source_prefix
             value: candidates/shards
           - name: parquet_prefix
-            value: candidates/shards_sample/shard_{{item}}
+            value: candidates/shards_sample/
           - name: num_samples
             value: '625000'
   - name: merge-shards
@@ -284,11 +284,11 @@ spec:
         mountPath: /mnt/lynceus
       resources:
         limits:
-          cpu: '4'
-          memory: 4Gi
+          cpu: '14'
+          memory: 8Gi
         requests:
-          cpu: '4'
-          memory: 4Gi
+          cpu: '10'
+          memory: 8Gi
   - name: clean-prefix
     volumes:
     - name: lynceus-data
@@ -357,8 +357,8 @@ spec:
         mountPath: /mnt/lynceus
       resources:
         limits:
-          cpu: '4'
-          memory: 4Gi
+          cpu: '14'
+          memory: 8Gi
         requests:
-          cpu: '4'
-          memory: 4Gi
+          cpu: '10'
+          memory: 8Gi

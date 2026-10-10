@@ -29,6 +29,21 @@ templates:
       limits:
         cpu: "8"
         memory: 8Gi
+    merge_shards:
+      requests:
+        cpu: "10"
+        memory: 8Gi
+      limits:
+        cpu: "14"
+        memory: 8Gi
+    subsample_candidates:
+      requests:
+        cpu: "10"
+        memory: 8Gi
+      limits:
+        cpu: "14"
+        memory: 8Gi
+
 volume:
   name: lynceus
   claim_name: lynceus-pvc

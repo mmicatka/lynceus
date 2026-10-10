@@ -8,6 +8,7 @@ from workflows.registry.common import (
     ITEM_PARAM,
     SERVICE_ACCOUNT_NAME,
     SHARD_PREFIX,
+    SHARD_SUFFIX,
     SOURCE_PARAM,
     shard_ids,
 )
@@ -18,8 +19,6 @@ from workflows.templates import (
     generate_features_template,
 )
 
-SHARD_SUFFIX = ".parquet"
-
 
 def build_preprocess_candidates_workflow(
     infra_config: InfraConfig, screen_config: ScreenConfig
@@ -27,7 +26,7 @@ def build_preprocess_candidates_workflow(
     templates = TemplateFactory.from_config(
         infra_config, ImageName.CANDIDATES, retry_strategy=IO_RETRY_STRATEGY
     )
-    candidate_prefixes = infra_config.storage.prefixes.candidates
+
     mount_path = infra_config.volume.mount_path
     num_shards = infra_config.candidates.num_shards
     features = screen_config.filter.features
@@ -37,6 +36,14 @@ def build_preprocess_candidates_workflow(
     )
     generate_features = templates.build(
         TemplateName.GENERATE_FEATURES, generate_features_template
+    )
+
+    candidate_prefixes = infra_config.storage.prefixes.candidates
+
+    input_prefix = (
+        candidate_prefixes.shards_sample
+        if screen_config.candidates.sub_sample
+        else candidate_prefixes.shards
     )
 
     with Workflow(
@@ -52,7 +59,7 @@ def build_preprocess_candidates_workflow(
                 arguments={
                     "source": SOURCE_PARAM,
                     "mount_path": mount_path,
-                    "input_prefix": candidate_prefixes.shards,
+                    "input_prefix": input_prefix,
                     "output_prefix": candidate_prefixes.conformers,
                 },
             )

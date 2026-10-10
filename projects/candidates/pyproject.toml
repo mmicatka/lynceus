@@ -6,6 +6,7 @@ authors = [{ name = "Mike Micatka", email = "mike.micatka@gmail.com" }]
 requires-python = ">=3.14"
 dependencies = [
     "click>=8.4.2",
+    "dimorphite-dl",
     "duckdb>=1.5.4",
     "lynceus-core",
     "pyarrow>=24.0.0",
@@ -26,4 +27,5 @@ requires = ["uv_build>=0.12.23,<0.13.0"]
 build-backend = "uv_build"
 
 [tool.uv.sources]
+dimorphite-dl = { git = "https://github.com/mmicatka/dimorphite_dl.git" }
 lynceus-core = { workspace = true }

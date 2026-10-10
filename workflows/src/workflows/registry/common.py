@@ -4,8 +4,10 @@
 ITEM_PARAM = "{{item}}"
 SERVICE_ACCOUNT_NAME = "argo-workflow"
 
-SHARD_PREFIX = "shard_id="
+SHARD_FOLDER_PREFIX = "shard_id="
 SOURCE_PARAM = "{{inputs.parameters.source}}"
+SHARD_SUFFIX = ".parquet"
+SHARD_PREFIX = "shard_"
 
 
 def shard_path(prefix: str) -> str:
