@@ -12,7 +12,6 @@ from workflows.registry.common import (
     shard_ids,
 )
 from workflows.resources.retry import IO_RETRY_STRATEGY
-from workflows.resources.volumes import LYNCEUS_VOLUME
 from workflows.templates import (
     build_clean_prefix_template,
     load_candidates_template,
@@ -33,7 +32,7 @@ def build_load_candidates_workflow(
 
     candidates_config = screen_config.candidates
     candidate_prefixes = infra_config.storage.prefixes.candidates
-    mount_path = LYNCEUS_VOLUME.mount_path
+    mount_path = infra_config.volume.mount_path
     num_shards = infra_config.candidates.num_shards
 
     load_candidates = templates.build(

@@ -47,7 +47,6 @@ class StoragePrefixes(StrictModel):
 
 
 class StorageConfig(StrictModel):
-    bucket: str
     prefixes: StoragePrefixes
 
 

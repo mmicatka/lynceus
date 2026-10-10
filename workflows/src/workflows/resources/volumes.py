@@ -4,6 +4,6 @@ from hera.workflows import ExistingVolume
 
 LYNCEUS_VOLUME = ExistingVolume(
     name="lynceus-data",
-    claim_name="lynceus-bucket-pvc",
+    claim_name="lynceus-pvc",
     mount_path="/mnt/data",
 )

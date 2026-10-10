@@ -1,6 +1,5 @@
 ---
 storage:
-  bucket: lynceus
   prefixes:
     candidates:
       raw_smiles: candidates/raw/smiles

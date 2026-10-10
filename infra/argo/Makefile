@@ -63,7 +63,7 @@ deploy: require-region
 clean:
 	helm uninstall argo-workflows --namespace $(ARGO_NAMESPACE) || true
 	kubectl delete -f resources/pvc.yaml --ignore-not-found || true
-	kubectl delete pv lynceus-bucket-pv --ignore-not-found || true
+	kubectl delete -f resources/pv.yaml --ignore-not-found || true
 	helm uninstall $(CSI_RELEASE) --namespace $(CSI_NAMESPACE) || true
 	kubectl delete secret $(CSI_SECRET_NAME) --namespace $(CSI_NAMESPACE) --ignore-not-found || true
 	kubectl delete namespace $(ARGO_NAMESPACE) $(WORKFLOW_NAMESPACE) || true
