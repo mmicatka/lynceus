@@ -32,7 +32,7 @@ templates:
         memory: 8Gi
 volume:
   name: lynceus
-  claim_name: lynceus-workdir
+  claim_name: lynceus-pvc
   mount_path: /mnt/lynceus
 
 images:

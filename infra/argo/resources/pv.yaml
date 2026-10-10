@@ -2,7 +2,7 @@
 apiVersion: v1
 kind: PersistentVolume
 metadata:
-  name: lynceus-bucket-pv
+  name: lynceus-pv
 spec:
   accessModes:
     - ReadWriteMany
@@ -11,7 +11,7 @@ spec:
   storageClassName: ""
   claimRef:
     namespace: workflows
-    name: lynceus-bucket-pvc
+    name: lynceus-pvc
   mountOptions:
     - endpoint-url=REPLACE_ME_S3_ENDPOINT_URL
     - region=REPLACE_ME_S3_REGION
@@ -25,6 +25,6 @@ spec:
     - dir-mode=0775
   csi:
     driver: s3.csi.aws.com
-    volumeHandle: lynceus-bucket-pv
+    volumeHandle: lynceus-pv
     volumeAttributes:
       bucketName: REPLACE_ME_S3_BUCKET
