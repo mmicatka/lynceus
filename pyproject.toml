@@ -13,7 +13,6 @@ dependencies = [
     "candidates",
     # utils
     "detect-binding-sites",
-    "physiochemical-filter",
     "docking-run",
     "surrogate-model",
     "workflows",
@@ -27,16 +26,15 @@ members = [
     # projects
     "projects/candidates",
     "modules/local/detect_binding_sites",
-    "modules/local/physiochemical_filter",
     "modules/local/docking_run",
     "modules/local/surrogate_model",
     "workflows",
+    "projects/target",
 ]
 
 [tool.uv.sources]
 
 candidates = { workspace = true }
-physiochemical-filter = { workspace = true }
 detect-binding-sites = { workspace = true }
 lynceus-utils = { workspace = true }
 docking-run = { workspace = true }

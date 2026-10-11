@@ -15,13 +15,11 @@ members = [
     "candidates",
     "detect-binding-sites",
     "docking-run",
-    "generate-conformers",
-    "generate-features",
     "lynceus-core",
     "lynceus-dev",
     "lynceus-utils",
-    "physiochemical-filter",
     "surrogate-model",
+    "target",
     "workflows",
 ]
 
@@ -933,50 +931,6 @@ wheels = [
 ]
 
 [[package]]
-name = "generate-conformers"
-version = "0.1.0"
-source = { editable = "modules/local/generate_conformers" }
-dependencies = [
-    { name = "blake3" },
-    { name = "click" },
-    { name = "dimorphite-dl" },
-    { name = "duckdb" },
-    { name = "lynceus-utils", extra = ["s3"] },
-    { name = "numpy" },
-    { name = "pyarrow" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "blake3", specifier = ">=1.0.9" },
-    { name = "click", specifier = ">=8.4.2" },
-    { name = "dimorphite-dl", git = "https://github.com/mmicatka/dimorphite_dl.git" },
-    { name = "duckdb", specifier = ">=1.5.4" },
-    { name = "lynceus-utils", extras = ["s3"], editable = "libs/lynceus-utils" },
-    { name = "numpy", specifier = ">=2.5.1" },
-    { name = "pyarrow", specifier = ">=24.0.0" },
-]
-
-[[package]]
-name = "generate-features"
-version = "0.1.0"
-source = { editable = "modules/local/generate_features" }
-dependencies = [
-    { name = "click" },
-    { name = "lynceus-utils", extra = ["s3"] },
-    { name = "rdkit" },
-    { name = "scikit-fingerprints" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "click", specifier = ">=8.4.2" },
-    { name = "lynceus-utils", extras = ["s3"], editable = "libs/lynceus-utils" },
-    { name = "rdkit", specifier = ">=2026.3.5" },
-    { name = "scikit-fingerprints", specifier = ">=2.1.0" },
-]
-
-[[package]]
 name = "h11"
 version = "0.16.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1667,11 +1621,8 @@ dependencies = [
     { name = "candidates" },
     { name = "detect-binding-sites" },
     { name = "docking-run" },
-    { name = "generate-conformers" },
-    { name = "generate-features" },
     { name = "lynceus-core" },
     { name = "lynceus-utils" },
-    { name = "physiochemical-filter" },
     { name = "surrogate-model" },
     { name = "workflows" },
 ]
@@ -1692,11 +1643,8 @@ requires-dist = [
     { name = "candidates", editable = "projects/candidates" },
     { name = "detect-binding-sites", editable = "modules/local/detect_binding_sites" },
     { name = "docking-run", editable = "modules/local/docking_run" },
-    { name = "generate-conformers", editable = "modules/local/generate_conformers" },
-    { name = "generate-features", editable = "modules/local/generate_features" },
     { name = "lynceus-core", editable = "libs/lynceus-core" },
     { name = "lynceus-utils", editable = "libs/lynceus-utils" },
-    { name = "physiochemical-filter", editable = "modules/local/physiochemical_filter" },
     { name = "surrogate-model", editable = "modules/local/surrogate_model" },
     { name = "workflows", editable = "workflows" },
 ]
@@ -2271,27 +2219,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/42/92/cc564bf6381ff43ce1f4d06852fc19a2f11d180f23dc32d9588bee2f149d/pexpect-4.9.0.tar.gz", hash = "sha256:ee7d41123f3c9911050ea2c2dac107568dc43b2d3b0c7557a33212c398ead30f", size = 166450, upload-time = "2023-11-25T09:07:26.339Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/9e/c3/059298687310d527a58bb01f3b1965787ee3b40dce76752eda8b44e9a2c5/pexpect-4.9.0-py2.py3-none-any.whl", hash = "sha256:7236d1e080e4936be2dc3e326cec0af72acf9212a7e1d060210e70a47e253523", size = 63772, upload-time = "2023-11-25T06:56:14.81Z" },
-]
-
-[[package]]
-name = "physiochemical-filter"
-version = "0.1.0"
-source = { editable = "modules/local/physiochemical_filter" }
-dependencies = [
-    { name = "click" },
-    { name = "duckdb" },
-    { name = "lynceus-utils" },
-    { name = "pyarrow" },
-    { name = "pyyaml" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "click", specifier = ">=8.4.2" },
-    { name = "duckdb", specifier = ">=1.5.4" },
-    { name = "lynceus-utils", editable = "libs/lynceus-utils" },
-    { name = "pyarrow", specifier = ">=24.0.0" },
-    { name = "pyyaml", specifier = ">=6.0.3" },
 ]
 
 [[package]]
@@ -3143,6 +3070,21 @@ requires-dist = [
 dev = [
     { name = "matplotlib", specifier = ">=3.11.2" },
     { name = "seaborn", specifier = ">=0.13.2" },
+]
+
+[[package]]
+name = "target"
+version = "0.1.0"
+source = { editable = "projects/target" }
+dependencies = [
+    { name = "click" },
+    { name = "gemmi" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "click", specifier = ">=8.4.2" },
+    { name = "gemmi", specifier = ">=0.7.5" },
 ]
 
 [[package]]
