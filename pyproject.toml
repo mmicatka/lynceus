@@ -16,8 +16,6 @@ dependencies = [
     "physiochemical-filter",
     "docking-run",
     "surrogate-model",
-    "generate-conformers",
-    "generate-features",
     "workflows",
 ]
 
@@ -32,8 +30,6 @@ members = [
     "modules/local/physiochemical_filter",
     "modules/local/docking_run",
     "modules/local/surrogate_model",
-    "modules/local/generate_conformers",
-    "modules/local/generate_features",
     "workflows",
 ]
 
@@ -45,8 +41,6 @@ detect-binding-sites = { workspace = true }
 lynceus-utils = { workspace = true }
 docking-run = { workspace = true }
 surrogate-model = { workspace = true }
-generate-conformers = { workspace = true }
-generate-features = { workspace = true }
 workflows = { workspace = true }
 lynceus-core = { workspace = true }
 
