@@ -97,10 +97,10 @@ spec:
       resources:
         limits:
           cpu: '4'
-          memory: 4Gi
+          memory: 2Gi
         requests:
           cpu: '4'
-          memory: 4Gi
+          memory: 2Gi
   - name: generate-features
     volumes:
     - name: lynceus

@@ -409,6 +409,7 @@ version = "0.1.0"
 source = { editable = "projects/candidates" }
 dependencies = [
     { name = "click" },
+    { name = "dimorphite-dl" },
     { name = "duckdb" },
     { name = "lynceus-core" },
     { name = "pyarrow" },
@@ -420,6 +421,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "click", specifier = ">=8.4.2" },
+    { name = "dimorphite-dl", git = "https://github.com/mmicatka/dimorphite_dl.git" },
     { name = "duckdb", specifier = ">=1.5.4" },
     { name = "lynceus-core", editable = "libs/lynceus-core" },
     { name = "pyarrow", specifier = ">=24.0.0" },

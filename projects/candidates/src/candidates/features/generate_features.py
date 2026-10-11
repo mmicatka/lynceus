@@ -3,7 +3,7 @@
 import json
 import os
 import sys
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import Future, ProcessPoolExecutor
 
 import click
 import pyarrow as pa
@@ -15,7 +15,10 @@ from rdkit import rdBase
 from rdkit.Chem import Mol, MolFromMolBlock
 
 from candidates.features.feature_generators import FEATURE_GENERATOR_REGISTRY
-from candidates.features.feature_generators.feature_generator import FeatureGenerator
+from candidates.features.feature_generators.feature_generator import (
+    FeatureChunk,
+    FeatureGenerator,
+)
 
 os.environ["OMP_NUM_THREADS"] = "1"
 os.environ["OPENBLAS_NUM_THREADS"] = "1"
@@ -68,28 +71,57 @@ def _chunk_list(input_list: list, size: int):
         yield input_list[i : i + size]
 
 
-def _generate_feature_chunk(
-    generator_name: str, conformer_chunk: list[str]
-) -> list[dict]:
-    if _WORKER_GENERATORS is None:
-        raise RuntimeError("worker not initialized: _WORKER_GENERATORS is None")
-    generator = _WORKER_GENERATORS[generator_name]
-    mols: list[Mol | None] = [
+def _parse_conformers(conformers: list[str]) -> list[Mol | None]:
+    return [
         MolFromMolBlock(conformer, removeHs=False) if conformer else None
-        for conformer in conformer_chunk
+        for conformer in conformers
     ]
 
-    valid_indices = [i for i, mol in enumerate(mols) if mol is not None]
-    valid_mols = [mols[i] for i in valid_indices]
 
-    results: list[dict] = [generator.failure_result() for _ in mols]
+def _generate_feature_chunk(
+    generator_name: str, conformer_chunk: list[str]
+) -> FeatureChunk:
+    if _WORKER_GENERATORS is None:
+        raise RuntimeError("worker not initialized: _WORKER_GENERATORS is None")
+    return _WORKER_GENERATORS[generator_name].generate_feature_chunk(
+        _parse_conformers(conformer_chunk)
+    )
 
-    if valid_mols:
-        valid_results = generator.generate_feature_batch(valid_mols)
-        for index, result in zip(valid_indices, valid_results):
-            results[index] = result
 
-    return results
+def _submit_chunks(
+    executor: ProcessPoolExecutor,
+    feature_generators: list[FeatureGenerator],
+    chunks: list[list[str]],
+) -> dict[str, list[Future[FeatureChunk]]]:
+    return {
+        generator.name: [
+            executor.submit(_generate_feature_chunk, generator.name, chunk)
+            for chunk in chunks
+        ]
+        for generator in feature_generators
+    }
+
+
+def _process_batch(
+    batch: pa.RecordBatch,
+    feature_generators: list[FeatureGenerator],
+    chunk_size: int,
+    executor: ProcessPoolExecutor,
+) -> pa.RecordBatch:
+    chunks = list(_chunk_list(batch["conformer"].to_pylist(), chunk_size))
+    pending = _submit_chunks(executor, feature_generators, chunks)
+
+    base = batch.drop_columns(["conformer", "smiles"])
+    arrays = list(base.columns)
+    names = list(base.schema.names)
+
+    for generator in feature_generators:
+        results = [future.result() for future in pending.pop(generator.name)]
+        for field_name, array in generator.to_columns(results):
+            arrays.append(array)
+            names.append(field_name)
+
+    return pa.RecordBatch.from_arrays(arrays, names=names)
 
 
 def _expected_schema_fields(
@@ -173,6 +205,7 @@ def _write_success_marker(
 )
 @click.option(
     "--features",
+    "-f",
     "features",
     multiple=True,
     type=click.Choice(list(FEATURE_GENERATOR_REGISTRY), case_sensitive=False),
@@ -230,56 +263,18 @@ def generate_features(
         max_tasks_per_child=100,
     ) as executor:
         for i, batch in enumerate(parquet_file.iter_batches(batch_size=batch_size)):
-            conformers = batch["conformer"].to_pylist()
-            chunks = list(_chunk_list(conformers, chunk_size))
-
-            futures = {
-                executor.submit(_generate_feature_chunk, generator.name, chunk): (
-                    generator,
-                    chunk_index,
-                )
-                for generator in feature_generators
-                for chunk_index, chunk in enumerate(chunks)
-            }
-
-            results_by_generator: dict[str, list[list[dict] | None]] = {
-                generator.name: [None] * len(chunks) for generator in feature_generators
-            }
-
-            for future in futures:
-                generator, chunk_index = futures[future]
-                results_by_generator[generator.name][chunk_index] = future.result()
-
-            new_batch = batch.drop_columns(["conformer", "smiles"])
-            for generator in feature_generators:
-                chunk_results = results_by_generator[generator.name]
-                if any(chunk_result is None for chunk_result in chunk_results):
-                    raise RuntimeError(
-                        f"missing chunk result(s) for generator '{generator.name}'"
-                    )
-
-                flattened = [
-                    row
-                    for chunk_result in chunk_results
-                    if chunk_result is not None
-                    for row in chunk_result
-                ]
-
-                for field_name, field_type in generator.output_fields():
-                    column_values = [row[field_name] for row in flattened]
-                    new_batch = new_batch.append_column(
-                        field_name, pa.array(column_values, type=field_type)
-                    )
+            new_batch = _process_batch(batch, feature_generators, chunk_size, executor)
 
             if writer is None:
                 writer = pq.ParquetWriter(output_path, new_batch.schema)
 
             writer.write_batch(new_batch)
+            del batch, new_batch
 
             logger.info(
                 "Processed batch",
                 batch_index=i + 1,
-                processed=(i + 1) * batch_size,
+                processed=min((i + 1) * batch_size, num_rows),
                 total_rows=num_rows,
             )
 
