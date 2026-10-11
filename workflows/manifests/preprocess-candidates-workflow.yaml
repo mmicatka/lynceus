@@ -156,10 +156,10 @@ spec:
       resources:
         limits:
           cpu: '4'
-          memory: 4Gi
+          memory: 3Gi
         requests:
           cpu: '4'
-          memory: 4Gi
+          memory: 3Gi
   - name: main-dag
     dag:
       tasks:

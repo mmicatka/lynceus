@@ -46,10 +46,10 @@ templates:
     generate_features:
       requests:
         cpu: "4"
-        memory: 4Gi
+        memory: 3Gi
       limits:
         cpu: "4"
-        memory: 4Gi
+        memory: 3Gi
 
 volume:
   name: lynceus
