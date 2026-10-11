@@ -1,25 +1,61 @@
 ---
 storage:
-  bucket: lynceus
   prefixes:
     candidates:
       raw_smiles: candidates/raw/smiles
       raw_parquet: candidates/raw/parquet
       shards_staging: candidates/shards_staging
       shards: candidates/shards
-  files:
-    subset_manifest: candidates/subset_manifest.csv
+      shards_sample: candidates/shards_sample
+      conformers: candidates/conformers
+      features: candidates/features
 
 candidates:
-  num_shards: 1024
+  num_shards: 16
 
 templates:
-  load_candidates:
-    cpu: "4"
-    memory: 4Gi
-  shard_candidates:
-    cpu: "4"
-    memory: 4Gi
-  merge_shards:
-    cpu: "4"
-    memory: 4Gi
+  default:
+    requests:
+      cpu: "4"
+      memory: 2Gi
+    limits:
+      cpu: "4"
+      memory: 2Gi
+  overrides:
+    shard_candidates:
+      requests:
+        cpu: "8"
+        memory: 8Gi
+      limits:
+        cpu: "8"
+        memory: 8Gi
+    merge_shards:
+      requests:
+        cpu: "10"
+        memory: 8Gi
+      limits:
+        cpu: "14"
+        memory: 8Gi
+    subsample_candidates:
+      requests:
+        cpu: "10"
+        memory: 8Gi
+      limits:
+        cpu: "14"
+        memory: 8Gi
+    generate_features:
+      requests:
+        cpu: "4"
+        memory: 3Gi
+      limits:
+        cpu: "4"
+        memory: 3Gi
+
+volume:
+  name: lynceus
+  claim_name: lynceus-pvc
+  mount_path: /mnt/lynceus
+
+images:
+  candidates:
+    image: registry.nebula.lan:5000/lynceus/candidates:0.1.0

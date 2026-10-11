@@ -44,10 +44,6 @@ PARQUET_SCHEMA = pa.schema(
 )
 
 
-def _folder_output_dir(output_dir: str, folder: str) -> str:
-    return os.path.join(output_dir, folder)
-
-
 def _parquet_output_path(source_path: str, output_dir: str) -> str:
     filename = os.path.basename(source_path)
     stem = filename[: -len(".smi.gz")] if filename.endswith(".smi.gz") else filename
@@ -209,19 +205,17 @@ def load_candidates(
             f"folder={input_folder} resolved to zero files at {source_glob}"
         )
 
-    folder_output_dir = _folder_output_dir(output_path, input_folder)
-
     logger.info(
         "Streaming files to parquet",
         folder=input_folder,
         file_count=len(source_paths),
-        path=folder_output_dir,
+        path=output_path,
         workers=num_workers,
     )
 
     _write_parquet_parallel(
         source_paths,
-        folder_output_dir,
+        output_path,
         chunk_size,
         batch_rows,
         num_workers,

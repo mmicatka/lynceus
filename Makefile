@@ -9,7 +9,6 @@ INFRA_CONFIG ?= conf/infra/dev.yaml
 NAMESPACE ?= workflows
 VERSION ?= 0.1.0
 
-
 WORKFLOWS ?= candidates-workflow
 OUT_DIR ?= workflows/manifests
 

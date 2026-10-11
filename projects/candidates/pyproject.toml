@@ -6,19 +6,26 @@ authors = [{ name = "Mike Micatka", email = "mike.micatka@gmail.com" }]
 requires-python = ">=3.14"
 dependencies = [
     "click>=8.4.2",
+    "dimorphite-dl",
     "duckdb>=1.5.4",
     "lynceus-core",
     "pyarrow>=24.0.0",
+    "rdkit>=2026.3.5",
+    "scikit-fingerprints>=2.1.0",
     "structlog>=26.1.0",
 ]
 
 [project.scripts]
 load-candidates = "candidates:load_candidates"
+sample-candidates = "candidates:sample_candidates"
 shard-candidates = "candidates:shard_candidates"
+generate-conformers = "candidates:generate_conformers"
+generate-features = "candidates:generate_features"
 
 [build-system]
 requires = ["uv_build>=0.12.23,<0.13.0"]
 build-backend = "uv_build"
 
 [tool.uv.sources]
+dimorphite-dl = { git = "https://github.com/mmicatka/dimorphite_dl.git" }
 lynceus-core = { workspace = true }
