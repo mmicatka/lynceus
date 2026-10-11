@@ -9,14 +9,13 @@ import click
 import pyarrow as pa
 import pyarrow.parquet as pq
 import structlog
-from generate_features.feature_generators import (
-    FEATURE_GENERATOR_REGISTRY,
-    FeatureGenerator,
-)
 from lynceus_core.cli import NumWorkers
 from lynceus_core.logging import wide_log
 from rdkit import rdBase
 from rdkit.Chem import Mol, MolFromMolBlock
+
+from candidates.features.feature_generators import FEATURE_GENERATOR_REGISTRY
+from candidates.features.feature_generators.feature_generator import FeatureGenerator
 
 os.environ["OMP_NUM_THREADS"] = "1"
 os.environ["OPENBLAS_NUM_THREADS"] = "1"
