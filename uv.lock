@@ -18,7 +18,7 @@ members = [
     "lynceus-dev",
     "lynceus-utils",
     "surrogate-model",
-    "target",
+    "targets",
     "workflows",
 ]
 
@@ -1603,7 +1603,7 @@ dependencies = [
     { name = "lynceus-core" },
     { name = "lynceus-utils" },
     { name = "surrogate-model" },
-    { name = "target" },
+    { name = "targets" },
     { name = "workflows" },
 ]
 
@@ -1625,7 +1625,7 @@ requires-dist = [
     { name = "lynceus-core", editable = "libs/lynceus-core" },
     { name = "lynceus-utils", editable = "libs/lynceus-utils" },
     { name = "surrogate-model", editable = "modules/local/surrogate_model" },
-    { name = "target", editable = "projects/target" },
+    { name = "targets", editable = "projects/targets" },
     { name = "workflows", editable = "workflows" },
 ]
 
@@ -3053,12 +3053,13 @@ dev = [
 ]
 
 [[package]]
-name = "target"
+name = "targets"
 version = "0.1.0"
-source = { editable = "projects/target" }
+source = { editable = "projects/targets" }
 dependencies = [
     { name = "click" },
     { name = "gemmi" },
+    { name = "httpx" },
     { name = "lynceus-core" },
     { name = "protein-ensemble" },
 ]
@@ -3067,6 +3068,7 @@ dependencies = [
 requires-dist = [
     { name = "click", specifier = ">=8.4.2" },
     { name = "gemmi", specifier = ">=0.7.5" },
+    { name = "httpx", specifier = ">=0.28.1" },
     { name = "lynceus-core", editable = "libs/lynceus-core" },
     { name = "protein-ensemble", git = "https://github.com/proteinensemble/python-sdk.git" },
 ]

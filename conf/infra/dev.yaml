@@ -44,6 +44,14 @@ templates:
   generate_features:
     resources: *med_cpu
     image: *candidates_image
+  download_pdbs:
+    resources: &low_cpu
+      requests: &low_cpu_res
+        cpu: "2"
+        memory: 1Gi
+      limits: *med_cpu_res
+    image: &targets_image
+      image: registry.nebula.lan:5000/lynceus/targets:0.1.0
 
 volume:
   name: lynceus
