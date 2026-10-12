@@ -14,9 +14,9 @@ def build_clean_prefix_template() -> Container:
         command=["sh", "-c"],
         args=[
             CLEAN_SCRIPT,
-            "{{inputs.parameters.mount_path}}",
+            "{{inputs.parameters.base_path}}",
             "{{inputs.parameters.prefix}}",
         ],
-        inputs=[Parameter(name="mount_path"), Parameter(name="prefix")],
+        inputs=[Parameter(name="base_path"), Parameter(name="prefix")],
         volumes=[LYNCEUS_VOLUME],
     )

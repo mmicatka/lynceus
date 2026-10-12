@@ -97,7 +97,7 @@ def _cleanup_staging_task(infra_config: InfraConfig) -> Task:
         name="cleanup-staging",
         template=build_clean_prefix_template(),
         arguments={
-            "mount_path": infra_config.volume.mount_path,
+            "base_path": infra_config.volume.mount_path,
             "prefix": infra_config.storage.prefixes.candidates.shards_staging,
         },
     )

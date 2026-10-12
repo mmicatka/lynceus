@@ -203,7 +203,7 @@ spec:
         template: clean-prefix
         arguments:
           parameters:
-          - name: mount_path
+          - name: base_path
             value: /mnt/lynceus
           - name: prefix
             value: candidates/shards_staging
@@ -246,7 +246,7 @@ spec:
         claimName: lynceus-pvc
     inputs:
       parameters:
-      - name: mount_path
+      - name: base_path
       - name: input_path
       - name: output_path
       - name: num_workers
@@ -265,10 +265,10 @@ spec:
         import sys
         sys.path.append(os.getcwd())
         import json
+        try: base_path = json.loads(r'''{{inputs.parameters.base_path}}''')
+        except: base_path = r'''{{inputs.parameters.base_path}}'''
         try: input_path = json.loads(r'''{{inputs.parameters.input_path}}''')
         except: input_path = r'''{{inputs.parameters.input_path}}'''
-        try: mount_path = json.loads(r'''{{inputs.parameters.mount_path}}''')
-        except: mount_path = r'''{{inputs.parameters.mount_path}}'''
         try: num_workers = json.loads(r'''{{inputs.parameters.num_workers}}''')
         except: num_workers = r'''{{inputs.parameters.num_workers}}'''
         try: output_path = json.loads(r'''{{inputs.parameters.output_path}}''')
@@ -276,7 +276,7 @@ spec:
 
         import os
         import subprocess
-        subprocess.run(['merge-shards', '--input', os.path.join(mount_path, input_path), '--output', os.path.join(mount_path, output_path), '--num-workers', str(num_workers)], check=True)
+        subprocess.run(['merge-shards', '--input', os.path.join(base_path, input_path), '--output', os.path.join(base_path, output_path), '--num-workers', str(num_workers)], check=True)
       command:
       - python
       volumeMounts:
@@ -298,7 +298,7 @@ spec:
       image: alpine:3.20
       args:
       - test -n "$1" && rm -rf "$0/$1"
-      - '{{inputs.parameters.mount_path}}'
+      - '{{inputs.parameters.base_path}}'
       - '{{inputs.parameters.prefix}}'
       command:
       - sh
@@ -308,7 +308,7 @@ spec:
         mountPath: /mnt/data
     inputs:
       parameters:
-      - name: mount_path
+      - name: base_path
       - name: prefix
   - name: subsample-candidates
     volumes:
