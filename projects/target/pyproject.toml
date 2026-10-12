@@ -19,5 +19,5 @@ requires = ["uv_build>=0.12.23,<0.13.0"]
 build-backend = "uv_build"
 
 [tool.uv.sources]
-lynceus-core = { workspace = true }
 protein-ensemble = { git = "https://github.com/proteinensemble/python-sdk.git" }
+lynceus-core = { workspace = true }

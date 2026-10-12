@@ -13,7 +13,6 @@ resolution-markers = [
 [manifest]
 members = [
     "candidates",
-    "detect-binding-sites",
     "docking-run",
     "lynceus-core",
     "lynceus-dev",
@@ -679,25 +678,6 @@ dependencies = [
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/7b/3c/67bfc03db3f6527a54a0f9b696809bca55eb6de27928829218ab7e6c40e7/descriptastorus-2.8.0-py3-none-any.whl", hash = "sha256:cc0c8201d6d9d8534dc8a45ce629aeaf4cf1e62ba848b9b1e392b2600ca834dc", size = 2127218, upload-time = "2024-10-26T19:48:30.328Z" },
-]
-
-[[package]]
-name = "detect-binding-sites"
-version = "0.1.0"
-source = { editable = "modules/local/detect_binding_sites" }
-dependencies = [
-    { name = "click" },
-    { name = "gemmi" },
-    { name = "lynceus-utils", extra = ["s3"] },
-    { name = "protein-ensemble" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "click", specifier = ">=8.4.2" },
-    { name = "gemmi", specifier = ">=0.7.5" },
-    { name = "lynceus-utils", extras = ["s3"], editable = "libs/lynceus-utils" },
-    { name = "protein-ensemble", git = "https://github.com/proteinensemble/python-sdk.git" },
 ]
 
 [[package]]
@@ -1619,11 +1599,11 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "candidates" },
-    { name = "detect-binding-sites" },
     { name = "docking-run" },
     { name = "lynceus-core" },
     { name = "lynceus-utils" },
     { name = "surrogate-model" },
+    { name = "target" },
     { name = "workflows" },
 ]
 
@@ -1641,11 +1621,11 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "candidates", editable = "projects/candidates" },
-    { name = "detect-binding-sites", editable = "modules/local/detect_binding_sites" },
     { name = "docking-run", editable = "modules/local/docking_run" },
     { name = "lynceus-core", editable = "libs/lynceus-core" },
     { name = "lynceus-utils", editable = "libs/lynceus-utils" },
     { name = "surrogate-model", editable = "modules/local/surrogate_model" },
+    { name = "target", editable = "projects/target" },
     { name = "workflows", editable = "workflows" },
 ]
 
@@ -3079,12 +3059,16 @@ source = { editable = "projects/target" }
 dependencies = [
     { name = "click" },
     { name = "gemmi" },
+    { name = "lynceus-core" },
+    { name = "protein-ensemble" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "click", specifier = ">=8.4.2" },
     { name = "gemmi", specifier = ">=0.7.5" },
+    { name = "lynceus-core", editable = "libs/lynceus-core" },
+    { name = "protein-ensemble", git = "https://github.com/proteinensemble/python-sdk.git" },
 ]
 
 [[package]]

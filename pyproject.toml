@@ -10,9 +10,10 @@ dependencies = [
     # libs
     "lynceus-core",
     "lynceus-utils",
+    # projects
     "candidates",
+    "target",
     # utils
-    "detect-binding-sites",
     "docking-run",
     "surrogate-model",
     "workflows",
@@ -25,17 +26,16 @@ members = [
     "libs/lynceus-core",
     # projects
     "projects/candidates",
-    "modules/local/detect_binding_sites",
+    "projects/target",
     "modules/local/docking_run",
     "modules/local/surrogate_model",
+    # workflows
     "workflows",
-    "projects/target",
 ]
 
 [tool.uv.sources]
-
 candidates = { workspace = true }
-detect-binding-sites = { workspace = true }
+target = { workspace = true }
 lynceus-utils = { workspace = true }
 docking-run = { workspace = true }
 surrogate-model = { workspace = true }
