@@ -2775,7 +2775,7 @@ wheels = [
 [[package]]
 name = "protein-ensemble"
 version = "0.1.0"
-source = { git = "https://github.com/proteinensemble/python-sdk.git#bb8f5560e45aea0d4015bb7f77e36f8478fbbf07" }
+source = { git = "https://github.com/proteinensemble/python-sdk.git#a68579b40849565509531e06efca6b17f96294b0" }
 dependencies = [
     { name = "blake3" },
     { name = "pydantic" },
