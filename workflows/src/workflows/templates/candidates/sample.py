@@ -2,8 +2,8 @@
 
 
 def sample_candidates_template(
+    base_path: str,
     source: str,
-    mount_path: str,
     source_prefix: str,
     parquet_prefix: str,
     num_samples: int,
@@ -15,9 +15,9 @@ def sample_candidates_template(
         [
             "sample-candidates",
             "--input",
-            os.path.join(mount_path, source_prefix, source),
+            os.path.join(base_path, source_prefix, source),
             "--output",
-            os.path.join(mount_path, parquet_prefix, source),
+            os.path.join(base_path, parquet_prefix, source),
             "--num-samples",
             str(num_samples),
         ],

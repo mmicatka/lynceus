@@ -1,4 +1,4 @@
-# modules/local/detect_binding_sites/src/detect_binding_sites/models.py
+# projects/targets/src/targets/models.py
 
 
 from typing import Annotated, Any, Literal, Union

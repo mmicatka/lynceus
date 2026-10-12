@@ -10,11 +10,11 @@ from workflows.resources import LYNCEUS_VOLUME
 
 
 @script(volumes=[LYNCEUS_VOLUME])
-def echo(message: str, mount_path: str = ""):
+def echo(message: str, base_path: str = ""):
     print(message)
 
-    if mount_path:
-        test_file = os.path.join(mount_path, "hera_smoke_test.txt")
+    if base_path:
+        test_file = os.path.join(base_path, "hera_smoke_test.txt")
         with open(test_file, "w") as f:
             f.write(f"Latest message:\n{message}\n")
 
@@ -53,7 +53,7 @@ def build_smoke_test_workflow(
                 name="task-a",
                 arguments={
                     "message": config_dump,
-                    "mount_path": LYNCEUS_VOLUME.mount_path,
+                    "base_path": LYNCEUS_VOLUME.mount_path,
                 },
             )
             task_b = echo(name="task-b", arguments={"message": "Workflow complete!"})

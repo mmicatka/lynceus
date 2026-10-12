@@ -1,19 +1,17 @@
 # workflows/src/workflows/registry/candidates/preprocess.py
 
-from hera.workflows import DAG, Parameter, Workflow
+from hera.workflows import DAG, Parameter, Task, Workflow
 
 from workflows.config import InfraConfig, ScreenConfig
 from workflows.config.infrastructure import TemplateName
-from workflows.registry.candidates.common import (
-    ENTRYPOINT_DAG,
-    candidates_template_factory,
-    new_candidates_workflow,
-)
 from workflows.registry.common import (
+    ENTRYPOINT_DAG,
     ITEM_PARAM,
-    SHARD_PREFIX,
-    SHARD_SUFFIX,
+    SOURCE_INPUT_NAME,
     SOURCE_PARAM,
+    get_template_factory,
+    new_workflow,
+    shard_filename,
     shard_ids,
 )
 from workflows.templates import (
@@ -26,15 +24,25 @@ PREPROCESS_CANDIDATES_DAG = "preprocess-candidates-dag"
 PROCESS_SHARD_DAG = "process-shard-dag"
 
 
-def build_preprocess_candidates_dag(
+def _conformer_input_prefix(
+    infra_config: InfraConfig,
+    screen_config: ScreenConfig,
+) -> str:
+    prefixes = infra_config.storage.prefixes.candidates
+    return (
+        prefixes.shards_sample
+        if screen_config.candidates.sub_sample
+        else prefixes.shards
+    )
+
+
+def _build_process_shard_dag(
     templates: TemplateFactory,
     infra_config: InfraConfig,
     screen_config: ScreenConfig,
 ) -> DAG:
-    mount_path = infra_config.volume.mount_path
-    num_shards = infra_config.candidates.num_shards
-    features = screen_config.filter.features
-    candidate_prefixes = infra_config.storage.prefixes.candidates
+    prefixes = infra_config.storage.prefixes.candidates
+    base_path = infra_config.volume.mount_path
 
     generate_conformers = templates.build(
         TemplateName.GENERATE_CONFORMERS, generate_conformers_template
@@ -43,59 +51,61 @@ def build_preprocess_candidates_dag(
         TemplateName.GENERATE_FEATURES, generate_features_template
     )
 
-    input_prefix = (
-        candidate_prefixes.shards_sample
-        if screen_config.candidates.sub_sample
-        else candidate_prefixes.shards
-    )
-
-    with DAG(
-        name=PROCESS_SHARD_DAG, inputs=[Parameter(name="source")]
-    ) as process_shard_dag:
+    with DAG(name=PROCESS_SHARD_DAG, inputs=[Parameter(name=SOURCE_INPUT_NAME)]) as dag:
         conformers_task = generate_conformers(
             name="generate-conformers",
             arguments={
+                "base_path": base_path,
                 "source": SOURCE_PARAM,
-                "mount_path": mount_path,
-                "input_prefix": input_prefix,
-                "output_prefix": candidate_prefixes.conformers,
+                "input_prefix": _conformer_input_prefix(infra_config, screen_config),
+                "output_prefix": prefixes.conformers,
             },
         )
-
         features_task = generate_features(
             name="generate-features",
             arguments={
+                "base_path": base_path,
                 "source": SOURCE_PARAM,
-                "mount_path": mount_path,
-                "input_prefix": candidate_prefixes.conformers,
-                "output_prefix": candidate_prefixes.features,
-                "features": features,
+                "input_prefix": prefixes.conformers,
+                "output_prefix": prefixes.features,
+                "features": screen_config.filter.features,
             },
         )
-
         conformers_task >> features_task  # type: ignore
 
-    with DAG(name=PREPROCESS_CANDIDATES_DAG) as preprocess_dag:
-        process_shard_dag(
+    return dag
+
+
+def build_preprocess_candidates_dag(
+    templates: TemplateFactory,
+    infra_config: InfraConfig,
+    screen_config: ScreenConfig,
+) -> DAG:
+    process_shard_dag = _build_process_shard_dag(templates, infra_config, screen_config)
+
+    with DAG(name=PREPROCESS_CANDIDATES_DAG) as dag:
+        Task(
             name="process-shards",
-            with_items=shard_ids(num_shards),
-            arguments={"source": f"{SHARD_PREFIX}{ITEM_PARAM}{SHARD_SUFFIX}"},
+            template=process_shard_dag,
+            with_items=shard_ids(infra_config.candidates.num_shards),
+            arguments={SOURCE_INPUT_NAME: shard_filename(ITEM_PARAM)},
         )
 
-    return preprocess_dag
+    return dag
 
 
 def build_preprocess_candidates_workflow(
-    infra_config: InfraConfig, screen_config: ScreenConfig
+    infra_config: InfraConfig,
+    screen_config: ScreenConfig,
 ) -> Workflow:
-    templates = candidates_template_factory(infra_config)
+    templates = get_template_factory(infra_config)
 
-    with new_candidates_workflow(screen_config.name, "preprocess-candidates") as w:
+    with new_workflow(screen_config.name, "preprocess-candidates") as workflow:
         preprocess_dag = build_preprocess_candidates_dag(
             templates, infra_config, screen_config
         )
 
         with DAG(name=ENTRYPOINT_DAG):
-            preprocess_dag(name="preprocess-candidates")
+            Task(name="preprocess-candidates", template=preprocess_dag)
 
-    return w
+    return workflow

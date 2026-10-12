@@ -10,6 +10,7 @@ from .candidates import (
 )
 from .common import build_clean_prefix_template, merge_shards_template
 from .config import ImageConfig, TemplateConfig
+from .targets import download_pdbs_template
 
 __all__ = [
     # utils
@@ -26,4 +27,6 @@ __all__ = [
     "load_candidates_template",
     "sample_candidates_template",
     "shard_candidates_template",
+    # target
+    "download_pdbs_template",
 ]

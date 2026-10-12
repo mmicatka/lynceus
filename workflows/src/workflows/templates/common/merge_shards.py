@@ -2,7 +2,7 @@
 
 
 def merge_shards_template(
-    mount_path: str,
+    base_path: str,
     input_path: str,
     output_path: str,
     num_workers: str = "auto",
@@ -14,9 +14,9 @@ def merge_shards_template(
         [
             "merge-shards",
             "--input",
-            os.path.join(mount_path, input_path),
+            os.path.join(base_path, input_path),
             "--output",
-            os.path.join(mount_path, output_path),
+            os.path.join(base_path, output_path),
             "--num-workers",
             str(num_workers),
         ],

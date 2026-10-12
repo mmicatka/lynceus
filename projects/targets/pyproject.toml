@@ -1,0 +1,25 @@
+[project]
+name = "targets"
+version = "0.1.0"
+description = "Add your description here"
+authors = [{ name = "Mike Micatka", email = "mike.micatka@gmail.com" }]
+requires-python = ">=3.14"
+dependencies = [
+    "click>=8.4.2",
+    "gemmi>=0.7.5",
+    "httpx>=0.28.1",
+    "lynceus-core",
+    "protein-ensemble",
+]
+
+[project.scripts]
+detect-binding-sites = "targets:detect_binding_sites"
+download-pdbs = "targets:download_pdbs"
+
+[build-system]
+requires = ["uv_build>=0.12.23,<0.13.0"]
+build-backend = "uv_build"
+
+[tool.uv.sources]
+protein-ensemble = { git = "https://github.com/proteinensemble/python-sdk.git" }
+lynceus-core = { workspace = true }

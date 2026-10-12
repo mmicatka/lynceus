@@ -1,6 +1,6 @@
-# modules/local/detect_binding_sites/Dockerfile
+# projects/candidates/Dockerfile
 
-FROM python:3.12-slim-trixie
+FROM python:3.14-slim-trixie
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     procps \
@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=ghcr.io/astral-sh/uv:0.11.28-python3.12-trixie /usr/local/bin/uv /usr/local/bin/uvx /usr/local/bin/
+COPY --from=ghcr.io/astral-sh/uv:0.11.28-python3.14-trixie /usr/local/bin/uv /usr/local/bin/uvx /usr/local/bin/
 
 ENV P2RANK_VERSION=2.5.1
 ENV P2RANK_HOME=/opt/p2rank_${P2RANK_VERSION}
@@ -22,10 +22,10 @@ WORKDIR /app
 
 COPY pyproject.toml uv.lock ./
 
-COPY libs/lynceus-utils ./libs/lynceus-utils
-COPY modules/local/detect_binding_sites ./modules/local/detect_binding_sites
+COPY libs/lynceus-core ./libs/lynceus-core
 
-WORKDIR /app/modules/local/detect_binding_sites
+COPY projects/targets ./projects/targets
+WORKDIR /app/projects/targets
 
 RUN uv pip install --system .
 

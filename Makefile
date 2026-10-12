@@ -9,13 +9,16 @@ INFRA_CONFIG ?= conf/infra/dev.yaml
 NAMESPACE ?= workflows
 VERSION ?= 0.1.0
 
-WORKFLOWS ?= candidates-workflow
+WORKFLOWS ?= candidates-workflow targets-workflow
 OUT_DIR ?= workflows/manifests
 
 .PHONY: build push build-* clean lint lint-python lint-argo generate generate-workflows submit run logs
 
 build-candidates:
 	docker buildx build --platform linux/amd64,linux/arm64 --push -f projects/candidates/Dockerfile -t $(IMAGE_PREFIX)/candidates:$(VERSION) .
+
+build-targets:
+	docker buildx build --platform linux/amd64,linux/arm64 --push -f projects/targets/Dockerfile -t $(IMAGE_PREFIX)/targets:$(VERSION) .
 
 setup-argo:
 	$(MAKE) -C infra/argo all WORKFLOW_NAMESPACE=$(NAMESPACE)

@@ -3,7 +3,7 @@
 from enum import StrEnum
 from typing import Annotated, Literal
 
-from pydantic import Field, PositiveInt, StringConstraints
+from pydantic import PositiveInt, StringConstraints
 
 from workflows.config.base import StrictModel
 
@@ -16,6 +16,7 @@ MemoryQuantity = Annotated[
     str,
     StringConstraints(pattern=r"^\d+(\.\d+)?(Ki|Mi|Gi|Ti|Pi|Ei|k|M|G|T|P|E)?$"),
 ]
+MountPath = Annotated[str, StringConstraints(pattern=r"^/[^/\s]+(/[^/\s]+)*$")]
 
 
 class TemplateName(StrEnum):
@@ -25,11 +26,8 @@ class TemplateName(StrEnum):
     SUBSAMPLE_CANDIDATES = "subsample_candidates"
     GENERATE_CONFORMERS = "generate_conformers"
     GENERATE_FEATURES = "generate_features"
-
-
-class ImageConfig(StrictModel):
-    image: str
-    image_pull_policy: Literal["Always", "IfNotPresent", "Never"] = "Always"
+    DOWNLOAD_PDBS = "download_pdbs"
+    GENERATE_MANIFEST = "generate_manifest"
 
 
 class CandidatePrefixes(StrictModel):
@@ -42,8 +40,14 @@ class CandidatePrefixes(StrictModel):
     features: StoragePrefix
 
 
+class TargetPrefixes(StrictModel):
+    pdbs: StoragePrefix
+    ensembles: StoragePrefix
+
+
 class StoragePrefixes(StrictModel):
     candidates: CandidatePrefixes
+    target: TargetPrefixes
 
 
 class StorageConfig(StrictModel):
@@ -64,27 +68,24 @@ class ResourceSpec(StrictModel):
     limits: ResourceQuantities
 
 
-class TemplatesConfig(StrictModel):
-    default: ResourceSpec
-    overrides: dict[TemplateName, ResourceSpec] = Field(default_factory=dict)
+class VolumeConfig(StrictModel):
+    name: str
+    claim_name: str
+    mount_path: MountPath
 
-    def resources_for(self, name: TemplateName) -> ResourceSpec:
-        return self.overrides.get(name, self.default)
+
+class ImageConfig(StrictModel):
+    image: str
+    image_pull_policy: Literal["Always", "IfNotPresent", "Never"] = "Always"
+
+
+class TemplateConfig(StrictModel):
+    image: ImageConfig
+    resources: ResourceSpec
 
 
 class InfraConfig(StrictModel):
     storage: StorageConfig
     volume: VolumeConfig
-    images: dict[ImageName, ImageConfig]
     candidates: CandidatesInfraConfig
-    templates: TemplatesConfig
-
-
-class VolumeConfig(StrictModel):
-    name: str
-    claim_name: str
-    mount_path: Annotated[str, StringConstraints(pattern=r"^/[^/\s]+(/[^/\s]+)*$")]
-
-
-class ImageName(StrEnum):
-    CANDIDATES = "candidates"
+    templates: dict[TemplateName, TemplateConfig]

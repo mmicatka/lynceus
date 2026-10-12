@@ -2,7 +2,7 @@
 
 
 def shard_candidates_template(
-    mount_path: str,
+    base_path: str,
     input_prefix: str,
     output_prefix: str,
     num_shards: int,
@@ -16,9 +16,9 @@ def shard_candidates_template(
         [
             "shard-candidates",
             "--input",
-            os.path.join(mount_path, input_prefix),
+            os.path.join(base_path, input_prefix),
             "--output",
-            os.path.join(mount_path, output_prefix),
+            os.path.join(base_path, output_prefix),
             "--num-shards",
             str(num_shards),
             "--id-column",

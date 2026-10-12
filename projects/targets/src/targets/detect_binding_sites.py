@@ -1,33 +1,43 @@
-# modules/local/detect_binding_sites/src/detect_binding_sites/detect_binding_sites.py
+# projects/targets/src/targets/detect_binding_sites.py
+
 import csv
 import json
-import logging
+import os
 import subprocess
 import sys
 import tempfile
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
-from typing import Optional
 
 import click
 import gemmi
-from lynceus_utils.cli import NumWorkers
-from lynceus_utils.storage.blob_storage import get_blob_storage_settings
-from lynceus_utils.storage.filesystem import get_filesystem
+import structlog
+from lynceus_core.cli import NumWorkers
+from lynceus_core.logging import wide_log
 from protein_ensemble import Manifest
 
-from .models import BindingSite, Sphere
+from targets.models import BindingSite, Sphere
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)s %(message)s",
-    stream=sys.stderr,
-)
-logger = logging.getLogger(__name__)
 
-# Exact header written by p2rank's PredictionSummary.toCSV() (PredictionSummary.groovy,
-# rdk/p2rank, as of v2.6 / develop branch). Verified against source rather than assumed,
-# since a silently-wrong column name here would fail parsing without a clear signal.
+def configure_logging():
+    if sys.stdout.isatty():
+        processor = structlog.dev.ConsoleRenderer(colors=True)
+    else:
+        processor = structlog.processors.JSONRenderer()
+
+    structlog.configure(
+        processors=[
+            structlog.processors.TimeStamper(fmt="iso"),
+            structlog.processors.add_log_level,
+            processor,
+        ]
+    )
+
+
+configure_logging()
+logger = structlog.get_logger()
+
+# Exact header written by p2rank's PredictionSummary.toCSV()
 _P2RANK_PREDICTIONS_HEADER = (
     "name",
     "rank",
@@ -43,16 +53,21 @@ _P2RANK_PREDICTIONS_HEADER = (
 )
 
 
-def _member_to_local_cif(
-    manifest: Manifest, member_id: str, workdir: Path, fs, ensemble_uri: str
-) -> Path:
-    source_path = Path(manifest.structure_path(member_id))
-    local_path = (workdir / source_path.name).with_suffix(".cif")
+def _marker_path(output_path: str) -> str:
+    return f"{output_path}.SUCCESS"
 
-    remote_path = f"{ensemble_uri}/members/{source_path.name}"
-    fs.get(remote_path, str(local_path))
 
-    return local_path
+def _is_valid(output_path: str, num_members: int) -> bool:
+    marker_path = _marker_path(output_path)
+    if not os.path.exists(marker_path):
+        return False
+    with open(marker_path, "r") as f:
+        return json.load(f).get("num_members") == num_members
+
+
+def _write_success_marker(output_path: str, num_members: int) -> None:
+    with open(_marker_path(output_path), "w") as f:
+        json.dump({"num_members": num_members}, f)
 
 
 def _run_p2rank(local_input: Path, workdir: Path) -> Path:
@@ -81,9 +96,7 @@ def _parse_predictions_csv(predictions_csv: Path) -> list[dict[str, str]]:
         if missing:
             raise RuntimeError(
                 f"p2rank predictions CSV {predictions_csv} is missing expected "
-                f"columns {sorted(missing)}; found columns {fieldnames}. "
-                "This likely means the installed p2rank version's output "
-                "format has changed and this parser needs updating."
+                f"columns {sorted(missing)}; found columns {fieldnames}."
             )
 
         return [{_k.strip(): _v.strip() for _k, _v in row.items()} for row in reader]
@@ -102,9 +115,7 @@ def _resolve_atom_coords(structure_path: Path) -> dict[int, tuple[float, float, 
                         atom.pos.y,
                         atom.pos.z,
                     )
-        break  # only the first model is relevant; standalone/multi-model
-        # structures are already reduced to a single conformation by
-        # _member_to_local_cif before p2rank ever sees them.
+        break
 
     return coords_by_serial
 
@@ -144,25 +155,23 @@ def _pocket_row_to_binding_site(
     missing_count = len(surf_atom_ids) - len(points)
     if missing_count:
         logger.warning(
-            "pocket rank %s (%s): %d/%d surf_atom_ids not found in structure; "
-            "radius computed from the %d resolved atoms only",
-            pocket_rank,
-            member_id,
-            missing_count,
-            len(surf_atom_ids),
-            len(points),
+            "pocket rank surf_atom_ids not found in structure; "
+            "radius computed from resolved atoms only",
+            pocket_rank=pocket_rank,
+            member_id=member_id,
+            missing_count=missing_count,
+            total_atoms=len(surf_atom_ids),
         )
 
     if not points:
         logger.warning(
-            "pocket rank %s (%s): no surf_atom_ids resolved to structure "
-            "coordinates; skipping (cannot compute a radius)",
-            pocket_rank,
-            member_id,
+            "no surf_atom_ids resolved to structure coordinates;"
+            " skipping (cannot compute radius)",
+            pocket_rank=pocket_rank,
+            member_id=member_id,
         )
         return None
 
-    # Radius of gyration about p2rank's own reported pocket center
     radius = _radius_of_gyration(points, center)
 
     return BindingSite(
@@ -188,8 +197,8 @@ def _pockets_to_binding_sites(
     rows = _parse_predictions_csv(predictions_csv)
     if not rows:
         logger.warning(
-            "p2rank produced no predicted pockets for member: %s",
-            member_id,
+            "p2rank produced no predicted pockets",
+            member_id=member_id,
         )
         return []
 
@@ -205,39 +214,37 @@ def _pockets_to_binding_sites(
 
 
 def _detect_binding_sites(
-    manifest: Manifest, member_id: str, ensemble_uri: str, bucket: Optional[str]
+    manifest: Manifest, member_id: str, ensemble_path: str
 ) -> list[BindingSite]:
-    logger.info("detecting sites for member: %s", member_id)
+    logger.info("Detecting sites for member", member_id=member_id)
 
-    blob_storage_settings = get_blob_storage_settings() if bucket else None
-    fs = get_filesystem(blob_storage_settings)
+    source_path = Path(manifest.structure_path(member_id))
+    local_input = Path(ensemble_path) / "members" / source_path.name
+
+    if not local_input.is_file():
+        raise RuntimeError(f"Structure file not found: {local_input}")
 
     with tempfile.TemporaryDirectory(prefix="p2rank_") as _tmp:
         workdir = Path(_tmp)
-        local_input = _member_to_local_cif(
-            manifest, member_id, workdir, fs, ensemble_uri
-        )
         predictions_csv = _run_p2rank(local_input, workdir)
         return _pockets_to_binding_sites(predictions_csv, local_input, member_id)
 
 
 def _detect_binding_sites_ensemble(
-    ensemble_uri: str, num_workers: int, bucket: Optional[str], fs
+    ensemble_path: str, num_workers: int
 ) -> list[BindingSite]:
-    manifest_uri = f"{ensemble_uri}/manifest.json"
+    manifest_path = os.path.join(ensemble_path, "manifest.json")
+    if not os.path.exists(manifest_path):
+        raise RuntimeError(f"Manifest not found in ensemble at {manifest_path}")
 
-    with tempfile.TemporaryDirectory() as tmp_dir:
-        local_manifest_path = Path(tmp_dir) / "manifest.json"
-        fs.get(manifest_uri, str(local_manifest_path))
-        manifest = Manifest.load(str(local_manifest_path))
-
+    manifest = Manifest.load(manifest_path)
     member_ids = list(manifest.members)
     binding_sites: list[BindingSite] = []
 
     with ProcessPoolExecutor(max_workers=num_workers) as pool:
         futures = {
             pool.submit(
-                _detect_binding_sites, manifest, _member_id, ensemble_uri, bucket
+                _detect_binding_sites, manifest, _member_id, ensemble_path
             ): _member_id
             for _member_id in member_ids
         }
@@ -248,48 +255,81 @@ def _detect_binding_sites_ensemble(
                 binding_sites.extend(future.result())
             except Exception:
                 logger.exception(
-                    "p2rank detection failed for member: %s",
-                    member_id,
+                    "p2rank detection failed for member",
+                    member_id=member_id,
                 )
                 raise
 
     return binding_sites
 
 
-def _write_binding_sites(binding_sites: list[BindingSite], output_uri: str, fs):
-    with fs.open(output_uri, "w") as _f:
-        json.dump([_b.to_dict() for _b in binding_sites], _f)
-
-
-@click.command()
-@click.option("--ensemble", type=str, required=True, help="Path to the input ensemble.")
-@click.option("--out", type=str, required=True, help="Path to the output JSON file.")
+@click.command("detect_binding_sites")
 @click.option(
-    "--bucket", type=str, default="lynceus", help="S3-compatible bucket name."
+    "--ensemble",
+    "ensemble_path",
+    required=True,
+    type=str,
+    help="Path to the input ensemble folder.",
+)
+@click.option(
+    "--out",
+    "output_path",
+    required=True,
+    type=str,
+    help="Path to the output JSON file.",
 )
 @click.option(
     "--num-workers",
+    "num_workers",
     default="auto",
     type=NumWorkers(),
     show_default=True,
     help="Number of parallel workers (integer >= 1 or 'auto').",
 )
+@wide_log(logger)
 def detect_binding_sites(
-    ensemble: str,
-    out: str,
-    bucket: str,
+    ensemble_path: str,
+    output_path: str,
     num_workers: int,
 ):
-    logger.info("detecting binding sites for %s", ensemble)
+    click.echo(f"Processing ensemble at {ensemble_path}...")
 
-    blob_storage_settings = get_blob_storage_settings() if bucket else None
-    fs = get_filesystem(blob_storage_settings)
+    manifest_path = os.path.join(ensemble_path, "manifest.json")
+    if not os.path.exists(manifest_path):
+        raise RuntimeError(f"Manifest not found at {manifest_path}")
 
-    ensemble_uri = f"s3://{bucket}/{ensemble}" if bucket else ensemble
-    out_uri = f"s3://{bucket}/{out}" if bucket else out
+    manifest = Manifest.load(manifest_path)
+    num_members = len(list(manifest.members))
 
-    binding_sites = _detect_binding_sites_ensemble(
-        ensemble_uri, num_workers, bucket, fs
+    if _is_valid(output_path, num_members):
+        logger.info(
+            "Binding sites already detected, skipping",
+            ensemble_path=ensemble_path,
+            output_path=output_path,
+            num_members=num_members,
+        )
+        click.echo("Done!")
+        return
+
+    logger.info(
+        "Detecting binding sites for ensemble",
+        ensemble_path=ensemble_path,
+        num_members=num_members,
+        output_path=output_path,
+        workers=num_workers,
     )
 
-    _write_binding_sites(binding_sites, out_uri, fs)
+    binding_sites = _detect_binding_sites_ensemble(ensemble_path, num_workers)
+
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    with open(output_path, "w") as _f:
+        json.dump([_b.to_dict() for _b in binding_sites], _f)
+
+    _write_success_marker(output_path, num_members)
+
+    logger.info("Finished detecting binding sites", ensemble_path=ensemble_path)
+    click.echo("Done!")
+
+
+if __name__ == "__main__":
+    detect_binding_sites()

@@ -1,17 +1,16 @@
 # workflows/src/workflows/templates/builders.py
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
+from typing import Self
 
 from hera.workflows import ExistingVolume, Resources, RetryStrategy, script
 
 from workflows.config.infrastructure import (
-    ImageConfig,
-    ImageName,
     InfraConfig,
     ResourceSpec,
+    TemplateConfig,
     TemplateName,
-    TemplatesConfig,
     VolumeConfig,
 )
 
@@ -33,35 +32,35 @@ def _to_hera_volume(config: VolumeConfig) -> ExistingVolume:
     )
 
 
+def _to_template_name(name: TemplateName) -> str:
+    return name.value.replace("_", "-")
+
+
 @dataclass(frozen=True)
 class TemplateFactory:
-    image: ImageConfig
     volume: VolumeConfig
-    templates: TemplatesConfig
+    templates: dict[TemplateName, TemplateConfig]  # <-- Update type hint
     retry_strategy: RetryStrategy | None = None
 
     @classmethod
     def from_config(
         cls,
         infra_config: InfraConfig,
-        image_name: ImageName,
         retry_strategy: RetryStrategy | None = None,
-    ) -> "TemplateFactory":
-        if image_name not in infra_config.images:
-            raise RuntimeError(f"No image configured for '{image_name.value}'")
+    ) -> Self:
         return cls(
-            image=infra_config.images[image_name],
             volume=infra_config.volume,
             templates=infra_config.templates,
             retry_strategy=retry_strategy,
         )
 
     def build(self, name: TemplateName, func: Callable) -> Callable:
+        template = self.templates[name]
         return script(
-            name=name.value.replace("_", "-"),
-            image=self.image.image,
-            image_pull_policy=self.image.image_pull_policy,
-            resources=_to_hera_resources(self.templates.resources_for(name)),
+            name=_to_template_name(name),
+            image=template.image.image,
+            image_pull_policy=template.image.image_pull_policy,
+            resources=_to_hera_resources(template.resources),
             volumes=[_to_hera_volume(self.volume)],
             retry_strategy=self.retry_strategy,
         )(func)

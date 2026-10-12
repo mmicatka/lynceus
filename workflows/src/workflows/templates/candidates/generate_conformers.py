@@ -2,8 +2,8 @@
 
 
 def generate_conformers_template(
+    base_path: str,
     source: str,
-    mount_path: str,
     input_prefix: str,
     output_prefix: str,
     num_workers: str = "auto",
@@ -17,9 +17,9 @@ def generate_conformers_template(
         [
             "generate-conformers",
             "--input",
-            os.path.join(mount_path, input_prefix, source),
+            os.path.join(base_path, input_prefix, source),
             "--output",
-            os.path.join(mount_path, output_prefix, source),
+            os.path.join(base_path, output_prefix, source),
             "--batch-size",
             str(batch_size),
             "--chunk-size",

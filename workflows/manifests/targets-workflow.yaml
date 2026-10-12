@@ -1,0 +1,139 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: 10m-poc-download-pdbs-
+spec:
+  entrypoint: main-dag
+  serviceAccountName: argo-workflow
+  templates:
+  - name: download-pdbs
+    volumes:
+    - name: lynceus
+      persistentVolumeClaim:
+        claimName: lynceus-pvc
+    inputs:
+      parameters:
+      - name: base_path
+      - name: pdb_ids
+      - name: output_prefix
+    retryStrategy:
+      limit: 5
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 10m
+    script:
+      image: registry.nebula.lan:5000/lynceus/targets:0.1.0
+      imagePullPolicy: Always
+      source: |-
+        import os
+        import sys
+        sys.path.append(os.getcwd())
+        import json
+        try: base_path = json.loads(r'''{{inputs.parameters.base_path}}''')
+        except: base_path = r'''{{inputs.parameters.base_path}}'''
+        try: output_prefix = json.loads(r'''{{inputs.parameters.output_prefix}}''')
+        except: output_prefix = r'''{{inputs.parameters.output_prefix}}'''
+        try: pdb_ids = json.loads(r'''{{inputs.parameters.pdb_ids}}''')
+        except: pdb_ids = r'''{{inputs.parameters.pdb_ids}}'''
+
+        import os
+        import subprocess
+        subprocess.run(['download-pdbs', '--pdb-ids', pdb_ids, '--outdir', os.path.join(base_path, output_prefix)], check=True)
+      command:
+      - python
+      volumeMounts:
+      - name: lynceus
+        mountPath: /mnt/lynceus
+      resources:
+        limits:
+          cpu: '2'
+          memory: 1Gi
+        requests:
+          cpu: '2'
+          memory: 1Gi
+  - name: generate-manifest
+    volumes:
+    - name: lynceus
+      persistentVolumeClaim:
+        claimName: lynceus-pvc
+    inputs:
+      parameters:
+      - name: base_path
+      - name: input_path
+      - name: output_path
+      - name: ensemble_id
+      - name: structure_glob
+    retryStrategy:
+      limit: 5
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 10m
+    script:
+      image: registry.nebula.lan:5000/lynceus/targets:0.1.0
+      imagePullPolicy: Always
+      source: |-
+        import os
+        import sys
+        sys.path.append(os.getcwd())
+        import json
+        try: base_path = json.loads(r'''{{inputs.parameters.base_path}}''')
+        except: base_path = r'''{{inputs.parameters.base_path}}'''
+        try: ensemble_id = json.loads(r'''{{inputs.parameters.ensemble_id}}''')
+        except: ensemble_id = r'''{{inputs.parameters.ensemble_id}}'''
+        try: input_path = json.loads(r'''{{inputs.parameters.input_path}}''')
+        except: input_path = r'''{{inputs.parameters.input_path}}'''
+        try: output_path = json.loads(r'''{{inputs.parameters.output_path}}''')
+        except: output_path = r'''{{inputs.parameters.output_path}}'''
+        try: structure_glob = json.loads(r'''{{inputs.parameters.structure_glob}}''')
+        except: structure_glob = r'''{{inputs.parameters.structure_glob}}'''
+
+        import os
+        import subprocess
+        subprocess.run(['generate-manifest', '--input', os.path.join(base_path, input_path), '--output', os.path.join(base_path, output_path), '--id', ensemble_id, '--structure-glob', structure_glob], check=True)
+      command:
+      - python
+      volumeMounts:
+      - name: lynceus
+        mountPath: /mnt/lynceus
+      resources:
+        limits:
+          cpu: '2'
+          memory: 1Gi
+        requests:
+          cpu: '2'
+          memory: 1Gi
+  - name: load-targets
+    dag:
+      tasks:
+      - name: download-pdbs-t4-lysozyme-l99
+        template: download-pdbs
+        arguments:
+          parameters:
+          - name: pdb_ids
+            value: 1L83
+          - name: base_path
+            value: /mnt/lynceus
+          - name: output_prefix
+            value: target/pdbs/T4_lysozyme_L99
+      - name: generate-manifest-t4-lysozyme-l99
+        depends: download-pdbs-t4-lysozyme-l99
+        template: generate-manifest
+        arguments:
+          parameters:
+          - name: base_path
+            value: /mnt/lynceus
+          - name: input_path
+            value: target/pdbs/T4_lysozyme_L99
+          - name: output_path
+            value: target/ensembles/T4_lysozyme_L99
+          - name: ensemble_id
+            value: T4_lysozyme_L99
+          - name: structure_glob
+            value: '*'
+  - name: main-dag
+    dag:
+      tasks:
+      - name: download-pdbs
+        template: load-targets
