@@ -12,6 +12,7 @@ SERVICE_ACCOUNT_NAME = "argo-workflow"
 
 ENTRYPOINT_DAG = "main-dag"
 
+SOURCE_INPUT_NAME = "source"
 SHARD_FOLDER_PREFIX = "shard_id="
 SOURCE_PARAM = "{{inputs.parameters.source}}"
 SHARD_SUFFIX = ".parquet"
@@ -24,6 +25,10 @@ def shard_path(prefix: str) -> str:
 
 def shard_ids(num_shards: int) -> list[int]:
     return list(range(num_shards))
+
+
+def shard_filename(shard: str) -> str:
+    return f"{SHARD_PREFIX}{shard}{SHARD_SUFFIX}"
 
 
 def get_template_factory(infra_config: InfraConfig) -> TemplateFactory:

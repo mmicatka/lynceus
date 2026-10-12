@@ -17,48 +17,35 @@ candidates:
   num_shards: 16
 
 templates:
-  default:
-    requests:
-      cpu: "4"
-      memory: 2Gi
-    limits:
-      cpu: "4"
-      memory: 2Gi
-  overrides:
-    shard_candidates:
-      requests:
-        cpu: "8"
-        memory: 8Gi
-      limits:
-        cpu: "8"
-        memory: 8Gi
-    merge_shards:
-      requests:
-        cpu: "10"
-        memory: 8Gi
-      limits:
-        cpu: "14"
-        memory: 8Gi
-    subsample_candidates:
-      requests:
-        cpu: "10"
-        memory: 8Gi
-      limits:
-        cpu: "14"
-        memory: 8Gi
-    generate_features:
-      requests:
+  load_candidates:
+    resources: &med_cpu
+      requests: &med_cpu_res
         cpu: "4"
         memory: 3Gi
-      limits:
-        cpu: "4"
-        memory: 3Gi
+      limits: *med_cpu_res
+    image: &candidates_image
+      image: registry.nebula.lan:5000/lynceus/candidates:0.1.0
+  shard_candidates:
+    resources: &high_cpu
+      requests: &high_cpu_res
+        cpu: "8"
+        memory: 8Gi
+      limits: *high_cpu_res
+    image: *candidates_image
+  merge_shards:
+    resources: *high_cpu
+    image: *candidates_image
+  subsample_candidates:
+    resources: *high_cpu
+    image: *candidates_image
+  generate_conformers:
+    resources: *med_cpu
+    image: *candidates_image
+  generate_features:
+    resources: *med_cpu
+    image: *candidates_image
 
 volume:
   name: lynceus
   claim_name: lynceus-pvc
   mount_path: /mnt/lynceus
-
-images:
-  candidates:
-    image: registry.nebula.lan:5000/lynceus/candidates:0.1.0
