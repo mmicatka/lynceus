@@ -23,7 +23,7 @@ candidates:
 
 targets:
   ensembles:
-    - id: T4_lysozyme_L99
+    - id: "T4_lysozyme_L99"
       members:
         - pdb_id: 1L83
           weight: 1.0

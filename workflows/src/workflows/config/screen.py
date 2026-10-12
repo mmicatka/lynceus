@@ -25,6 +25,14 @@ class EnsembleConfig(StrictModel):
     id: str
     members: list[MemberConfig]
 
+    @property
+    def pdb_ids(self) -> list[str]:
+        return [member.pdb_id for member in self.members]
+
+    @property
+    def weights(self) -> dict[str, float]:
+        return {member.pdb_id: member.weight for member in self.members}
+
 
 class TargetConfig(StrictModel):
     ensembles: list[EnsembleConfig]

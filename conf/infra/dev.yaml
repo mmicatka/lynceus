@@ -49,9 +49,12 @@ templates:
       requests: &low_cpu_res
         cpu: "2"
         memory: 1Gi
-      limits: *med_cpu_res
+      limits: *low_cpu_res
     image: &targets_image
       image: registry.nebula.lan:5000/lynceus/targets:0.1.0
+  generate_manifest:
+    resources: *low_cpu
+    image: *targets_image
 
 volume:
   name: lynceus
