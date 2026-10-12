@@ -1,4 +1,4 @@
-# projects/target/src/target/models.py
+# projects/targets/src/targets/models.py
 
 
 from typing import Annotated, Any, Literal, Union

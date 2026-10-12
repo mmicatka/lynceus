@@ -9,6 +9,9 @@ storage:
       shards_sample: candidates/shards_sample
       conformers: candidates/conformers
       features: candidates/features
+    target:
+      pdbs: target/pdbs
+      ensembles: target/ensembles
 
 candidates:
   num_shards: 16

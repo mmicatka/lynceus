@@ -35,7 +35,7 @@ def _to_hera_volume(config: VolumeConfig) -> ExistingVolume:
 
 @dataclass(frozen=True)
 class TemplateFactory:
-    image: ImageConfig
+    images: dict[ImageName, ImageConfig]
     volume: VolumeConfig
     templates: TemplatesConfig
     retry_strategy: RetryStrategy | None = None
@@ -44,23 +44,27 @@ class TemplateFactory:
     def from_config(
         cls,
         infra_config: InfraConfig,
-        image_name: ImageName,
         retry_strategy: RetryStrategy | None = None,
     ) -> "TemplateFactory":
-        if image_name not in infra_config.images:
-            raise RuntimeError(f"No image configured for '{image_name.value}'")
         return cls(
-            image=infra_config.images[image_name],
+            images=infra_config.images,
             volume=infra_config.volume,
             templates=infra_config.templates,
             retry_strategy=retry_strategy,
         )
 
-    def build(self, name: TemplateName, func: Callable) -> Callable:
+    def build(
+        self, name: TemplateName, image_name: ImageName, func: Callable
+    ) -> Callable:
+        if image_name not in self.images:
+            raise RuntimeError(f"No image configured for '{image_name.value}'")
+
+        image_config = self.images[image_name]
+
         return script(
             name=name.value.replace("_", "-"),
-            image=self.image.image,
-            image_pull_policy=self.image.image_pull_policy,
+            image=image_config.image,
+            image_pull_policy=image_config.image_pull_policy,
             resources=_to_hera_resources(self.templates.resources_for(name)),
             volumes=[_to_hera_volume(self.volume)],
             retry_strategy=self.retry_strategy,

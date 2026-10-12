@@ -31,7 +31,7 @@ def build_preprocess_candidates_dag(
     infra_config: InfraConfig,
     screen_config: ScreenConfig,
 ) -> DAG:
-    mount_path = infra_config.volume.mount_path
+    base_path = infra_config.volume.mount_path
     num_shards = infra_config.candidates.num_shards
     features = screen_config.filter.features
     candidate_prefixes = infra_config.storage.prefixes.candidates
@@ -55,8 +55,8 @@ def build_preprocess_candidates_dag(
         conformers_task = generate_conformers(
             name="generate-conformers",
             arguments={
+                "base_path": base_path,
                 "source": SOURCE_PARAM,
-                "mount_path": mount_path,
                 "input_prefix": input_prefix,
                 "output_prefix": candidate_prefixes.conformers,
             },
@@ -65,8 +65,8 @@ def build_preprocess_candidates_dag(
         features_task = generate_features(
             name="generate-features",
             arguments={
+                "base_path": base_path,
                 "source": SOURCE_PARAM,
-                "mount_path": mount_path,
                 "input_prefix": candidate_prefixes.conformers,
                 "output_prefix": candidate_prefixes.features,
                 "features": features,

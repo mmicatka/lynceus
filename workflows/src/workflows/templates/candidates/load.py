@@ -2,7 +2,7 @@
 
 
 def load_candidates_template(
-    source: str, mount_path: str, source_prefix: str, parquet_prefix: str
+    base_path: str, source: str, source_prefix: str, parquet_prefix: str
 ):
     import os
     import subprocess
@@ -11,9 +11,9 @@ def load_candidates_template(
         [
             "load-candidates",
             "--input",
-            os.path.join(mount_path, source_prefix, source),
+            os.path.join(base_path, source_prefix, source),
             "--output",
-            os.path.join(mount_path, parquet_prefix),
+            os.path.join(base_path, parquet_prefix),
         ],
         check=True,
     )

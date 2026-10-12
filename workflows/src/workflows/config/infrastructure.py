@@ -25,6 +25,7 @@ class TemplateName(StrEnum):
     SUBSAMPLE_CANDIDATES = "subsample_candidates"
     GENERATE_CONFORMERS = "generate_conformers"
     GENERATE_FEATURES = "generate_features"
+    DOWNLOAD_PDBS = "download_pdbs"
 
 
 class ImageConfig(StrictModel):
@@ -42,8 +43,14 @@ class CandidatePrefixes(StrictModel):
     features: StoragePrefix
 
 
+class TargetPrefixes(StrictModel):
+    pdbs: StoragePrefix
+    ensembles: StoragePrefix
+
+
 class StoragePrefixes(StrictModel):
     candidates: CandidatePrefixes
+    target: TargetPrefixes
 
 
 class StorageConfig(StrictModel):
@@ -88,3 +95,4 @@ class VolumeConfig(StrictModel):
 
 class ImageName(StrEnum):
     CANDIDATES = "candidates"
+    TARGETS = "targets"

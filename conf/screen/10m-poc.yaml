@@ -21,10 +21,12 @@ candidates:
     - H18
     - H19
 
-# target:
-#   ensemble_prefix: targets/protein_ensembles
-#   ensembles:
-#     - T4_lysozyme_L99
+target:
+  ensembles:
+    - name: T4_lysozyme_L99
+      members:
+        - pdb_id: 1L83
+          weight: 1.0
 
 filter:
   features:

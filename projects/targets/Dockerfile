@@ -24,8 +24,8 @@ COPY pyproject.toml uv.lock ./
 
 COPY libs/lynceus-core ./libs/lynceus-core
 
-COPY projects/target ./projects/target
-WORKDIR /app/projects/target
+COPY projects/targets ./projects/targets
+WORKDIR /app/projects/targets
 
 RUN uv pip install --system .
 

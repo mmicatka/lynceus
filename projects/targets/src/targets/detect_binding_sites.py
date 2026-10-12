@@ -1,4 +1,4 @@
-# modules/local/detect_binding_sites/src/detect_binding_sites/detect_binding_sites.py
+# projects/targets/src/targets/detect_binding_sites.py
 
 import csv
 import json
@@ -16,7 +16,7 @@ from lynceus_core.cli import NumWorkers
 from lynceus_core.logging import wide_log
 from protein_ensemble import Manifest
 
-from target.models import BindingSite, Sphere
+from targets.models import BindingSite, Sphere
 
 
 def configure_logging():

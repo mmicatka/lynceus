@@ -4,11 +4,6 @@ from hera.workflows import DAG, Parameter, Workflow
 
 from workflows.config import InfraConfig, ScreenConfig
 from workflows.config.infrastructure import TemplateName
-from workflows.registry.candidates.common import (
-    ENTRYPOINT_DAG,
-    candidates_template_factory,
-    new_candidates_workflow,
-)
 from workflows.registry.common import (
     ITEM_PARAM,
     SHARD_FOLDER_PREFIX,
@@ -35,7 +30,7 @@ def build_load_candidates_dag(
 ) -> DAG:
     candidates_config = screen_config.candidates
     candidate_prefixes = infra_config.storage.prefixes.candidates
-    mount_path = infra_config.volume.mount_path
+    base_path = infra_config.volume.mount_path
     num_shards = infra_config.candidates.num_shards
 
     load_candidates = templates.build(
@@ -55,8 +50,8 @@ def build_load_candidates_dag(
         load_task = load_candidates(
             name="load-candidates",
             arguments={
+                "base_path": base_path,
                 "source": SOURCE_PARAM,
-                "mount_path": mount_path,
                 "source_prefix": candidate_prefixes.raw_smiles,
                 "parquet_prefix": source_parquet_prefix,
             },
@@ -65,7 +60,7 @@ def build_load_candidates_dag(
         shard_task = shard_candidates(
             name="shard-candidates",
             arguments={
-                "mount_path": mount_path,
+                "base_path": base_path,
                 "input_prefix": source_parquet_prefix,
                 "output_prefix": candidate_prefixes.shards_staging,
                 "num_shards": num_shards,
@@ -85,7 +80,7 @@ def build_load_candidates_dag(
             name="merge-shards",
             with_items=shard_ids(num_shards),
             arguments={
-                "mount_path": mount_path,
+                "base_path": base_path,
                 "input_path": f"{candidate_prefixes.shards_staging}/"
                 f"{SHARD_FOLDER_PREFIX}{ITEM_PARAM}",
                 "output_path": f"{candidate_prefixes.shards}/"
@@ -96,7 +91,7 @@ def build_load_candidates_dag(
         cleanup_task = clean_prefix(
             name="cleanup-staging",
             arguments={
-                "mount_path": mount_path,
+                "mount_path": base_path,
                 "prefix": candidate_prefixes.shards_staging,
             },
         )
@@ -112,8 +107,8 @@ def build_load_candidates_dag(
                 name="subsample-candidates",
                 with_items=shard_ids(num_shards),
                 arguments={
+                    "base_path": base_path,
                     "source": f"shard_{ITEM_PARAM}.parquet",
-                    "mount_path": mount_path,
                     "source_prefix": candidate_prefixes.shards,
                     "parquet_prefix": f"{candidate_prefixes.shards_sample}/",
                     "num_samples": candidates_config.sub_sample // num_shards,

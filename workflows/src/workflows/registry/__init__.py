@@ -15,6 +15,7 @@ WorkflowBuilder = Callable[[InfraConfig, ScreenConfig], Workflow]
 WORKFLOW_REGISTRY: dict[str, WorkflowBuilder] = {
     "echo": build_smoke_test_workflow,
     "candidates-workflow": build_candidates_workflow,
+    "targets-workflow": build_targets_workflow,
 }
 
 __all__ = ["WORKFLOW_REGISTRY"]
