@@ -9,6 +9,7 @@ import click
 import duckdb
 import structlog
 from lynceus_core.cli import NumWorkers
+from lynceus_core.io import staged_io
 from lynceus_core.logging import wide_log
 
 
@@ -85,6 +86,20 @@ def _write_success_marker(output_path: str, num_shards: int, input_folder: str) 
     show_default=True,
     help="Number of parallel workers (integer >= 1 or 'auto').",
 )
+@click.option(
+    "--transfers",
+    default=4,
+    type=click.IntRange(min=1),
+    show_default=True,
+    help="Concurrent file copies between the mount and local scratch.",
+)
+@click.option(
+    "--scratch-dir",
+    "scratch_dir",
+    default=None,
+    type=click.Path(file_okay=False),
+    help="Local scratch directory for staging. Defaults to the system temp dir.",
+)
 @wide_log(logger)
 def shard_candidates(
     input_path: str,
@@ -92,6 +107,8 @@ def shard_candidates(
     num_shards: int,
     id_column: str,
     num_workers: int,
+    transfers: int,
+    scratch_dir: str | None,
 ) -> None:
     click.echo(f"Processing {input_path}...")
 
@@ -124,21 +141,27 @@ def shard_candidates(
         num_shards=num_shards,
         output_path=output_path,
         workers=num_workers,
+        transfers=transfers,
     )
 
     os.makedirs(output_path, exist_ok=True)
 
-    conn.sql(
-        f"""
-        COPY (
-            SELECT *, hash({id_column}) % {num_shards} AS shard_id
-            FROM read_parquet('{source_glob}')
+    with staged_io(input_path, output_path, transfers, scratch_dir) as (
+        local_input,
+        local_output,
+    ):
+        conn.sql(
+            f"""
+            COPY (
+                SELECT *, hash({id_column}) % {num_shards} AS shard_id
+                FROM read_parquet('{local_input}/*.parquet')
+            )
+            TO '{local_output}'
+            (FORMAT parquet, COMPRESSION zstd, PARTITION_BY (shard_id),
+            OVERWRITE_OR_IGNORE,
+            FILENAME_PATTERN '{input_folder}_{{i}}')
+            """
         )
-        TO '{output_path}'
-        (FORMAT parquet, COMPRESSION zstd, PARTITION_BY (shard_id), OVERWRITE_OR_IGNORE,
-        FILENAME_PATTERN '{input_folder}_{{i}}')
-        """
-    )
 
     _write_success_marker(output_path, num_shards, input_folder)
 

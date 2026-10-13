@@ -6,6 +6,7 @@ def shard_candidates_template(
     input_prefix: str,
     output_prefix: str,
     num_shards: int,
+    scratch_path: str,
     id_column: str = "id",
     num_workers: str = "auto",
 ):
@@ -19,6 +20,8 @@ def shard_candidates_template(
             os.path.join(base_path, input_prefix),
             "--output",
             os.path.join(base_path, output_prefix),
+            "--scratch-dir",
+            scratch_path,
             "--num-shards",
             str(num_shards),
             "--id-column",

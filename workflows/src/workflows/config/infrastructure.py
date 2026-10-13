@@ -68,6 +68,12 @@ class ResourceSpec(StrictModel):
     limits: ResourceQuantities
 
 
+class ScratchConfig(StrictModel):
+    mount_path: MountPath = "/scratch"
+    size_limit: MemoryQuantity | None = None
+    in_memory: bool = False
+
+
 class VolumeConfig(StrictModel):
     name: str
     claim_name: str
@@ -82,6 +88,13 @@ class ImageConfig(StrictModel):
 class TemplateConfig(StrictModel):
     image: ImageConfig
     resources: ResourceSpec
+    scratch: ScratchConfig | None = None
+
+    @property
+    def scratch_path(self) -> str:
+        if self.scratch is None:
+            raise ValueError("scratch is not configured for this template")
+        return self.scratch.mount_path
 
 
 class InfraConfig(StrictModel):

@@ -25,7 +25,7 @@ from workflows.templates.builders import TemplateFactory
 LOAD_CANDIDATES_DAG = "load-candidates-dag"
 PROCESS_SOURCE_DAG = "process-source-dag"
 SOURCE_INPUT_NAME = "source"
-MAX_PARALLEL_SOURCES = 2
+MAX_PARALLEL_SOURCES = 3
 
 
 def _shard_filename(shard: str) -> str:
@@ -59,12 +59,16 @@ def _build_process_source_dag(
                 "parquet_prefix": source_parquet_prefix,
             },
         )
+
         shard_task = shard_candidates(
             name="shard-candidates",
             arguments={
                 "base_path": base_path,
                 "input_prefix": source_parquet_prefix,
                 "output_prefix": prefixes.shards_staging,
+                "scratch_path": infra_config.templates[
+                    TemplateName.SHARD_CANDIDATES
+                ].scratch_path,
                 "num_shards": infra_config.candidates.num_shards,
             },
         )

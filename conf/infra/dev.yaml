@@ -14,7 +14,8 @@ storage:
       ensembles: target/ensembles
 
 candidates:
-  num_shards: 16
+  num_shards: 32
+  # num_shards: 512
 
 templates:
   load_candidates:
@@ -32,6 +33,9 @@ templates:
         memory: 8Gi
       limits: *high_cpu_res
     image: *candidates_image
+    scratch: &scratch
+      mount_path: /scratch
+      size_limit: 50Gi
   merge_shards:
     resources: *high_cpu
     image: *candidates_image
