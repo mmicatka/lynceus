@@ -56,6 +56,7 @@ class StorageConfig(StrictModel):
 
 class CandidatesInfraConfig(StrictModel):
     num_shards: PositiveInt
+    max_batch_gib: PositiveInt
 
 
 class ResourceQuantities(StrictModel):

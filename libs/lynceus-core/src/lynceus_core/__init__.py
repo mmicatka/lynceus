@@ -1,8 +1,8 @@
 # libs/lynceus-core/src/lynceus_core/__init__.py
 
 from .cli import NumWorkers
-from .io import staged_io
+from .io import plan_batches, staged_io
 from .logging import wide_log
 from .utils import merge_shards
 
-__all__ = ["NumWorkers", "wide_log", "merge_shards", "staged_io"]
+__all__ = ["NumWorkers", "wide_log", "merge_shards", "plan_batches", "staged_io"]

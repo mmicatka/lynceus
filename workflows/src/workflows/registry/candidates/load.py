@@ -66,10 +66,11 @@ def _build_process_source_dag(
                 "base_path": base_path,
                 "input_prefix": source_parquet_prefix,
                 "output_prefix": prefixes.shards_staging,
+                "num_shards": infra_config.candidates.num_shards,
                 "scratch_path": infra_config.templates[
                     TemplateName.SHARD_CANDIDATES
                 ].scratch_path,
-                "num_shards": infra_config.candidates.num_shards,
+                "max_batch_gib": infra_config.candidates.max_batch_gib,
             },
         )
         load_task >> shard_task  # type: ignore

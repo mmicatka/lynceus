@@ -70,6 +70,9 @@ spec:
       - name: output_prefix
       - name: num_shards
       - name: scratch_path
+      - name: max_batch_gib
+      - name: transfers
+        default: '4'
       - name: id_column
         default: id
       - name: num_workers
@@ -94,6 +97,8 @@ spec:
         except: id_column = r'''{{inputs.parameters.id_column}}'''
         try: input_prefix = json.loads(r'''{{inputs.parameters.input_prefix}}''')
         except: input_prefix = r'''{{inputs.parameters.input_prefix}}'''
+        try: max_batch_gib = json.loads(r'''{{inputs.parameters.max_batch_gib}}''')
+        except: max_batch_gib = r'''{{inputs.parameters.max_batch_gib}}'''
         try: num_shards = json.loads(r'''{{inputs.parameters.num_shards}}''')
         except: num_shards = r'''{{inputs.parameters.num_shards}}'''
         try: num_workers = json.loads(r'''{{inputs.parameters.num_workers}}''')
@@ -102,10 +107,12 @@ spec:
         except: output_prefix = r'''{{inputs.parameters.output_prefix}}'''
         try: scratch_path = json.loads(r'''{{inputs.parameters.scratch_path}}''')
         except: scratch_path = r'''{{inputs.parameters.scratch_path}}'''
+        try: transfers = json.loads(r'''{{inputs.parameters.transfers}}''')
+        except: transfers = r'''{{inputs.parameters.transfers}}'''
 
         import os
         import subprocess
-        subprocess.run(['shard-candidates', '--input', os.path.join(base_path, input_prefix), '--output', os.path.join(base_path, output_prefix), '--scratch-dir', scratch_path, '--num-shards', str(num_shards), '--id-column', id_column, '--num-workers', str(num_workers)], check=True)
+        subprocess.run(['shard-candidates', '--input', os.path.join(base_path, input_prefix), '--output', os.path.join(base_path, output_prefix), '--scratch-dir', scratch_path, '--num-shards', str(num_shards), '--max-batch-gib', str(max_batch_gib), '--transfers', str(transfers), '--id-column', id_column, '--num-workers', str(num_workers)], check=True)
       command:
       - python
       volumeMounts:
@@ -146,10 +153,12 @@ spec:
             value: candidates/raw/parquet/{{inputs.parameters.source}}
           - name: output_prefix
             value: candidates/shards_staging
-          - name: scratch_path
-            value: /scratch
           - name: num_shards
             value: '32'
+          - name: scratch_path
+            value: /scratch
+          - name: max_batch_gib
+            value: '50'
     inputs:
       parameters:
       - name: source

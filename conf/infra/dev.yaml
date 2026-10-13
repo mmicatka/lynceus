@@ -15,6 +15,7 @@ storage:
 
 candidates:
   num_shards: 32
+  max_batch_gib: 50
   # num_shards: 512
 
 templates:
