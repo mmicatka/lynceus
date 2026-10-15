@@ -50,25 +50,6 @@ def _copy_file(source: Path, destination: Path, policy: RetryPolicy) -> None:
     _retry_on_missing_path(copy, f"copy to {destination}", policy)
 
 
-def _copy_tree(
-    source: Path,
-    destination: Path,
-    transfers: int,
-    pattern: str,
-    policy: RetryPolicy,
-) -> None:
-    files = [path for path in source.glob(pattern) if path.is_file()]
-    with ThreadPoolExecutor(max_workers=transfers) as executor:
-        futures = [
-            executor.submit(
-                _copy_file, path, destination / path.relative_to(source), policy
-            )
-            for path in files
-        ]
-        for future in futures:
-            future.result()
-
-
 def _copy_pairs(
     pairs: Sequence[tuple[Path, Path]],
     transfers: int,
