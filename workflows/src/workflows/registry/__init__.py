@@ -1,22 +1,5 @@
 # workflows/src/workflows/registry/__init__.py
 
-from typing import Callable
-
-from hera.workflows import Workflow
-
-from workflows.config import InfraConfig, ScreenConfig
-from workflows.registry.candidates import (
-    build_candidates_workflow,
-)
-from workflows.registry.smoke_test import build_smoke_test_workflow
-from workflows.registry.targets.targets import build_targets_workflow
-
-WorkflowBuilder = Callable[[InfraConfig, ScreenConfig], Workflow]
-
-WORKFLOW_REGISTRY: dict[str, WorkflowBuilder] = {
-    "echo": build_smoke_test_workflow,
-    "candidates-workflow": build_candidates_workflow,
-    "targets-workflow": build_targets_workflow,
-}
+from .core import WORKFLOW_REGISTRY
 
 __all__ = ["WORKFLOW_REGISTRY"]

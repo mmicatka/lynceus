@@ -1,14 +1,15 @@
-# projects/candidates/src/candidates/shard_candidates.py
+# projects/candidates/src/candidates/shard.py
 
-import glob
 import json
 import os
 import sys
+from pathlib import Path
 
 import click
 import duckdb
 import structlog
 from lynceus_core.cli import NumWorkers
+from lynceus_core.io import plan_batches, staged_io
 from lynceus_core.logging import wide_log
 
 
@@ -31,22 +32,124 @@ configure_logging()
 logger = structlog.get_logger()
 
 
-def _marker_path(output_path: str, input_folder: str) -> str:
-    return os.path.join(output_path, f"_SUCCESS_{input_folder}")
+def _read_marker(path: Path) -> dict | None:
+    try:
+        with open(path, "r") as f:
+            return json.load(f)
+    except FileNotFoundError, json.JSONDecodeError:
+        return None
 
 
-def _partition_is_valid(output_path: str, num_shards: int, input_folder: str) -> bool:
-    marker_path = _marker_path(output_path, input_folder)
-    if not os.path.exists(marker_path):
-        return False
-    with open(marker_path, "r") as f:
-        return json.load(f).get("num_shards") == num_shards
+def _write_marker(path: Path, payload: dict) -> None:
+    temporary = path.with_name(f"{path.name}.tmp")
+    with open(temporary, "w") as f:
+        json.dump(payload, f)
+    os.replace(temporary, path)
 
 
-def _write_success_marker(output_path: str, num_shards: int, input_folder: str) -> None:
-    os.makedirs(output_path, exist_ok=True)
-    with open(_marker_path(output_path, input_folder), "w") as f:
-        json.dump({"num_shards": num_shards}, f)
+def _partition_marker_path(output_path: Path, input_folder: str) -> Path:
+    return output_path / f"_SUCCESS_{input_folder}"
+
+
+def _partition_marker_payload(num_shards: int) -> dict:
+    return {"num_shards": num_shards}
+
+
+def _partition_is_valid(output_path: Path, num_shards: int, input_folder: str) -> bool:
+    marker = _read_marker(_partition_marker_path(output_path, input_folder))
+    return marker == _partition_marker_payload(num_shards)
+
+
+def _batch_prefix(input_folder: str, batch_index: int) -> str:
+    return f"{input_folder}_b{batch_index}"
+
+
+def _batch_marker_path(output_path: Path, input_folder: str, batch_index: int) -> Path:
+    return output_path / f"_SUCCESS_{_batch_prefix(input_folder, batch_index)}"
+
+
+def _batch_marker_payload(num_shards: int, batch: list[Path]) -> dict:
+    return {
+        "num_shards": num_shards,
+        "files": [{"name": path.name, "size": path.stat().st_size} for path in batch],
+    }
+
+
+def _batch_is_valid(
+    output_path: Path,
+    input_folder: str,
+    batch_index: int,
+    num_shards: int,
+    batch: list[Path],
+) -> bool:
+    marker = _read_marker(_batch_marker_path(output_path, input_folder, batch_index))
+    return marker == _batch_marker_payload(num_shards, batch)
+
+
+def _purge_batch_outputs(output_path: Path, prefix: str) -> None:
+    for stale in output_path.glob(f"shard_id=*/{prefix}_*"):
+        stale.unlink()
+
+
+def _configure_connection(
+    conn: duckdb.DuckDBPyConnection,
+    num_workers: int,
+    num_shards: int,
+    memory_limit: str | None,
+) -> None:
+    conn.execute("SET threads = ?", [num_workers])
+    conn.execute("SET arrow_large_buffer_size=true")
+    conn.execute(f"SET partitioned_write_max_open_files = {num_shards}")
+    if memory_limit:
+        conn.execute("SET memory_limit = ?", [memory_limit])
+
+
+def _shard_batch(
+    conn: duckdb.DuckDBPyConnection,
+    local_input: Path,
+    local_output: Path,
+    id_column: str,
+    num_shards: int,
+    filename_prefix: str,
+) -> None:
+    conn.sql(
+        f"""
+        COPY (
+            SELECT *, hash({id_column}) % {num_shards} AS shard_id
+            FROM read_parquet('{local_input}/*.parquet')
+        )
+        TO '{local_output}'
+        (FORMAT parquet, COMPRESSION zstd, PARTITION_BY (shard_id),
+        OVERWRITE_OR_IGNORE,
+        FILENAME_PATTERN '{filename_prefix}_{{i}}')
+        """
+    )
+
+
+def _process_batch(
+    conn: duckdb.DuckDBPyConnection,
+    batch: list[Path],
+    batch_index: int,
+    output_path: Path,
+    input_folder: str,
+    id_column: str,
+    num_shards: int,
+    transfers: int,
+    scratch_dir: str | None,
+) -> None:
+    prefix = _batch_prefix(input_folder, batch_index)
+    _purge_batch_outputs(output_path, prefix)
+
+    with staged_io(batch, output_path, transfers, scratch_dir) as (
+        local_input,
+        local_output,
+    ):
+        _shard_batch(conn, local_input, local_output, id_column, num_shards, prefix)
+
+    _write_marker(
+        _batch_marker_path(output_path, input_folder, batch_index),
+        _batch_marker_payload(num_shards, batch),
+    )
 
 
 @click.command("shard_candidates")
@@ -85,6 +188,35 @@ def _write_success_marker(output_path: str, num_shards: int, input_folder: str) 
     show_default=True,
     help="Number of parallel workers (integer >= 1 or 'auto').",
 )
+@click.option(
+    "--transfers",
+    default=4,
+    type=click.IntRange(min=1),
+    show_default=True,
+    help="Concurrent file copies between the mount and local scratch.",
+)
+@click.option(
+    "--scratch-dir",
+    "scratch_dir",
+    default=None,
+    type=click.Path(file_okay=False),
+    help="Local scratch directory for staging. Defaults to the system temp dir.",
+)
+@click.option(
+    "--max-batch-gib",
+    "max_batch_gib",
+    default=50,
+    type=click.IntRange(min=1),
+    show_default=True,
+    help="Maximum input size per batch. Peak scratch is roughly twice this.",
+)
+@click.option(
+    "--memory-limit",
+    "memory_limit",
+    default=None,
+    type=str,
+    help="DuckDB memory limit, e.g. '48GB'. Defaults to DuckDB's own default.",
+)
 @wide_log(logger)
 def shard_candidates(
     input_path: str,
@@ -92,22 +224,23 @@ def shard_candidates(
     num_shards: int,
     id_column: str,
     num_workers: int,
+    transfers: int,
+    scratch_dir: str | None,
+    max_batch_gib: int,
+    memory_limit: str | None,
 ) -> None:
     click.echo(f"Processing {input_path}...")
 
-    conn = duckdb.connect()
-    conn.execute("SET threads = ?", [num_workers])
-    conn.execute("SET arrow_large_buffer_size=true")
-
+    output = Path(output_path)
     input_folder = os.path.basename(input_path.rstrip("/"))
-    source_glob = os.path.join(input_path, "*.parquet")
+    input_files = sorted(Path(input_path).glob("*.parquet"))
 
-    if not glob.glob(source_glob):
+    if not input_files:
         raise RuntimeError(
-            f"folder={input_folder} resolved to zero parquet files at {source_glob}"
+            f"folder={input_folder} resolved to zero parquet files at {input_path}"
         )
 
-    if _partition_is_valid(output_path, num_shards, input_folder):
+    if _partition_is_valid(output, num_shards, input_folder):
         logger.info(
             "Partition already valid, skipping shard creation",
             folder=input_folder,
@@ -117,30 +250,56 @@ def shard_candidates(
         click.echo("Done!")
         return
 
+    conn = duckdb.connect()
+    _configure_connection(conn, num_workers, num_shards, memory_limit)
+
+    batches = plan_batches(input_files, max_batch_gib * 1024**3)
+
     logger.info(
         "Hash-partitioning rows into shards",
-        source=source_glob,
+        source=input_path,
         id_column=id_column,
         num_shards=num_shards,
         output_path=output_path,
         workers=num_workers,
+        transfers=transfers,
+        batches=len(batches),
+        memory_limit=memory_limit,
     )
 
-    os.makedirs(output_path, exist_ok=True)
+    output.mkdir(parents=True, exist_ok=True)
 
-    conn.sql(
-        f"""
-        COPY (
-            SELECT *, hash({id_column}) % {num_shards} AS shard_id
-            FROM read_parquet('{source_glob}')
+    for batch_index, batch in enumerate(batches):
+        if _batch_is_valid(output, input_folder, batch_index, num_shards, batch):
+            logger.info(
+                "Batch already valid, skipping",
+                folder=input_folder,
+                batch=batch_index,
+            )
+            continue
+
+        _process_batch(
+            conn,
+            batch,
+            batch_index,
+            output,
+            input_folder,
+            id_column,
+            num_shards,
+            transfers,
+            scratch_dir,
         )
-        TO '{output_path}'
-        (FORMAT parquet, COMPRESSION zstd, PARTITION_BY (shard_id), OVERWRITE_OR_IGNORE,
-        FILENAME_PATTERN '{input_folder}_{{i}}')
-        """
-    )
+        logger.info(
+            "Flushed batch",
+            folder=input_folder,
+            batch=batch_index,
+            files=len(batch),
+        )
 
-    _write_success_marker(output_path, num_shards, input_folder)
+    _write_marker(
+        _partition_marker_path(output, input_folder),
+        _partition_marker_payload(num_shards),
+    )
 
     logger.info(
         "Finished hash-partitioning candidates",
