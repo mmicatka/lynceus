@@ -9,39 +9,38 @@ requires-python = ">=3.14"
 dependencies = [
     # libs
     "lynceus-core",
-    "lynceus-utils",
     # projects
     "candidates",
+    "lynceus-dock",
     "surrogate-model",
     "targets",
-    # utils
-    "docking",
+    # workflows
     "workflows",
 ]
 
 [tool.uv.workspace]
 members = [
     # libs
-    "libs/lynceus-utils",
     "libs/lynceus-core",
     # projects
     "projects/candidates",
+    "projects/lynceus-dock",
     "projects/surrogate_model",
     "projects/targets",
-    "modules/local/docking_run",
     # workflows
     "workflows",
-    "projects/docking",
 ]
 
 [tool.uv.sources]
-candidates = { workspace = true }
-targets = { workspace = true }
-lynceus-utils = { workspace = true }
-docking = { workspace = true }
-surrogate-model = { workspace = true }
-workflows = { workspace = true }
+# libs
 lynceus-core = { workspace = true }
+# projects
+candidates = { workspace = true }
+lynceus-dock = { workspace = true }
+surrogate-model = { workspace = true }
+targets = { workspace = true }
+# workflows
+workflows = { workspace = true }
 
 [dependency-groups]
 dev = [
