@@ -1,5 +1,5 @@
 [project]
-name = "surrogate-model"
+name = "surrogate-model-old"
 version = "0.1.0"
 description = "Add your description here"
 authors = [{ name = "Mike Micatka", email = "mike.micatka@gmail.com" }]

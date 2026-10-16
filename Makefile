@@ -12,7 +12,7 @@ VERSION ?= 0.1.0
 WORKFLOWS ?= candidates-workflow targets-workflow
 OUT_DIR ?= workflows/manifests
 
-.PHONY: build push build-* clean lint lint-python lint-argo generate generate-workflows submit run logs
+.PHONY: build push build-* clean lint lint-python lint-argo generate generate-workflows submit-workflows run logs
 
 build-candidates:
 	docker buildx build --platform linux/amd64,linux/arm64 --push -f projects/candidates/Dockerfile -t $(IMAGE_PREFIX)/candidates:$(VERSION) .
@@ -31,6 +31,12 @@ generate-workflows:
 		-s $(SCREEN_CONFIG) \
 		-i $(INFRA_CONFIG)
 
+submit-workflows: generate
+	@echo "Submitting workflows: $(WORKFLOWS) to namespace $(NAMESPACE)..."
+	@for wf in $(WORKFLOWS); do \
+		argo submit -n $(NAMESPACE) $(OUT_DIR)/$$wf.yaml; \
+	done
+
 generate: generate-workflows
 
 lint-argo: generate
@@ -47,11 +53,6 @@ lint-yaml:
 
 lint: lint-python lint-argo lint-yaml
 
-submit: generate
-	@echo "Submitting workflows: $(WORKFLOWS) to namespace $(NAMESPACE)..."
-	@for wf in $(WORKFLOWS); do \
-		argo submit -n $(NAMESPACE) $(OUT_DIR)/$$wf.yaml; \
-	done
 
 clean:
 	rm -f $(OUT_DIR)/*.yaml

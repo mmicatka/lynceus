@@ -13,8 +13,8 @@ from lynceus_utils.storage.blob_storage import get_blob_storage_settings
 from lynceus_utils.storage.filesystem import get_filesystem, resolve_path
 from sklearn.model_selection import train_test_split
 
-from surrogate_model.data import flatten_features, label, load_and_clean_data
-from surrogate_model.metrics import evaluation_metrics, predict_active
+from surrogate_model_old.data import flatten_features, label, load_and_clean_data
+from surrogate_model_old.metrics import evaluation_metrics, predict_active
 
 logging.basicConfig(
     level=logging.INFO,

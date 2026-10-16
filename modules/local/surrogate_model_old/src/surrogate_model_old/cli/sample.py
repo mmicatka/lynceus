@@ -8,8 +8,8 @@ from lynceus_utils.duckdb import get_connection
 from lynceus_utils.storage.blob_storage import get_blob_storage_settings
 from lynceus_utils.storage.filesystem import get_filesystem, resolve_path
 
-from surrogate_model.data import flatten_features, load_and_clean_data
-from surrogate_model.model import ProbabilisticClassifier
+from surrogate_model_old.data import flatten_features, load_and_clean_data
+from surrogate_model_old.model import ProbabilisticClassifier
 
 STRATEGY_COLUMN = "_sample_strategy"
 STRATEGY_UNIFORM = "uniform"

@@ -3,7 +3,7 @@
 import numpy as np
 import polars as pl
 
-from surrogate_model.model import ProbabilisticClassifier
+from surrogate_model_old.model import ProbabilisticClassifier
 
 
 def recall_at_k(y_true, y_score, k) -> float:
