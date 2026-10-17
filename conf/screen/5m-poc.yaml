@@ -41,8 +41,24 @@ filter:
     - topological_torsion
     - usrcat
     - whim
-#   surrogate:
-#     validation: 100000
-#     rounds:
-#       - { active: 0, uniform: 10000 }
-#       - { active: 5000, uniform: 5000 }
+  surrogate:
+    model_prefix: candidates/10m/models
+    feature_list:
+      [
+        atom_pair,
+        autocorr,
+        descriptors,
+        ecfp,
+        functional_groups,
+        morse,
+        rdf,
+        topological_torsion,
+        usrcat,
+        whim,
+      ]
+    validation: 100000
+    rounds:
+      - active: 0
+        uniform: 100000
+      - active: 50000
+        uniform: 50000

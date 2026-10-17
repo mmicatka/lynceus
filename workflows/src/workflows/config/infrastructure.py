@@ -28,6 +28,7 @@ class TemplateName(StrEnum):
     GENERATE_FEATURES = "generate_features"
     DOWNLOAD_PDBS = "download_pdbs"
     GENERATE_MANIFEST = "generate_manifest"
+    SURROGATE_SAMPLE = "surrogate_sample"
 
 
 class CandidatePrefixes(StrictModel):
