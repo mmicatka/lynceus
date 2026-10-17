@@ -30,7 +30,7 @@ targets:
           weight: 1.0
 
 filter:
-  features:
+  feature_list:
     - atom_pair
     - autocorr
     - descriptors
@@ -42,20 +42,18 @@ filter:
     - usrcat
     - whim
   surrogate:
-    model_prefix: candidates/10m/models
+    model_prefix: candidates/5m/models
     feature_list:
-      [
-        atom_pair,
-        autocorr,
-        descriptors,
-        ecfp,
-        functional_groups,
-        morse,
-        rdf,
-        topological_torsion,
-        usrcat,
-        whim,
-      ]
+      - atom_pair
+      - autocorr
+      - descriptors
+      - ecfp
+      - functional_groups
+      - morse
+      - rdf
+      - topological_torsion
+      - usrcat
+      - whim
     validation: 100000
     rounds:
       - active: 0
