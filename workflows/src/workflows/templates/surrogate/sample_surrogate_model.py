@@ -9,14 +9,13 @@ def surrogate_sample_template(
     output_prefix: str,
     num_samples: int,
     id_column: str = "id",
-    num_workers: str = "auto",
 ):
     import os
     import subprocess
 
     subprocess.run(
         [
-            "surrogate-model-sample",
+            "surrogate-sample",
             "--features-input",
             os.path.join(base_path, features_input_prefix, source),
             "--conformers-input",
@@ -27,8 +26,6 @@ def surrogate_sample_template(
             str(num_samples),
             "--id-column",
             id_column,
-            "--num-workers",
-            str(num_workers),
         ],
         check=True,
     )

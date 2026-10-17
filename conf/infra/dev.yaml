@@ -12,6 +12,9 @@ storage:
     target:
       pdbs: target/pdbs
       ensembles: target/ensembles
+    surrogate:
+      samples_staging: surrogate/samples_staging
+      samples: surrogate/samples
 
 candidates:
   max_batch_gib: 20
@@ -65,6 +68,10 @@ templates:
   generate_manifest:
     resources: *low_cpu
     image: *targets_image
+  surrogate_sample:
+    resources: *high_cpu
+    image: &surrogate_image
+      image: registry.nebula.lan:5000/lynceus/surrogate-model:0.1.0
 
 volume:
   name: lynceus

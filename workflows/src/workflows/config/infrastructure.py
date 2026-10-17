@@ -46,9 +46,15 @@ class TargetPrefixes(StrictModel):
     ensembles: StoragePrefix
 
 
+class SurrogatePrefixes(StrictModel):
+    samples_staging: StoragePrefix
+    samples: StoragePrefix
+
+
 class StoragePrefixes(StrictModel):
     candidates: CandidatePrefixes
     target: TargetPrefixes
+    surrogate: SurrogatePrefixes
 
 
 class StorageConfig(StrictModel):

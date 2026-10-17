@@ -4,12 +4,17 @@ import glob
 import json
 import os
 import sys
+from pathlib import Path
 
 import click
 import duckdb
 import structlog
 from lynceus_core.cli import NumWorkers
 from lynceus_core.logging import wide_log
+
+PARQUET_PATTERN = "*.parquet"
+MARKER_SUFFIX = ".success"
+TEMP_SUFFIX = ".tmp"
 
 
 def configure_logging():
@@ -31,66 +36,90 @@ configure_logging()
 logger = structlog.get_logger()
 
 
-def _marker_path(output_path: str, identifier: str) -> str:
-    return os.path.join(output_path, f"_SUCCESS_{identifier}")
+def _quote_literal(value: str) -> str:
+    return "'" + value.replace("'", "''") + "'"
 
 
-def _partition_is_valid(output_path: str, num_samples: int, identifier: str) -> bool:
-    marker_path = _marker_path(output_path, identifier)
-    if not os.path.exists(marker_path):
+def _quote_identifier(value: str) -> str:
+    return '"' + value.replace('"', '""') + '"'
+
+
+def _marker_path(output_path: str) -> str:
+    return f"{output_path}{MARKER_SUFFIX}"
+
+
+def _output_is_valid(output_path: str, num_samples: int) -> bool:
+    marker_path = _marker_path(output_path)
+    if not (os.path.isfile(output_path) and os.path.isfile(marker_path)):
         return False
     with open(marker_path, "r") as f:
-        data = json.load(f)
-        return data.get("num_samples") == num_samples
+        return json.load(f).get("num_samples") == num_samples
 
 
-def _write_success_marker(output_path: str, num_samples: int, identifier: str) -> None:
-    os.makedirs(output_path, exist_ok=True)
-    with open(_marker_path(output_path, identifier), "w") as f:
+def _write_success_marker(output_path: str, num_samples: int) -> None:
+    with open(_marker_path(output_path), "w") as f:
         json.dump({"num_samples": num_samples}, f)
+
+
+def _resolve_parquet_files(pattern: str) -> list[str]:
+    files: list[str] = []
+    for match in sorted(glob.glob(pattern, recursive=True)):
+        if os.path.isdir(match):
+            files.extend(sorted(glob.glob(os.path.join(match, PARQUET_PATTERN))))
+        else:
+            files.append(match)
+
+    unique_files = list(dict.fromkeys(files))
+    if not unique_files:
+        raise RuntimeError(f"Resolved zero parquet files at {pattern}")
+    return unique_files
 
 
 def _sample_aligned(
     conn: duckdb.DuckDBPyConnection,
-    features_glob: str,
-    conformers_glob: str,
-    features_out: str,
-    conformers_out: str,
-    features_folder: str,
+    features_files: list[str],
+    conformers_files: list[str],
+    output_file: str,
     num_samples: int,
     id_column: str,
 ) -> None:
-
+    column = _quote_identifier(id_column)
     conn.execute(
         f"""
-        CREATE TEMP TABLE joined_sample AS
-        SELECT
-            f.*,
-            c.conformer
-        FROM read_parquet('{features_glob}') f
-        JOIN read_parquet('{conformers_glob}') c
-          ON f.{id_column} = c.{id_column}
-        USING SAMPLE reservoir({num_samples} ROWS);
-        """
+        COPY (
+            SELECT
+                f.*,
+                c.conformer
+            FROM read_parquet(?) f
+            JOIN read_parquet(?) c
+              ON f.{column} = c.{column}
+            USING SAMPLE reservoir({num_samples} ROWS)
+        )
+        TO {_quote_literal(output_file)}
+        (FORMAT parquet, COMPRESSION zstd)
+        """,
+        [features_files, conformers_files],
     )
 
-    conn.sql(
-        f"""
-        COPY (SELECT * EXCLUDE (conformer) FROM joined_sample)
-        TO '{features_out}'
-        (FORMAT parquet, COMPRESSION zstd, OVERWRITE_OR_IGNORE, FILENAME_PATTERN
-        '{features_folder}_features_{{i}}')
-        """
-    )
 
-    conn.sql(
-        f"""
-        COPY (SELECT {id_column}, conformer FROM joined_sample)
-        TO '{conformers_out}'
-        (FORMAT parquet, COMPRESSION zstd, OVERWRITE_OR_IGNORE, FILENAME_PATTERN
-        '{features_folder}_conformers_{{i}}')
-        """
+def _write_sample_atomically(
+    conn: duckdb.DuckDBPyConnection,
+    features_files: list[str],
+    conformers_files: list[str],
+    output_path: str,
+    num_samples: int,
+    id_column: str,
+) -> None:
+    temp_path = f"{output_path}{TEMP_SUFFIX}"
+    _sample_aligned(
+        conn=conn,
+        features_files=features_files,
+        conformers_files=conformers_files,
+        output_file=temp_path,
+        num_samples=num_samples,
+        id_column=id_column,
     )
+    os.replace(temp_path, output_path)
 
 
 @click.command("sample_aligned")
@@ -99,21 +128,21 @@ def _sample_aligned(
     "features_input",
     required=True,
     type=str,
-    help="Input folder for features parquet files.",
+    help="Features parquet file, glob pattern, or folder of parquet files.",
 )
 @click.option(
     "--conformers-input",
     "conformers_input",
     required=True,
     type=str,
-    help="Input folder for conformer parquet files.",
+    help="Conformer parquet file, glob pattern, or folder of parquet files.",
 )
 @click.option(
     "--output",
     "output_path",
     required=True,
-    type=str,
-    help="Base output folder for sampled results.",
+    type=click.Path(dir_okay=False),
+    help="Output parquet file path.",
 )
 @click.option(
     "--num-samples",
@@ -150,58 +179,53 @@ def sample_candidates(
         f"Processing aligned samples from {features_input} and {conformers_input}..."
     )
 
-    features_folder = os.path.basename(features_input.rstrip("/"))
-    features_glob = os.path.join(features_input, "*.parquet")
-    conformers_glob = os.path.join(conformers_input, "*.parquet")
+    identifier = Path(output_path).stem
 
-    if not glob.glob(features_glob):
-        raise RuntimeError(f"Resolved zero parquet files at {features_glob}")
-    if not glob.glob(conformers_glob):
-        raise RuntimeError(f"Resolved zero parquet files at {conformers_glob}")
-
-    if _partition_is_valid(output_path, num_samples, features_folder):
+    if _output_is_valid(output_path, num_samples):
         logger.info(
             "Sample already valid, skipping generation",
-            identifier=features_folder,
+            identifier=identifier,
             num_samples=num_samples,
             output_path=output_path,
         )
         click.echo("Done!")
         return
 
+    features_files = _resolve_parquet_files(features_input)
+    conformers_files = _resolve_parquet_files(conformers_input)
+
     logger.info(
         "Executing aligned reservoir sampling",
-        features_source=features_glob,
-        conformers_source=conformers_glob,
+        features_source=features_input,
+        conformers_source=conformers_input,
+        num_features_files=len(features_files),
+        num_conformers_files=len(conformers_files),
+        identifier=identifier,
         num_samples=num_samples,
         output_path=output_path,
         workers=num_workers,
     )
 
-    os.makedirs(output_path, exist_ok=True)
-    features_out = os.path.join(output_path, "features")
-    conformers_out = os.path.join(output_path, "conformers")
+    os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
 
     conn = duckdb.connect()
     conn.execute("SET threads = ?", [num_workers])
     conn.execute("SET arrow_large_buffer_size=true")
 
-    _sample_aligned(
+    _write_sample_atomically(
         conn=conn,
-        features_glob=features_glob,
-        conformers_glob=conformers_glob,
-        features_out=features_out,
-        conformers_out=conformers_out,
-        features_folder=features_folder,
+        features_files=features_files,
+        conformers_files=conformers_files,
+        output_path=output_path,
         num_samples=num_samples,
         id_column=id_column,
     )
 
-    _write_success_marker(output_path, num_samples, features_folder)
+    _write_success_marker(output_path, num_samples)
 
     logger.info(
         "Finished aligned reservoir sampling",
-        identifier=features_folder,
+        identifier=identifier,
         num_samples=num_samples,
         output_path=output_path,
     )

@@ -68,7 +68,7 @@ def _build_process_shard_dag(
                 "source": SOURCE_PARAM,
                 "input_prefix": prefixes.conformers,
                 "output_prefix": prefixes.features,
-                "features": screen_config.filter.features,
+                "features": screen_config.filter.feature_list,
             },
         )
         conformers_task >> features_task  # type: ignore

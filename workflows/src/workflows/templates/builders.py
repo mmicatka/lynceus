@@ -63,7 +63,7 @@ def _to_template_name(name: TemplateName) -> str:
 @dataclass(frozen=True)
 class TemplateFactory:
     volume: VolumeConfig
-    templates: dict[TemplateName, TemplateConfig]  # <-- Update type hint
+    templates: dict[TemplateName, TemplateConfig]
     retry_strategy: RetryStrategy | None = None
 
     @classmethod

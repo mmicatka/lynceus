@@ -9,13 +9,7 @@ from workflows.config.base import StrictModel
 
 class CandidatesConfig(StrictModel):
     sources: list[str] = Field(min_length=1)
-    sub_sample: Optional[PositiveInt]
-
-
-class FeaturesConfig(StrictModel):
-    conformer_prefix: str
-    feature_prefix: str
-    feature_list: list[str] = Field(min_length=1)
+    sub_sample: Optional[PositiveInt] = None
 
 
 class RoundConfig(StrictModel):
@@ -52,16 +46,16 @@ class SurrogateConfig(StrictModel):
 
 
 class FilterConfig(StrictModel):
-    features: FeaturesConfig
+    feature_list: list[str] = Field(min_length=1)
     surrogate: SurrogateConfig
 
     @model_validator(mode="after")
     def _surrogate_features_are_subset(self) -> "FilterConfig":
-        unknown = set(self.surrogate.feature_list) - set(self.features.feature_list)
+        unknown = set(self.surrogate.feature_list) - set(self.feature_list)
         if unknown:
             raise ValueError(
                 f"surrogate.feature_list contains features not in "
-                f"features.feature_list: {sorted(unknown)}"
+                f"feature_list: {sorted(unknown)}"
             )
         return self
 

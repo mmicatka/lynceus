@@ -14,8 +14,8 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 COPY libs/lynceus-core ./libs/lynceus-core
 
-COPY projects/candidates ./projects/candidates
-WORKDIR /app/projects/candidates
+COPY projects/surrogate-model ./projects/surrogate-model
+WORKDIR /app/projects/surrogate-model
 
 RUN uv pip install --system .
 

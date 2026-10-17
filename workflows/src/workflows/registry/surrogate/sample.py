@@ -4,11 +4,7 @@ from hera.workflows import DAG, Task
 
 from workflows.config import InfraConfig, ScreenConfig
 from workflows.config.infrastructure import TemplateName
-from workflows.registry.common import (
-    ITEM_PARAM,
-    SHARD_FOLDER_PREFIX,
-    shard_ids,
-)
+from workflows.registry.common import ITEM_PARAM, shard_ids
 from workflows.templates import (
     build_clean_prefix_template,
     merge_shards_template,
@@ -17,27 +13,32 @@ from workflows.templates import (
 from workflows.templates.builders import TemplateFactory
 
 SURROGATE_SAMPLE_DAG = "surrogate-sample-dag"
-SAMPLE_OUTPUT_FILENAME = "docking_input.parquet"
-SAMPLE_STAGING_FOLDER = "sample_staging"
+SHARD_FILENAME_PATTERN = "shard_{shard}.parquet"
+
+MAX_PARALLEL_SOURCES = 3
 
 
-def _shard_folder(shard: str) -> str:
-    return f"{SHARD_FOLDER_PREFIX}{shard}"
+def _round_name(round_index: int) -> str:
+    return f"round_{round_index}"
 
 
-def _round_prefix(model_prefix: str, round_index: int) -> str:
-    return f"{model_prefix}/round_{round_index}"
+def _round_path(prefix: str, round_index: int) -> str:
+    return f"{prefix}/{_round_name(round_index)}"
+
+
+def _shard_filename(shard: str) -> str:
+    return SHARD_FILENAME_PATTERN.format(shard=shard)
 
 
 def _sample_shards_task(
     templates: TemplateFactory,
     infra_config: InfraConfig,
-    screen_config: ScreenConfig,
-    staging_prefix: str,
+    staging_path: str,
     num_samples: int,
 ) -> Task:
-    features_config = screen_config.filter.features
+    candidate_prefixes = infra_config.storage.prefixes.candidates
     num_shards = infra_config.candidates.num_shards
+
     surrogate_sample = templates.build(
         TemplateName.SURROGATE_SAMPLE, surrogate_sample_template
     )
@@ -47,10 +48,10 @@ def _sample_shards_task(
         with_items=shard_ids(num_shards),
         arguments={
             "base_path": infra_config.volume.mount_path,
-            "source": _shard_folder(ITEM_PARAM),
-            "features_input_prefix": features_config.feature_prefix,
-            "conformers_input_prefix": features_config.conformer_prefix,
-            "output_prefix": staging_prefix,
+            "source": _shard_filename(ITEM_PARAM),
+            "features_input_prefix": candidate_prefixes.features,
+            "conformers_input_prefix": candidate_prefixes.conformers,
+            "output_prefix": staging_path,
             "num_samples": num_samples // num_shards,
         },
     )
@@ -59,7 +60,7 @@ def _sample_shards_task(
 def _merge_samples_task(
     templates: TemplateFactory,
     infra_config: InfraConfig,
-    staging_prefix: str,
+    staging_path: str,
     output_path: str,
 ) -> Task:
     merge_shards = templates.build(TemplateName.MERGE_SHARDS, merge_shards_template)
@@ -68,19 +69,19 @@ def _merge_samples_task(
         name="merge-samples",
         arguments={
             "base_path": infra_config.volume.mount_path,
-            "input_path": staging_prefix,
+            "input_path": staging_path,
             "output_path": output_path,
         },
     )
 
 
-def _cleanup_staging_task(infra_config: InfraConfig, staging_prefix: str) -> Task:
+def _cleanup_staging_task(infra_config: InfraConfig, staging_path: str) -> Task:
     return Task(
         name="cleanup-sample-staging",
         template=build_clean_prefix_template(),
         arguments={
             "base_path": infra_config.volume.mount_path,
-            "prefix": staging_prefix,
+            "prefix": staging_path,
         },
     )
 
@@ -91,20 +92,19 @@ def build_surrogate_sample_dag(
     screen_config: ScreenConfig,
     round_index: int = 0,
 ) -> DAG:
-    surrogate_config = screen_config.filter.surrogate
-    round_prefix = _round_prefix(surrogate_config.model_prefix, round_index)
-    staging_prefix = f"{round_prefix}/{SAMPLE_STAGING_FOLDER}"
-    output_path = f"{round_prefix}/{SAMPLE_OUTPUT_FILENAME}"
-    num_samples = surrogate_config.rounds[round_index].uniform
+    surrogate_prefixes = infra_config.storage.prefixes.surrogate
+    staging_path = _round_path(surrogate_prefixes.samples_staging, round_index)
+    output_path = _round_path(surrogate_prefixes.samples, round_index)
+    num_samples = screen_config.filter.surrogate.rounds[round_index].uniform
 
-    with DAG(name=SURROGATE_SAMPLE_DAG) as dag:
+    with DAG(name=SURROGATE_SAMPLE_DAG, parallelism=MAX_PARALLEL_SOURCES) as dag:
         sample_task = _sample_shards_task(
-            templates, infra_config, screen_config, staging_prefix, num_samples
+            templates, infra_config, staging_path, num_samples
         )
         merge_task = _merge_samples_task(
-            templates, infra_config, staging_prefix, output_path
+            templates, infra_config, staging_path, output_path
         )
-        cleanup_task = _cleanup_staging_task(infra_config, staging_prefix)
+        cleanup_task = _cleanup_staging_task(infra_config, staging_path)
 
         sample_task >> merge_task >> cleanup_task  # type: ignore
 
