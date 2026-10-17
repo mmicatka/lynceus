@@ -1,4 +1,4 @@
-# modules/local/docking_run/src/docking_run/providers/unidock_gpu.py
+# projects/lynceus-dock/src/lynceus_dock/providers/unidock_gpu.py
 
 from __future__ import annotations
 
@@ -8,11 +8,15 @@ import subprocess
 from pathlib import Path
 from typing import Iterator
 
-from docking_run.prep.ligand import materialize_ligands
-from docking_run.types import DockingError, DockingResult, LigandRecord, SearchBox
+from lynceus_dock.common.ligand import materialize_ligands
+from lynceus_dock.common.types import (
+    DockingError,
+    DockingResult,
+    LigandRecord,
+    SearchBox,
+)
 
-from .provider import DockingProvider, ProviderNotAvailableError
-from .utils import parse_vina_output_pdbqt
+from .common import DockingProvider, ProviderNotAvailableError, parse_vina_output_pdbqt
 
 logger = logging.getLogger(__name__)
 

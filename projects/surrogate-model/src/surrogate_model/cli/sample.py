@@ -1,4 +1,4 @@
-# projects/surrogate_model/src/surrogate_model/sample.py
+# projects/surrogate-model/src/surrogate_model/cli/sample.py
 
 import glob
 import json

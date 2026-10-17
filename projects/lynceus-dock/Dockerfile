@@ -1,4 +1,4 @@
-# modules/local/docking_run/Dockerfile
+# projects/lynceus-dock/Dockerfile
 
 FROM nvidia/cuda:12.6.3-runtime-ubuntu24.04 AS gpu
 
@@ -28,13 +28,12 @@ ENV PATH=/opt/micromamba/envs/unidock/bin:$PATH
 
 WORKDIR /app
 
-COPY pyproject.toml ./
-COPY libs/lynceus-utils ./libs/lynceus-utils
+COPY pyproject.toml uv.lock ./
+COPY libs/lynceus-core ./libs/lynceus-core
 
-COPY modules/local/docking_run ./modules/local/docking_run
-WORKDIR /app/modules/local/docking_run
+COPY projects/lynceus-dock ./projects/lynceus-dock
+WORKDIR /app/projects/lynceus-dock
 
 RUN uv pip install --system .
-RUN python -c "import duckdb; duckdb.execute('INSTALL httpfs')"
 
 ENTRYPOINT []

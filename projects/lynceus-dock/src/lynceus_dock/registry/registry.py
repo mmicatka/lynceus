@@ -1,9 +1,9 @@
-# modules/local/docking_run/src/docking_run/providers/registry.py
+# projects/lynceus-dock/src/lynceus_dock/providers/registry.py
 
 from typing import Any
 
-from .provider import DockingProvider
-from .unidock_gpu import UnidockGPUProvider
+from lynceus_dock.registry.common import DockingProvider
+from lynceus_dock.registry.unidock_gpu import UnidockGPUProvider
 
 _PROVIDERS: dict[str, type[DockingProvider]] = {
     "gpu": UnidockGPUProvider,

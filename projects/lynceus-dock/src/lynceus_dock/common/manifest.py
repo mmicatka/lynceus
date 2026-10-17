@@ -1,38 +1,39 @@
-# modules/local/docking_run/src/docking_run/manifest.py
+# projects/lynceus-dock/src/lynceus_dock/common/manifest.py
 
 from __future__ import annotations
 
 import json
-
-import fsspec
+import os
+from pathlib import Path
 
 MANIFEST_FILENAME = "docking_manifest.json"
 
 
-def manifest_path(out_parquet: str) -> str:
-    parent_dir = out_parquet.rsplit("/", 1)[0] if "/" in out_parquet else "."
-    return f"{parent_dir}/{MANIFEST_FILENAME}"
+def build_manifest_path(out_parquet: str) -> Path:
+    return Path(out_parquet).parent / MANIFEST_FILENAME
 
 
-def load_manifest(fs: fsspec.AbstractFileSystem, path: str) -> dict:
-    if not fs.exists(path):
+def load_manifest(manifest_path: Path) -> dict:
+    if not manifest_path.exists():
         return {"runs": {}}
 
-    with fs.open(path, "r") as f:
+    with open(manifest_path, "r") as f:
         manifest = json.load(f)
 
     if "runs" not in manifest:
-        raise RuntimeError(f"Manifest at {path} is malformed: missing 'runs' key")
+        raise RuntimeError(
+            f"Manifest at {manifest_path} is malformed: missing 'runs' key"
+        )
 
     return manifest
 
 
-def write_manifest(fs: fsspec.AbstractFileSystem, path: str, manifest: dict) -> None:
-    tmp_path = f"{path}.tmp"
+def write_manifest(output_path: Path, manifest: dict) -> None:
+    tmp_path = f"{output_path}.tmp"
 
-    with fs.open(tmp_path, "w") as f:
+    with open(tmp_path, "w") as f:
         json.dump(manifest, f, indent=2, sort_keys=True)
-    fs.mv(tmp_path, path)
+    os.replace(tmp_path, output_path)
 
 
 def run_key(member_id: str, site_id: str) -> str:
@@ -58,7 +59,6 @@ def build_entry(
 
 
 def existing_entry_is_valid(
-    fs: fsspec.AbstractFileSystem,
     entry: dict,
     ligands_path: str,
     ligand_row_count: int,
@@ -94,7 +94,7 @@ def existing_entry_is_valid(
             f"entry to force a redo)."
         )
 
-    if not fs.exists(out_parquet):
+    if not os.path.exists(out_parquet):
         raise RuntimeError(
             f"Manifest claims member={entry.get('member_id')!r} "
             f"site={entry.get('site_id')!r} is docked but output "

@@ -20,6 +20,12 @@ build-candidates:
 build-targets:
 	docker buildx build --platform linux/amd64,linux/arm64 --push -f projects/targets/Dockerfile -t $(IMAGE_PREFIX)/targets:$(VERSION) .
 
+build-lynceus-dock:
+	docker buildx build --platform linux/amd64 --push -f projects/lynceus-dock/Dockerfile -t $(IMAGE_PREFIX)/lynceus-dock:$(VERSION) .
+
+build-surrogate-model:
+	docker buildx build --platform linux/amd64,linux/arm64 --push -f projects/surrogate-model/Dockerfile -t $(IMAGE_PREFIX)/surrogate-model:$(VERSION) .
+
 setup-argo:
 	$(MAKE) -C infra/argo all WORKFLOW_NAMESPACE=$(NAMESPACE)
 

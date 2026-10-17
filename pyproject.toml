@@ -25,7 +25,7 @@ members = [
     # projects
     "projects/candidates",
     "projects/lynceus-dock",
-    "projects/surrogate_model",
+    "projects/surrogate-model",
     "projects/targets",
     # workflows
     "workflows",

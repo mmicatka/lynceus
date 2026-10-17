@@ -5,9 +5,25 @@ description = "Add your description here"
 readme = "README.md"
 authors = [{ name = "Mike Micatka", email = "mike.micatka@gmail.com" }]
 requires-python = ">=3.14"
-dependencies = []
+
+dependencies = [
+    "click>=8.5.0",
+    "duckdb>=1.5.6",
+    "gemmi>=0.7.5",
+    "lynceus-core",
+    "meeko>=0.8.0",
+    "prody>=2.6.1",
+    "protein-ensemble",
+    "pyarrow>=26.0.0",
+    "rdkit>=2026.3.5",
+]
 
 [project.scripts]
+run-docking = "lynceus_dock:run_docking"
+
+[tool.uv.sources]
+protein-ensemble = { git = "https://github.com/proteinensemble/python-sdk.git" }
+lynceus-core = { workspace = true }
 
 [build-system]
 requires = ["uv_build>=0.12.23,<0.13.0"]

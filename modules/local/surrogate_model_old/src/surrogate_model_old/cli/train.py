@@ -1,29 +1,39 @@
 # modules/local/surrogate_model/src/surrogate_model/train.py
 
-import logging
+import json
+import os
 import sys
 import time
 
 import click
-import fsspec
 import joblib
 import lightgbm as lgb
 import polars as pl
-from lynceus_utils.storage.blob_storage import get_blob_storage_settings
-from lynceus_utils.storage.filesystem import get_filesystem, resolve_path
+import structlog
+from lynceus_core.logging import wide_log
 from sklearn.model_selection import train_test_split
+from surrogate_model.data import flatten_features, label, load_and_clean_data
+from surrogate_model.metrics import evaluation_metrics, predict_active
 
-from surrogate_model_old.data import flatten_features, label, load_and_clean_data
-from surrogate_model_old.metrics import evaluation_metrics, predict_active
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-    stream=sys.stdout,
-)
+# Apply environment-aware structured logging
+def configure_logging():
+    if sys.stdout.isatty():
+        processor = structlog.dev.ConsoleRenderer(colors=True)
+    else:
+        processor = structlog.processors.JSONRenderer()
 
-logger = logging.getLogger(__name__)
+    structlog.configure(
+        processors=[
+            structlog.processors.TimeStamper(fmt="iso"),
+            structlog.processors.add_log_level,
+            processor,
+        ]
+    )
+
+
+configure_logging()
+logger = structlog.get_logger()
 
 RANDOM_SEED = 1000
 FEATURE_COLS = [
@@ -40,20 +50,38 @@ FEATURE_COLS = [
 ]
 
 
-def _read_parquet(path: str, fs: fsspec.AbstractFileSystem) -> pl.DataFrame:
-    return pl.read_parquet(fs.cat_file(path))
+def _marker_path(output_path: str) -> str:
+    return f"{output_path}.SUCCESS"
+
+
+def _model_is_valid(output_path: str, active_percentile: float) -> bool:
+    marker_path = _marker_path(output_path)
+    if not os.path.exists(marker_path):
+        return False
+    with open(marker_path, "r") as f:
+        data = json.load(f)
+        return data.get("active_percentile") == active_percentile
+
+
+def _write_success_marker(output_path: str, active_percentile: float) -> None:
+    os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
+    with open(_marker_path(output_path), "w") as f:
+        json.dump({"active_percentile": active_percentile}, f)
+
+
+def _read_parquet(path: str) -> pl.DataFrame:
+    return pl.read_parquet(path)
 
 
 def _prepare_dataset(
     features_path: str,
     labels_path: str,
-    fs: fsspec.AbstractFileSystem,
     features: list[str],
     percentile: float = None,
     threshold: float = None,
 ) -> tuple:
-    raw_features = _read_parquet(features_path, fs)
-    raw_labels = _read_parquet(labels_path, fs)
+    raw_features = _read_parquet(features_path)
+    raw_labels = _read_parquet(labels_path)
 
     df_cleaned = load_and_clean_data(raw_features, raw_labels)
 
@@ -71,15 +99,21 @@ def _prepare_dataset(
 def _evaluate_and_log(model, x, y_true, dataset_name: str) -> pl.DataFrame:
     y_predict = predict_active(model=model, x=x)
     metrics = evaluation_metrics(y_true, y_predict)
-    logger.info(f"{dataset_name} Evaluation Metrics:\n{metrics}")
+    logger.info(
+        "Evaluation metrics generated", dataset_name=dataset_name, metrics=metrics
+    )
     return metrics
 
 
-def _save_model(model, path: str, fs: fsspec.AbstractFileSystem):
-    logger.info("Saving model to %s...", path)
-    with fs.open(path, "wb") as f:
+def _save_model(model, path: str):
+    logger.info("Saving model", path=path)
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    with open(path, "wb") as f:
         joblib.dump(model, f)
-    logger.info("Model saved successfully.")
+    logger.info("Model saved successfully", path=path)
+
+
+# --- CLI Interface ---
 
 
 @click.command()
@@ -118,7 +152,6 @@ def _save_model(model, path: str, fs: fsspec.AbstractFileSystem):
     required=True,
     help="Output path to save the model.",
 )
-@click.option("--bucket", type=str, default="", help="S3-compatible bucket name.")
 @click.option(
     "--features",
     "-f",
@@ -128,7 +161,14 @@ def _save_model(model, path: str, fs: fsspec.AbstractFileSystem):
     show_default=True,
     help="Features to use.",
 )
-@click.option("--active-percentile", type=float, default=1.0, help="Active percentile.")
+@click.option(
+    "--active-percentile",
+    type=float,
+    default=1.0,
+    show_default=True,
+    help="Active percentile.",
+)
+@wide_log(logger)
 def train_model(
     train_features_path: str,
     train_labels_path: str,
@@ -136,33 +176,30 @@ def train_model(
     validation_labels_path: str,
     features: list[str],
     model_path: str,
-    bucket: str,
     active_percentile: float,
 ):
-    train_features_path = resolve_path(train_features_path, bucket)
-    train_labels_path = resolve_path(train_labels_path, bucket)
-    validation_features_path = resolve_path(validation_features_path, bucket)
-    validation_labels_path = resolve_path(validation_labels_path, bucket)
+    click.echo(f"Training surrogate model using features from {train_features_path}...")
+
+    if _model_is_valid(model_path, active_percentile):
+        logger.info(
+            "Model already valid, skipping training",
+            model_path=model_path,
+            active_percentile=active_percentile,
+        )
+        click.echo("Done!")
+        return
 
     logger.info(
-        "training surrogate model using features: %s\tlabels: %s",
-        train_features_path,
-        train_labels_path,
+        "Training surrogate model",
+        train_features_path=train_features_path,
+        train_labels_path=train_labels_path,
+        validation_features_path=validation_features_path,
+        validation_labels_path=validation_labels_path,
     )
-
-    logger.info(
-        "validating using features: %s\tlabels: %s",
-        validation_features_path,
-        validation_labels_path,
-    )
-
-    blob_storage_settings = get_blob_storage_settings() if bucket else None
-    fs = get_filesystem(blob_storage_settings)
 
     x_initial, y_initial_label, threshold = _prepare_dataset(
         train_features_path,
         train_labels_path,
-        fs,
         features,
         percentile=active_percentile,
     )
@@ -186,9 +223,9 @@ def train_model(
     model.fit(x_initial_train, y_initial_train)
 
     logger.info(
-        "trained model with: %d samples in %.3fs",
-        len(x_initial_train),
-        time.perf_counter() - time_start,
+        "Trained model",
+        samples=len(x_initial_train),
+        duration_seconds=round(time.perf_counter() - time_start, 3),
     )
 
     _evaluate_and_log(
@@ -198,7 +235,6 @@ def train_model(
     x_validation, y_validation_label, _ = _prepare_dataset(
         validation_features_path,
         validation_labels_path,
-        fs,
         features,
         threshold=threshold,
     )
@@ -207,4 +243,8 @@ def train_model(
         model, x_validation, y_validation_label, dataset_name="Validation"
     )
 
-    _save_model(model, model_path, fs)
+    _save_model(model, model_path)
+
+    _write_success_marker(model_path, active_percentile)
+
+    click.echo("Done!")
