@@ -1,20 +1,28 @@
 # projects/surrogate-model/src/surrogate_model/cli/sample.py
 
+import contextlib
 import glob
 import json
 import os
 import sys
+import time
+from collections.abc import Iterable, Iterator
 from pathlib import Path
 
 import click
-import duckdb
+import numpy as np
+import pyarrow as pa
+import pyarrow.parquet as pq
 import structlog
-from lynceus_core.cli import NumWorkers
 from lynceus_core.logging import wide_log
 
 PARQUET_PATTERN = "*.parquet"
 MARKER_SUFFIX = ".success"
 TEMP_SUFFIX = ".tmp"
+CONFORMER_COLUMN = "conformer"
+COMPRESSION = "zstd"
+DEFAULT_BATCH_SIZE = 50_000
+PROGRESS_INTERVAL_SECONDS = 15.0
 
 
 def configure_logging():
@@ -36,12 +44,33 @@ configure_logging()
 logger = structlog.get_logger()
 
 
-def _quote_literal(value: str) -> str:
-    return "'" + value.replace("'", "''") + "'"
+class ProgressReporter:
+    def __init__(
+        self,
+        total_rows: int,
+        identifier: str,
+        interval: float = PROGRESS_INTERVAL_SECONDS,
+    ) -> None:
+        self._total_rows = total_rows
+        self._identifier = identifier
+        self._interval = interval
+        self._started = time.monotonic()
+        self._last_report = self._started
 
-
-def _quote_identifier(value: str) -> str:
-    return '"' + value.replace('"', '""') + '"'
+    def update(self, scanned_rows: int) -> None:
+        now = time.monotonic()
+        finished = scanned_rows >= self._total_rows
+        if not finished and now - self._last_report < self._interval:
+            return
+        self._last_report = now
+        logger.info(
+            "Sampling in progress",
+            identifier=self._identifier,
+            scanned_rows=scanned_rows,
+            total_rows=self._total_rows,
+            percent=round(100 * scanned_rows / max(self._total_rows, 1), 1),
+            elapsed_seconds=round(now - self._started, 1),
+        )
 
 
 def _marker_path(output_path: str) -> str:
@@ -75,51 +104,137 @@ def _resolve_parquet_files(pattern: str) -> list[str]:
     return unique_files
 
 
-def _sample_aligned(
-    conn: duckdb.DuckDBPyConnection,
+def _count_rows(files: list[str]) -> int:
+    return sum(pq.ParquetFile(path).metadata.num_rows for path in files)
+
+
+def _select_positions(
+    total_rows: int, num_samples: int, seed: int | None
+) -> np.ndarray:
+    rng = np.random.default_rng(seed)
+    return np.sort(rng.choice(total_rows, size=num_samples, replace=False))
+
+
+def _stream_batches(
+    files: list[str],
+    columns: list[str] | None,
+    batch_size: int,
+) -> Iterator[pa.RecordBatch]:
+    for path in files:
+        yield from pq.ParquetFile(path).iter_batches(
+            batch_size=batch_size, columns=columns
+        )
+
+
+def _rechunk(batches: Iterable[pa.RecordBatch], size: int) -> Iterator[pa.Table]:
+    pending: list[pa.RecordBatch] = []
+    pending_rows = 0
+    for batch in batches:
+        pending.append(batch)
+        pending_rows += batch.num_rows
+        while pending_rows >= size:
+            table = pa.Table.from_batches(pending)
+            yield table.slice(0, size)
+            remainder = table.slice(size)
+            pending = remainder.to_batches()
+            pending_rows = remainder.num_rows
+    if pending_rows:
+        yield pa.Table.from_batches(pending)
+
+
+def _aligned_chunks(
     features_files: list[str],
     conformers_files: list[str],
-    output_file: str,
-    num_samples: int,
     id_column: str,
-) -> None:
-    column = _quote_identifier(id_column)
-    conn.execute(
-        f"""
-        COPY (
-            SELECT
-                f.*,
-                c.conformer
-            FROM read_parquet(?) f
-            JOIN read_parquet(?) c
-              ON f.{column} = c.{column}
-            USING SAMPLE reservoir({num_samples} ROWS)
-        )
-        TO {_quote_literal(output_file)}
-        (FORMAT parquet, COMPRESSION zstd)
-        """,
-        [features_files, conformers_files],
+    batch_size: int,
+) -> Iterator[tuple[pa.Table, pa.Table]]:
+    features = _rechunk(_stream_batches(features_files, None, batch_size), batch_size)
+    conformers = _rechunk(
+        _stream_batches(conformers_files, [id_column, CONFORMER_COLUMN], batch_size),
+        batch_size,
     )
+    for features_chunk, conformers_chunk in zip(features, conformers, strict=True):
+        if features_chunk.num_rows != conformers_chunk.num_rows:
+            raise ValueError("Features and conformers chunks differ in row count")
+        yield features_chunk, conformers_chunk
+
+
+def _select_aligned(
+    features: pa.Table,
+    conformers: pa.Table,
+    local_positions: np.ndarray,
+    id_column: str,
+) -> pa.Table:
+    indices = pa.array(local_positions, type=pa.int64())
+    selected_features = features.take(indices)
+    selected_conformers = conformers.take(indices)
+    if not selected_features[id_column].equals(selected_conformers[id_column]):
+        raise ValueError(f"Misaligned inputs: '{id_column}' differs between sides")
+    return selected_features.append_column(
+        CONFORMER_COLUMN, selected_conformers[CONFORMER_COLUMN]
+    )
+
+
+def _write_sample(
+    features_files: list[str],
+    conformers_files: list[str],
+    positions: np.ndarray,
+    output_file: str,
+    id_column: str,
+    batch_size: int,
+    reporter: ProgressReporter,
+) -> None:
+    writer: pq.ParquetWriter | None = None
+    offset = 0
+    try:
+        for features, conformers in _aligned_chunks(
+            features_files, conformers_files, id_column, batch_size
+        ):
+            end = offset + features.num_rows
+            lo, hi = np.searchsorted(positions, [offset, end])
+            selected = _select_aligned(
+                features, conformers, positions[lo:hi] - offset, id_column
+            )
+            if writer is None:
+                writer = pq.ParquetWriter(
+                    output_file, selected.schema, compression=COMPRESSION
+                )
+            writer.write_table(selected)
+            offset = end
+            reporter.update(offset)
+    finally:
+        if writer is not None:
+            writer.close()
 
 
 def _write_sample_atomically(
-    conn: duckdb.DuckDBPyConnection,
     features_files: list[str],
     conformers_files: list[str],
+    positions: np.ndarray,
     output_path: str,
-    num_samples: int,
     id_column: str,
+    batch_size: int,
+    reporter: ProgressReporter,
 ) -> None:
     temp_path = f"{output_path}{TEMP_SUFFIX}"
-    _sample_aligned(
-        conn=conn,
-        features_files=features_files,
-        conformers_files=conformers_files,
-        output_file=temp_path,
-        num_samples=num_samples,
-        id_column=id_column,
-    )
-    os.replace(temp_path, output_path)
+    try:
+        _write_sample(
+            features_files=features_files,
+            conformers_files=conformers_files,
+            positions=positions,
+            output_file=temp_path,
+            id_column=id_column,
+            batch_size=batch_size,
+            reporter=reporter,
+        )
+        written = pq.ParquetFile(temp_path).metadata.num_rows
+        if written != len(positions):
+            raise RuntimeError(f"Wrote {written} rows, expected {len(positions)}")
+        os.replace(temp_path, output_path)
+    except BaseException:
+        with contextlib.suppress(FileNotFoundError):
+            os.remove(temp_path)
+        raise
 
 
 @click.command("sample_aligned")
@@ -157,14 +272,22 @@ def _write_sample_atomically(
     default="id",
     show_default=True,
     type=str,
-    help="Shared ID column to join on.",
+    help="ID column used to verify row alignment.",
 )
 @click.option(
-    "--num-workers",
-    default="auto",
-    type=NumWorkers(),
+    "--batch-size",
+    "batch_size",
+    default=DEFAULT_BATCH_SIZE,
     show_default=True,
-    help="Number of parallel workers (integer >= 1 or 'auto').",
+    type=click.IntRange(min=1),
+    help="Rows read per chunk from each input.",
+)
+@click.option(
+    "--seed",
+    "seed",
+    default=None,
+    type=int,
+    help="Seed for reproducible sampling.",
 )
 @wide_log(logger)
 def sample_candidates(
@@ -173,7 +296,8 @@ def sample_candidates(
     output_path: str,
     num_samples: int,
     id_column: str,
-    num_workers: int,
+    batch_size: int,
+    seed: int | None,
 ) -> None:
     click.echo(
         f"Processing aligned samples from {features_input} and {conformers_input}..."
@@ -194,39 +318,54 @@ def sample_candidates(
     features_files = _resolve_parquet_files(features_input)
     conformers_files = _resolve_parquet_files(conformers_input)
 
+    total_rows = _count_rows(features_files)
+    conformer_rows = _count_rows(conformers_files)
+    if total_rows != conformer_rows:
+        raise RuntimeError(
+            f"Row count mismatch: {total_rows} features vs {conformer_rows} conformers"
+        )
+
+    effective_samples = min(num_samples, total_rows)
+    if effective_samples < num_samples:
+        logger.warning(
+            "Requested more samples than available rows, returning all rows",
+            identifier=identifier,
+            requested=num_samples,
+            available=total_rows,
+        )
+
     logger.info(
-        "Executing aligned reservoir sampling",
+        "Executing aligned position sampling",
         features_source=features_input,
         conformers_source=conformers_input,
         num_features_files=len(features_files),
         num_conformers_files=len(conformers_files),
         identifier=identifier,
-        num_samples=num_samples,
+        total_rows=total_rows,
+        num_samples=effective_samples,
         output_path=output_path,
-        workers=num_workers,
     )
 
     os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
 
-    conn = duckdb.connect()
-    conn.execute("SET threads = ?", [num_workers])
-    conn.execute("SET arrow_large_buffer_size=true")
+    positions = _select_positions(total_rows, effective_samples, seed)
 
     _write_sample_atomically(
-        conn=conn,
         features_files=features_files,
         conformers_files=conformers_files,
+        positions=positions,
         output_path=output_path,
-        num_samples=num_samples,
         id_column=id_column,
+        batch_size=batch_size,
+        reporter=ProgressReporter(total_rows, identifier),
     )
 
     _write_success_marker(output_path, num_samples)
 
     logger.info(
-        "Finished aligned reservoir sampling",
+        "Finished aligned position sampling",
         identifier=identifier,
-        num_samples=num_samples,
+        num_samples=effective_samples,
         output_path=output_path,
     )
     click.echo("Done!")

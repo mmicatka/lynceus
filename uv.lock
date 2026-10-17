@@ -2777,18 +2777,20 @@ version = "0.1.0"
 source = { editable = "projects/surrogate-model" }
 dependencies = [
     { name = "click" },
-    { name = "duckdb" },
     { name = "lynceus-core" },
+    { name = "numpy" },
     { name = "polars" },
+    { name = "pyarrow" },
     { name = "structlog" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "click", specifier = ">=8.5.0" },
-    { name = "duckdb", specifier = ">=1.5.6" },
     { name = "lynceus-core", editable = "libs/lynceus-core" },
+    { name = "numpy", specifier = ">=2.5.4" },
     { name = "polars", specifier = ">=2.0.0" },
+    { name = "pyarrow", specifier = ">=26.0.0" },
     { name = "structlog", specifier = ">=26.1.0" },
 ]
 
