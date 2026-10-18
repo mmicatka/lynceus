@@ -1,11 +1,9 @@
 # projects/surrogate-model/src/surrogate_model/cli/sample.py
 
-import contextlib
 import glob
 import json
 import os
 import sys
-import time
 from collections.abc import Iterable, Iterator
 from pathlib import Path
 
@@ -18,11 +16,9 @@ from lynceus_core.logging import wide_log
 
 PARQUET_PATTERN = "*.parquet"
 MARKER_SUFFIX = ".success"
-TEMP_SUFFIX = ".tmp"
 CONFORMER_COLUMN = "conformer"
 COMPRESSION = "zstd"
 DEFAULT_BATCH_SIZE = 50_000
-PROGRESS_INTERVAL_SECONDS = 15.0
 
 
 def configure_logging():
@@ -44,35 +40,6 @@ configure_logging()
 logger = structlog.get_logger()
 
 
-class ProgressReporter:
-    def __init__(
-        self,
-        total_rows: int,
-        identifier: str,
-        interval: float = PROGRESS_INTERVAL_SECONDS,
-    ) -> None:
-        self._total_rows = total_rows
-        self._identifier = identifier
-        self._interval = interval
-        self._started = time.monotonic()
-        self._last_report = self._started
-
-    def update(self, scanned_rows: int) -> None:
-        now = time.monotonic()
-        finished = scanned_rows >= self._total_rows
-        if not finished and now - self._last_report < self._interval:
-            return
-        self._last_report = now
-        logger.info(
-            "Sampling in progress",
-            identifier=self._identifier,
-            scanned_rows=scanned_rows,
-            total_rows=self._total_rows,
-            percent=round(100 * scanned_rows / max(self._total_rows, 1), 1),
-            elapsed_seconds=round(now - self._started, 1),
-        )
-
-
 def _marker_path(output_path: str) -> str:
     return f"{output_path}{MARKER_SUFFIX}"
 
@@ -82,7 +49,9 @@ def _output_is_valid(output_path: str, num_samples: int) -> bool:
     if not (os.path.isfile(output_path) and os.path.isfile(marker_path)):
         return False
     with open(marker_path, "r") as f:
-        return json.load(f).get("num_samples") == num_samples
+        if json.load(f).get("num_samples") != num_samples:
+            return False
+    return os.path.getsize(output_path) > 0
 
 
 def _write_success_marker(output_path: str, num_samples: int) -> None:
@@ -182,7 +151,6 @@ def _write_sample(
     output_file: str,
     id_column: str,
     batch_size: int,
-    reporter: ProgressReporter,
 ) -> None:
     writer: pq.ParquetWriter | None = None
     offset = 0
@@ -201,40 +169,36 @@ def _write_sample(
                 )
             writer.write_table(selected)
             offset = end
-            reporter.update(offset)
     finally:
         if writer is not None:
             writer.close()
 
 
-def _write_sample_atomically(
+def _verify_written(output_path: str, expected_rows: int) -> None:
+    written = pq.ParquetFile(output_path).metadata.num_rows
+    if written != expected_rows:
+        raise RuntimeError(f"Wrote {written} rows, expected {expected_rows}")
+
+
+def _write_sample_with_marker(
     features_files: list[str],
     conformers_files: list[str],
     positions: np.ndarray,
     output_path: str,
+    num_samples: int,
     id_column: str,
     batch_size: int,
-    reporter: ProgressReporter,
 ) -> None:
-    temp_path = f"{output_path}{TEMP_SUFFIX}"
-    try:
-        _write_sample(
-            features_files=features_files,
-            conformers_files=conformers_files,
-            positions=positions,
-            output_file=temp_path,
-            id_column=id_column,
-            batch_size=batch_size,
-            reporter=reporter,
-        )
-        written = pq.ParquetFile(temp_path).metadata.num_rows
-        if written != len(positions):
-            raise RuntimeError(f"Wrote {written} rows, expected {len(positions)}")
-        os.replace(temp_path, output_path)
-    except BaseException:
-        with contextlib.suppress(FileNotFoundError):
-            os.remove(temp_path)
-        raise
+    _write_sample(
+        features_files=features_files,
+        conformers_files=conformers_files,
+        positions=positions,
+        output_file=output_path,
+        id_column=id_column,
+        batch_size=batch_size,
+    )
+    _verify_written(output_path, len(positions))
+    _write_success_marker(output_path, num_samples)
 
 
 @click.command("sample_aligned")
@@ -350,17 +314,15 @@ def sample_candidates(
 
     positions = _select_positions(total_rows, effective_samples, seed)
 
-    _write_sample_atomically(
+    _write_sample_with_marker(
         features_files=features_files,
         conformers_files=conformers_files,
         positions=positions,
         output_path=output_path,
+        num_samples=num_samples,
         id_column=id_column,
         batch_size=batch_size,
-        reporter=ProgressReporter(total_rows, identifier),
     )
-
-    _write_success_marker(output_path, num_samples)
 
     logger.info(
         "Finished aligned position sampling",
