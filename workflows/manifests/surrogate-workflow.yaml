@@ -1,0 +1,158 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: 5m-poc-surrogate-sample-
+spec:
+  entrypoint: main-dag
+  serviceAccountName: argo-workflow
+  templates:
+  - name: surrogate-sample-dag
+    parallelism: 3
+    dag:
+      tasks:
+      - name: sample-shards
+        template: surrogate-sample
+        withItems:
+        - 0
+        - 1
+        - 2
+        - 3
+        - 4
+        - 5
+        - 6
+        - 7
+        arguments:
+          parameters:
+          - name: base_path
+            value: /mnt/lynceus
+          - name: source
+            value: shard_{{item}}.parquet
+          - name: features_input_prefix
+            value: candidates/features
+          - name: conformers_input_prefix
+            value: candidates/conformers
+          - name: output_prefix
+            value: surrogate/samples_staging/round_0
+          - name: num_samples
+            value: '12500'
+      - name: merge-samples
+        depends: sample-shards
+        template: merge-shards
+        arguments:
+          parameters:
+          - name: base_path
+            value: /mnt/lynceus
+          - name: input_path
+            value: surrogate/samples_staging/round_0
+          - name: output_path
+            value: surrogate/samples/round_0.parquet
+  - name: surrogate-sample
+    volumes:
+    - name: lynceus
+      persistentVolumeClaim:
+        claimName: lynceus-pvc
+    inputs:
+      parameters:
+      - name: base_path
+      - name: source
+      - name: features_input_prefix
+      - name: conformers_input_prefix
+      - name: output_prefix
+      - name: num_samples
+      - name: id_column
+        default: id
+    retryStrategy:
+      limit: 5
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 10m
+    script:
+      image: registry.nebula.lan:5000/lynceus/surrogate-model:0.1.0
+      imagePullPolicy: Always
+      source: |-
+        import os
+        import sys
+        sys.path.append(os.getcwd())
+        import json
+        try: base_path = json.loads(r'''{{inputs.parameters.base_path}}''')
+        except: base_path = r'''{{inputs.parameters.base_path}}'''
+        try: conformers_input_prefix = json.loads(r'''{{inputs.parameters.conformers_input_prefix}}''')
+        except: conformers_input_prefix = r'''{{inputs.parameters.conformers_input_prefix}}'''
+        try: features_input_prefix = json.loads(r'''{{inputs.parameters.features_input_prefix}}''')
+        except: features_input_prefix = r'''{{inputs.parameters.features_input_prefix}}'''
+        try: id_column = json.loads(r'''{{inputs.parameters.id_column}}''')
+        except: id_column = r'''{{inputs.parameters.id_column}}'''
+        try: num_samples = json.loads(r'''{{inputs.parameters.num_samples}}''')
+        except: num_samples = r'''{{inputs.parameters.num_samples}}'''
+        try: output_prefix = json.loads(r'''{{inputs.parameters.output_prefix}}''')
+        except: output_prefix = r'''{{inputs.parameters.output_prefix}}'''
+        try: source = json.loads(r'''{{inputs.parameters.source}}''')
+        except: source = r'''{{inputs.parameters.source}}'''
+
+        import os
+        import subprocess
+        subprocess.run(['surrogate-sample', '--features-input', os.path.join(base_path, features_input_prefix, source), '--conformers-input', os.path.join(base_path, conformers_input_prefix, source), '--output', os.path.join(base_path, output_prefix, source), '--num-samples', str(num_samples), '--id-column', id_column], check=True)
+      command:
+      - python
+      volumeMounts:
+      - name: lynceus
+        mountPath: /mnt/lynceus
+      resources:
+        limits:
+          cpu: '8'
+          memory: 8Gi
+        requests:
+          cpu: '8'
+          memory: 8Gi
+  - name: merge-shards
+    volumes:
+    - name: lynceus
+      persistentVolumeClaim:
+        claimName: lynceus-pvc
+    inputs:
+      parameters:
+      - name: base_path
+      - name: input_path
+      - name: output_path
+    retryStrategy:
+      limit: 5
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 10m
+    script:
+      image: registry.nebula.lan:5000/lynceus/candidates:0.1.0
+      imagePullPolicy: Always
+      source: |-
+        import os
+        import sys
+        sys.path.append(os.getcwd())
+        import json
+        try: base_path = json.loads(r'''{{inputs.parameters.base_path}}''')
+        except: base_path = r'''{{inputs.parameters.base_path}}'''
+        try: input_path = json.loads(r'''{{inputs.parameters.input_path}}''')
+        except: input_path = r'''{{inputs.parameters.input_path}}'''
+        try: output_path = json.loads(r'''{{inputs.parameters.output_path}}''')
+        except: output_path = r'''{{inputs.parameters.output_path}}'''
+
+        import os
+        import subprocess
+        subprocess.run(['merge-shards', '--input', os.path.join(base_path, input_path), '--output', os.path.join(base_path, output_path), '--memory-limit', '4GB'], check=True)
+      command:
+      - python
+      volumeMounts:
+      - name: lynceus
+        mountPath: /mnt/lynceus
+      resources:
+        limits:
+          cpu: '8'
+          memory: 8Gi
+        requests:
+          cpu: '8'
+          memory: 8Gi
+  - name: main-dag
+    dag:
+      tasks:
+      - name: surrogate-sample
+        template: surrogate-sample-dag

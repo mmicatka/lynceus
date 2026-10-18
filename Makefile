@@ -12,13 +12,19 @@ VERSION ?= 0.1.0
 WORKFLOWS ?= candidates-workflow targets-workflow
 OUT_DIR ?= workflows/manifests
 
-.PHONY: build push build-* clean lint lint-python lint-argo generate generate-workflows submit run logs
+.PHONY: build push build-* clean lint lint-python lint-argo generate generate-workflows submit-workflows run logs
 
 build-candidates:
 	docker buildx build --platform linux/amd64,linux/arm64 --push -f projects/candidates/Dockerfile -t $(IMAGE_PREFIX)/candidates:$(VERSION) .
 
 build-targets:
 	docker buildx build --platform linux/amd64,linux/arm64 --push -f projects/targets/Dockerfile -t $(IMAGE_PREFIX)/targets:$(VERSION) .
+
+build-lynceus-dock:
+	docker buildx build --platform linux/amd64 --push -f projects/lynceus-dock/Dockerfile -t $(IMAGE_PREFIX)/lynceus-dock:$(VERSION) .
+
+build-surrogate-model:
+	docker buildx build --platform linux/amd64,linux/arm64 --push -f projects/surrogate-model/Dockerfile -t $(IMAGE_PREFIX)/surrogate-model:$(VERSION) .
 
 setup-argo:
 	$(MAKE) -C infra/argo all WORKFLOW_NAMESPACE=$(NAMESPACE)
@@ -30,6 +36,12 @@ generate-workflows:
 		-o $(OUT_DIR) \
 		-s $(SCREEN_CONFIG) \
 		-i $(INFRA_CONFIG)
+
+submit-workflows: generate
+	@echo "Submitting workflows: $(WORKFLOWS) to namespace $(NAMESPACE)..."
+	@for wf in $(WORKFLOWS); do \
+		argo submit -n $(NAMESPACE) $(OUT_DIR)/$$wf.yaml; \
+	done
 
 generate: generate-workflows
 
@@ -47,11 +59,6 @@ lint-yaml:
 
 lint: lint-python lint-argo lint-yaml
 
-submit: generate
-	@echo "Submitting workflows: $(WORKFLOWS) to namespace $(NAMESPACE)..."
-	@for wf in $(WORKFLOWS); do \
-		argo submit -n $(NAMESPACE) $(OUT_DIR)/$$wf.yaml; \
-	done
 
 clean:
 	rm -f $(OUT_DIR)/*.yaml

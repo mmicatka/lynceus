@@ -10,6 +10,7 @@ from .candidates import (
 )
 from .common import build_clean_prefix_template, merge_shards_template
 from .config import ImageConfig, TemplateConfig
+from .surrogate import surrogate_sample_template
 from .targets import download_pdbs_template
 
 __all__ = [
@@ -29,4 +30,6 @@ __all__ = [
     "shard_candidates_template",
     # target
     "download_pdbs_template",
+    # surrogate
+    "surrogate_sample_template",
 ]

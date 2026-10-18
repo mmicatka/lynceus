@@ -1,0 +1,62 @@
+---
+name: 5m-poc
+
+candidates:
+  sub_sample: 5000000
+  sources:
+    - H04
+    - H05
+    - H06
+    - H07
+    - H08
+    - H09
+    - H10
+    - H11
+    - H12
+    - H13
+    - H14
+    - H15
+    - H16
+    - H17
+    - H18
+    - H19
+    - H20
+
+targets:
+  ensembles:
+    - id: "T4_lysozyme_L99"
+      members:
+        - pdb_id: 1L83
+          weight: 1.0
+
+filter:
+  feature_list:
+    - atom_pair
+    - autocorr
+    - descriptors
+    - ecfp
+    - functional_groups
+    - morse
+    - rdf
+    - topological_torsion
+    - usrcat
+    - whim
+  surrogate:
+    model_prefix: candidates/5m/models
+    feature_list:
+      - atom_pair
+      - autocorr
+      - descriptors
+      - ecfp
+      - functional_groups
+      - morse
+      - rdf
+      - topological_torsion
+      - usrcat
+      - whim
+    validation: 100000
+    rounds:
+      - active: 0
+        uniform: 100000
+      - active: 50000
+        uniform: 50000

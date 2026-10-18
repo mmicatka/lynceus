@@ -1,0 +1,27 @@
+# projects/surrogate-model/pyproject.toml
+
+[project]
+name = "surrogate-model"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [{ name = "Mike Micatka", email = "mike.micatka@gmail.com" }]
+requires-python = ">=3.14"
+dependencies = [
+    "click>=8.5.0",
+    "lynceus-core",
+    "numpy>=2.5.4",
+    "polars>=2.0.0",
+    "pyarrow>=26.0.0",
+    "structlog>=26.1.0",
+]
+
+[project.scripts]
+surrogate-sample = "surrogate_model:sample_candidates"
+
+[build-system]
+requires = ["uv_build>=0.12.23,<0.13.0"]
+build-backend = "uv_build"
+
+[tool.uv.sources]
+lynceus-core = { workspace = true }

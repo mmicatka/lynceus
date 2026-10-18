@@ -12,10 +12,13 @@ storage:
     target:
       pdbs: target/pdbs
       ensembles: target/ensembles
+    surrogate:
+      samples_staging: surrogate/samples_staging
+      samples: surrogate/samples
 
 candidates:
   max_batch_gib: 20
-  num_shards: 512
+  num_shards: 8
 
 templates:
   load_candidates:
@@ -27,18 +30,24 @@ templates:
     image: &candidates_image
       image: registry.nebula.lan:5000/lynceus/candidates:0.1.0
   shard_candidates:
-    resources: &high_cpu
-      requests: &high_cpu_res
-        cpu: "8"
-        memory: 8Gi
-      limits: *high_cpu_res
+    resources:
+      requests:
+        cpu: "2"
+        memory: 4Gi
+      limits:
+        cpu: "2"
+        memory: 4Gi
     image: *candidates_image
     scratch: &scratch
       mount_path: /scratch
       size_limit: 50Gi
   merge_shards:
-    resources: *high_cpu
-    image: *candidates_image
+    resources: &high_cpu
+      requests: &high_cpu_res
+        cpu: "8"
+        memory: 8Gi
+      limits: *high_cpu_res
+    image: *candidates_image # TODO: move this into a dedicated image
   subsample_candidates:
     resources: *high_cpu
     image: *candidates_image
@@ -59,6 +68,10 @@ templates:
   generate_manifest:
     resources: *low_cpu
     image: *targets_image
+  surrogate_sample:
+    resources: *high_cpu
+    image: &surrogate_image
+      image: registry.nebula.lan:5000/lynceus/surrogate-model:0.1.0
 
 volume:
   name: lynceus

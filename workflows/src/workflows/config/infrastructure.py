@@ -28,6 +28,7 @@ class TemplateName(StrEnum):
     GENERATE_FEATURES = "generate_features"
     DOWNLOAD_PDBS = "download_pdbs"
     GENERATE_MANIFEST = "generate_manifest"
+    SURROGATE_SAMPLE = "surrogate_sample"
 
 
 class CandidatePrefixes(StrictModel):
@@ -45,9 +46,15 @@ class TargetPrefixes(StrictModel):
     ensembles: StoragePrefix
 
 
+class SurrogatePrefixes(StrictModel):
+    samples_staging: StoragePrefix
+    samples: StoragePrefix
+
+
 class StoragePrefixes(StrictModel):
     candidates: CandidatePrefixes
     target: TargetPrefixes
+    surrogate: SurrogatePrefixes
 
 
 class StorageConfig(StrictModel):

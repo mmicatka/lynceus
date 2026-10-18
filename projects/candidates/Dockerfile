@@ -12,7 +12,6 @@ COPY --from=ghcr.io/astral-sh/uv:0.11.28-python3.14-trixie /usr/local/bin/uv /us
 WORKDIR /app
 
 COPY pyproject.toml uv.lock ./
-
 COPY libs/lynceus-core ./libs/lynceus-core
 
 COPY projects/candidates ./projects/candidates
