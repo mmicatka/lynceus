@@ -68,6 +68,9 @@ templates:
   generate_manifest:
     resources: *low_cpu
     image: *targets_image
+  detect_binding_sites:
+    resources: *low_cpu
+    image: *targets_image
   surrogate_sample:
     resources: *high_cpu
     image: &surrogate_image

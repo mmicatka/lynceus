@@ -28,6 +28,7 @@ class TemplateName(StrEnum):
     GENERATE_FEATURES = "generate_features"
     DOWNLOAD_PDBS = "download_pdbs"
     GENERATE_MANIFEST = "generate_manifest"
+    DETECT_BINDING_SITES = "detect_binding_sites"
     SURROGATE_SAMPLE = "surrogate_sample"
 
 
