@@ -5,7 +5,6 @@ def merge_shards_template(
     base_path: str,
     input_path: str,
     output_path: str,
-    num_workers: str = "auto",
 ):
     import os
     import subprocess
@@ -17,8 +16,8 @@ def merge_shards_template(
             os.path.join(base_path, input_path),
             "--output",
             os.path.join(base_path, output_path),
-            "--num-workers",
-            str(num_workers),
+            "--memory-limit",
+            "4GB",
         ],
         check=True,
     )

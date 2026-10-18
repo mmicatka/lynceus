@@ -47,7 +47,7 @@ templates:
         cpu: "8"
         memory: 8Gi
       limits: *high_cpu_res
-    image: *candidates_image
+    image: *candidates_image # TODO: move this into a dedicated image
   subsample_candidates:
     resources: *high_cpu
     image: *candidates_image

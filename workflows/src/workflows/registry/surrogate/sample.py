@@ -6,7 +6,6 @@ from workflows.config import InfraConfig, ScreenConfig
 from workflows.config.infrastructure import TemplateName
 from workflows.registry.common import ITEM_PARAM, shard_ids
 from workflows.templates import (
-    build_clean_prefix_template,
     merge_shards_template,
     surrogate_sample_template,
 )
@@ -16,6 +15,12 @@ SURROGATE_SAMPLE_DAG = "surrogate-sample-dag"
 SHARD_FILENAME_PATTERN = "shard_{shard}.parquet"
 
 MAX_PARALLEL_SOURCES = 3
+
+PARQUET_SUFFIX = ".parquet"
+
+
+def _round_file(prefix: str, round_index: int) -> str:
+    return f"{_round_path(prefix, round_index)}{PARQUET_SUFFIX}"
 
 
 def _round_name(round_index: int) -> str:
@@ -75,17 +80,6 @@ def _merge_samples_task(
     )
 
 
-def _cleanup_staging_task(infra_config: InfraConfig, staging_path: str) -> Task:
-    return Task(
-        name="cleanup-sample-staging",
-        template=build_clean_prefix_template(),
-        arguments={
-            "base_path": infra_config.volume.mount_path,
-            "prefix": staging_path,
-        },
-    )
-
-
 def build_surrogate_sample_dag(
     templates: TemplateFactory,
     infra_config: InfraConfig,
@@ -94,7 +88,7 @@ def build_surrogate_sample_dag(
 ) -> DAG:
     surrogate_prefixes = infra_config.storage.prefixes.surrogate
     staging_path = _round_path(surrogate_prefixes.samples_staging, round_index)
-    output_path = _round_path(surrogate_prefixes.samples, round_index)
+    output_path = _round_file(surrogate_prefixes.samples, round_index)
     num_samples = screen_config.filter.surrogate.rounds[round_index].uniform
 
     with DAG(name=SURROGATE_SAMPLE_DAG, parallelism=MAX_PARALLEL_SOURCES) as dag:
@@ -104,8 +98,7 @@ def build_surrogate_sample_dag(
         merge_task = _merge_samples_task(
             templates, infra_config, staging_path, output_path
         )
-        cleanup_task = _cleanup_staging_task(infra_config, staging_path)
 
-        sample_task >> merge_task >> cleanup_task  # type: ignore
+        sample_task >> merge_task  # type: ignore
 
     return dag

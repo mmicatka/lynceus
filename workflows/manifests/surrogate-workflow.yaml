@@ -45,16 +45,7 @@ spec:
           - name: input_path
             value: surrogate/samples_staging/round_0
           - name: output_path
-            value: surrogate/samples/round_0
-      - name: cleanup-sample-staging
-        depends: merge-samples
-        template: clean-prefix
-        arguments:
-          parameters:
-          - name: base_path
-            value: /mnt/lynceus
-          - name: prefix
-            value: surrogate/samples_staging/round_0
+            value: surrogate/samples/round_0.parquet
   - name: surrogate-sample
     volumes:
     - name: lynceus
@@ -124,8 +115,6 @@ spec:
       - name: base_path
       - name: input_path
       - name: output_path
-      - name: num_workers
-        default: auto
     retryStrategy:
       limit: 5
       backoff:
@@ -144,14 +133,12 @@ spec:
         except: base_path = r'''{{inputs.parameters.base_path}}'''
         try: input_path = json.loads(r'''{{inputs.parameters.input_path}}''')
         except: input_path = r'''{{inputs.parameters.input_path}}'''
-        try: num_workers = json.loads(r'''{{inputs.parameters.num_workers}}''')
-        except: num_workers = r'''{{inputs.parameters.num_workers}}'''
         try: output_path = json.loads(r'''{{inputs.parameters.output_path}}''')
         except: output_path = r'''{{inputs.parameters.output_path}}'''
 
         import os
         import subprocess
-        subprocess.run(['merge-shards', '--input', os.path.join(base_path, input_path), '--output', os.path.join(base_path, output_path), '--num-workers', str(num_workers)], check=True)
+        subprocess.run(['merge-shards', '--input', os.path.join(base_path, input_path), '--output', os.path.join(base_path, output_path), '--memory-limit', '4GB'], check=True)
       command:
       - python
       volumeMounts:
@@ -164,27 +151,6 @@ spec:
         requests:
           cpu: '8'
           memory: 8Gi
-  - name: clean-prefix
-    volumes:
-    - name: lynceus-data
-      persistentVolumeClaim:
-        claimName: lynceus-pvc
-    container:
-      image: alpine:3.20
-      args:
-      - test -n "$1" && rm -rf "$0/$1"
-      - '{{inputs.parameters.base_path}}'
-      - '{{inputs.parameters.prefix}}'
-      command:
-      - sh
-      - -c
-      volumeMounts:
-      - name: lynceus-data
-        mountPath: /mnt/data
-    inputs:
-      parameters:
-      - name: base_path
-      - name: prefix
   - name: main-dag
     dag:
       tasks:

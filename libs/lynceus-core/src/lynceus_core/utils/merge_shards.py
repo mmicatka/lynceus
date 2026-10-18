@@ -3,15 +3,16 @@
 import glob
 import json
 import os
-import shutil
 import sys
 
 import click
 import duckdb
 import structlog
 
-from lynceus_core.cli import NumWorkers
 from lynceus_core.logging import wide_log
+
+DEFAULT_ROW_GROUP_SIZE = 5_000
+PARQUET_GLOB = "*.parquet"
 
 
 def configure_logging():
@@ -52,20 +53,28 @@ def _write_success_marker(output_dir: str, identifier: str, num_files: int) -> N
 
 
 def _find_input_files(input_path: str) -> list[str]:
-    return sorted(glob.glob(os.path.join(input_path, "*.parquet")))
+    return sorted(glob.glob(os.path.join(input_path, PARQUET_GLOB)))
 
 
-def _write_merged_file(conn, input_files: list[str], output_file: str) -> None:
-    if os.path.isdir(output_file):
-        shutil.rmtree(output_file)
+def _connect(memory_limit: str) -> duckdb.DuckDBPyConnection:
+    conn = duckdb.connect()
+    conn.execute("SET arrow_large_buffer_size=true")
+    conn.execute("SET preserve_insertion_order=false")
+    conn.execute(f"SET memory_limit='{memory_limit}'")
+    return conn
 
+
+def _write_merged_file(
+    conn: duckdb.DuckDBPyConnection,
+    input_files: list[str],
+    output_file: str,
+    row_group_size: int,
+) -> None:
     conn.execute(
         f"""
-        COPY (
-            SELECT * FROM read_parquet(?, hive_partitioning=true)
-        )
+        COPY (SELECT * FROM read_parquet(?))
         TO '{output_file}'
-        (FORMAT parquet, COMPRESSION zstd)
+        (FORMAT parquet, COMPRESSION zstd, ROW_GROUP_SIZE {int(row_group_size)})
         """,
         [input_files],
     )
@@ -87,17 +96,24 @@ def _write_merged_file(conn, input_files: list[str], output_file: str) -> None:
     help="Output merged parquet file.",
 )
 @click.option(
-    "--num-workers",
-    default="auto",
-    type=NumWorkers(),
+    "--memory-limit",
+    required=True,
+    type=str,
+    help="DuckDB memory limit (e.g. 4GB); keep well below the pod memory limit.",
+)
+@click.option(
+    "--row-group-size",
+    default=DEFAULT_ROW_GROUP_SIZE,
     show_default=True,
-    help="Number of parallel workers (integer >= 1 or 'auto').",
+    type=int,
+    help="Rows per output parquet row group; smaller values lower peak memory.",
 )
 @wide_log(logger)
 def merge_shards(
     input_path: str,
     output_file: str,
-    num_workers: int,
+    memory_limit: str,
+    row_group_size: int,
 ) -> None:
     click.echo(f"Processing merge for {input_path}...")
 
@@ -128,14 +144,16 @@ def merge_shards(
         input_path=input_path,
         input_files=len(input_files),
         output_file=output_file,
-        workers=num_workers,
+        memory_limit=memory_limit,
+        row_group_size=row_group_size,
     )
 
-    conn = duckdb.connect()
-    conn.execute("SET threads = ?", [num_workers])
-    conn.execute("SET arrow_large_buffer_size=true")
+    conn = _connect(memory_limit)
+    try:
+        _write_merged_file(conn, input_files, output_file, row_group_size)
+    finally:
+        conn.close()
 
-    _write_merged_file(conn, input_files, output_file)
     _write_success_marker(output_dir, identifier, len(input_files))
 
     logger.info(
