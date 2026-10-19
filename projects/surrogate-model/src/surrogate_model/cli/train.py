@@ -11,6 +11,7 @@ import joblib
 import lightgbm as lgb
 import polars as pl
 import structlog
+from lynceus_core.features import FEATURE_COLS
 from lynceus_core.logging import wide_log
 from sklearn.model_selection import train_test_split
 
@@ -41,18 +42,6 @@ configure_logging()
 logger = structlog.get_logger()
 
 RANDOM_SEED = 1000
-FEATURE_COLS = [
-    "atom_pair",
-    "autocorr",
-    "descriptors",
-    "ecfp",
-    "functional_groups",
-    "morse",
-    "rdf",
-    "topological_torsion",
-    "usrcat",
-    "whim",
-]
 
 
 def _marker_path(output_path: str) -> str:
