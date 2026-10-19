@@ -13,8 +13,7 @@ storage:
       pdbs: target/pdbs
       ensembles: target/ensembles
     surrogate:
-      samples_staging: surrogate/samples_staging
-      samples: surrogate/samples
+      ensembles: surrogate/ensembles
 
 candidates:
   max_batch_gib: 20

@@ -107,29 +107,29 @@ spec:
   - name: load-targets
     dag:
       tasks:
-      - name: download-pdbs-t4-lysozyme-l99
+      - name: download-pdbs-hsp90-n-terminal
         template: download-pdbs
         arguments:
           parameters:
           - name: pdb_ids
-            value: 1L83
+            value: 1UYM,1YET
           - name: base_path
             value: /mnt/lynceus
           - name: output_prefix
-            value: target/pdbs/T4_lysozyme_L99
-      - name: generate-manifest-t4-lysozyme-l99
-        depends: download-pdbs-t4-lysozyme-l99
+            value: target/pdbs/HSP90_N_TERMINAL
+      - name: generate-manifest-hsp90-n-terminal
+        depends: download-pdbs-hsp90-n-terminal
         template: generate-manifest
         arguments:
           parameters:
           - name: base_path
             value: /mnt/lynceus
           - name: input_path
-            value: target/pdbs/T4_lysozyme_L99
+            value: target/pdbs/HSP90_N_TERMINAL
           - name: output_path
-            value: target/ensembles/T4_lysozyme_L99
+            value: target/ensembles/HSP90_N_TERMINAL
           - name: ensemble_id
-            value: T4_lysozyme_L99
+            value: HSP90_N_TERMINAL
           - name: structure_glob
             value: '*'
   - name: detect-binding-sites
@@ -181,14 +181,14 @@ spec:
   - name: detect-binding-sites-dag
     dag:
       tasks:
-      - name: detect-binding-sites-t4-lysozyme-l99
+      - name: detect-binding-sites-hsp90-n-terminal
         template: detect-binding-sites
         arguments:
           parameters:
           - name: ensemble_path
-            value: /mnt/lynceus/target/ensembles/T4_lysozyme_L99
+            value: /mnt/lynceus/target/ensembles/HSP90_N_TERMINAL
           - name: output_path
-            value: /mnt/lynceus/target/ensembles/T4_lysozyme_L99/binding_sites.json
+            value: /mnt/lynceus/target/ensembles/HSP90_N_TERMINAL/binding_sites.json
   - name: main-dag
     dag:
       tasks:

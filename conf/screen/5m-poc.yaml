@@ -24,10 +24,12 @@ candidates:
 
 targets:
   ensembles:
-    - id: "T4_lysozyme_L99"
+    - id: "HSP90_N_TERMINAL"
       members:
-        - pdb_id: 1L83
-          weight: 1.0
+        - pdb_id: 1UYM
+          weight: 0.5
+        - pdb_id: 1YET
+          weight: 0.5
 
 filter:
   feature_list:

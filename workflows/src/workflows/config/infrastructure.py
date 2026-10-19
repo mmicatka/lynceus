@@ -50,21 +50,13 @@ class TargetPrefixes(StrictModel):
 
 
 class SurrogatePrefixes(StrictModel):
-    samples_staging: StoragePrefix
-    samples: StoragePrefix
-
-
-class DockingPrefixes(StrictModel):
-    sites_file: StoragePrefix
-    ligands: StoragePrefix
-    results: StoragePrefix
+    ensembles: StoragePrefix
 
 
 class StoragePrefixes(StrictModel):
     candidates: CandidatePrefixes
     target: TargetPrefixes
     surrogate: SurrogatePrefixes
-    docking: DockingPrefixes
 
 
 class StorageConfig(StrictModel):
@@ -74,10 +66,6 @@ class StorageConfig(StrictModel):
 class CandidatesInfraConfig(StrictModel):
     num_shards: PositiveInt
     max_batch_gib: PositiveInt
-
-
-class DockingInfraConfig(StrictModel):
-    max_parallel: PositiveInt
 
 
 class ResourceQuantities(StrictModel):
@@ -134,5 +122,4 @@ class InfraConfig(StrictModel):
     storage: StorageConfig
     volume: VolumeConfig
     candidates: CandidatesInfraConfig
-    docking: DockingInfraConfig
     templates: dict[TemplateName, TemplateConfig]
