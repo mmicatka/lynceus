@@ -11,7 +11,7 @@ from workflows.registry.candidates import (
 )
 from workflows.registry.smoke_test import build_smoke_test_workflow
 from workflows.registry.surrogate import build_surrogate_sample_workflow
-from workflows.registry.targets.targets import build_targets_workflow
+from workflows.registry.targets import build_targets_workflow
 
 WorkflowBuilder = Callable[[InfraConfig, ScreenConfig], Workflow]
 

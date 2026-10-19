@@ -68,11 +68,31 @@ templates:
   generate_manifest:
     resources: *low_cpu
     image: *targets_image
+  detect_binding_sites:
+    resources: *low_cpu
+    image: *targets_image
   surrogate_sample:
     resources: *high_cpu
     image: &surrogate_image
       image: registry.nebula.lan:5000/lynceus/surrogate-model:0.1.0
-
+  run_docking:
+    image:
+      image: your-registry/lynceus-docking:tag
+    resources:
+      requests:
+        cpu: "8"
+        memory: 16Gi
+      limits:
+        cpu: "8"
+        memory: 32Gi
+      gpu: 1
+    node_selector:
+      nvidia.com/gpu.present: "true"
+    tolerations:
+      - key: nvidia.com/gpu
+        operator: Exists
+        effect: NoSchedule
+    runtime_class_name: nvidia
 volume:
   name: lynceus
   claim_name: lynceus-pvc

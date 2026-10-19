@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Workflow
 metadata:
-  generateName: 10m-poc-download-pdbs-
+  generateName: 5m-poc-targets-
 spec:
   entrypoint: main-dag
   serviceAccountName: argo-workflow
@@ -132,8 +132,68 @@ spec:
             value: T4_lysozyme_L99
           - name: structure_glob
             value: '*'
+  - name: detect-binding-sites
+    volumes:
+    - name: lynceus
+      persistentVolumeClaim:
+        claimName: lynceus-pvc
+    inputs:
+      parameters:
+      - name: ensemble_path
+      - name: output_path
+      - name: num_workers
+        default: auto
+    retryStrategy:
+      limit: 5
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 10m
+    script:
+      image: registry.nebula.lan:5000/lynceus/targets:0.1.0
+      imagePullPolicy: Always
+      source: |-
+        import os
+        import sys
+        sys.path.append(os.getcwd())
+        import json
+        try: ensemble_path = json.loads(r'''{{inputs.parameters.ensemble_path}}''')
+        except: ensemble_path = r'''{{inputs.parameters.ensemble_path}}'''
+        try: num_workers = json.loads(r'''{{inputs.parameters.num_workers}}''')
+        except: num_workers = r'''{{inputs.parameters.num_workers}}'''
+        try: output_path = json.loads(r'''{{inputs.parameters.output_path}}''')
+        except: output_path = r'''{{inputs.parameters.output_path}}'''
+
+        import subprocess
+        subprocess.run(['detect-binding-sites', '--ensemble', str(ensemble_path), '--out', str(output_path), '--num-workers', str(num_workers)], check=True)
+      command:
+      - python
+      volumeMounts:
+      - name: lynceus
+        mountPath: /mnt/lynceus
+      resources:
+        limits:
+          cpu: '2'
+          memory: 1Gi
+        requests:
+          cpu: '2'
+          memory: 1Gi
+  - name: detect-binding-sites-dag
+    dag:
+      tasks:
+      - name: detect-binding-sites-t4-lysozyme-l99
+        template: detect-binding-sites
+        arguments:
+          parameters:
+          - name: ensemble_path
+            value: /mnt/lynceus/target/ensembles/T4_lysozyme_L99
+          - name: output_path
+            value: /mnt/lynceus/target/ensembles/T4_lysozyme_L99/binding_sites.json
   - name: main-dag
     dag:
       tasks:
-      - name: download-pdbs
+      - name: load-targets
         template: load-targets
+      - name: detect-binding-sites
+        depends: load-targets
+        template: detect-binding-sites-dag

@@ -37,6 +37,8 @@ def configure_logging():
 configure_logging()
 logger = structlog.get_logger()
 
+MANIFEST_FILENAME = "manifest.json"
+
 # Exact header written by p2rank's PredictionSummary.toCSV()
 _P2RANK_PREDICTIONS_HEADER = (
     "name",
@@ -51,6 +53,13 @@ _P2RANK_PREDICTIONS_HEADER = (
     "residue_ids",
     "surf_atom_ids",
 )
+
+
+def _load_manifest(ensemble_path: Path) -> Manifest:
+    manifest_file = ensemble_path / MANIFEST_FILENAME
+    if not manifest_file.is_file():
+        raise RuntimeError(f"Manifest not found at {manifest_file}")
+    return Manifest.load(ensemble_path)
 
 
 def _marker_path(output_path: str) -> str:
@@ -214,12 +223,12 @@ def _pockets_to_binding_sites(
 
 
 def _detect_binding_sites(
-    manifest: Manifest, member_id: str, ensemble_path: str
+    manifest: Manifest, member_id: str, ensemble_path: Path
 ) -> list[BindingSite]:
     logger.info("Detecting sites for member", member_id=member_id)
 
     source_path = Path(manifest.structure_path(member_id))
-    local_input = Path(ensemble_path) / "members" / source_path.name
+    local_input = ensemble_path / "members" / source_path.name
 
     if not local_input.is_file():
         raise RuntimeError(f"Structure file not found: {local_input}")
@@ -231,14 +240,8 @@ def _detect_binding_sites(
 
 
 def _detect_binding_sites_ensemble(
-    ensemble_path: str, num_workers: int
+    manifest: Manifest, ensemble_path: Path, num_workers: int
 ) -> list[BindingSite]:
-    manifest_path = os.path.join(ensemble_path, "manifest.json")
-    if not os.path.exists(manifest_path):
-        raise RuntimeError(f"Manifest not found in ensemble at {manifest_path}")
-
-    manifest = Manifest.load(manifest_path)
-    member_ids = list(manifest.members)
     binding_sites: list[BindingSite] = []
 
     with ProcessPoolExecutor(max_workers=num_workers) as pool:
@@ -246,7 +249,7 @@ def _detect_binding_sites_ensemble(
             pool.submit(
                 _detect_binding_sites, manifest, _member_id, ensemble_path
             ): _member_id
-            for _member_id in member_ids
+            for _member_id in manifest.members
         }
 
         for future in as_completed(futures):
@@ -294,11 +297,8 @@ def detect_binding_sites(
 ):
     click.echo(f"Processing ensemble at {ensemble_path}...")
 
-    manifest_path = os.path.join(ensemble_path, "manifest.json")
-    if not os.path.exists(manifest_path):
-        raise RuntimeError(f"Manifest not found at {manifest_path}")
-
-    manifest = Manifest.load(manifest_path)
+    ensemble_dir = Path(ensemble_path)
+    manifest = _load_manifest(ensemble_dir)
     num_members = len(list(manifest.members))
 
     if _is_valid(output_path, num_members):
@@ -319,7 +319,7 @@ def detect_binding_sites(
         workers=num_workers,
     )
 
-    binding_sites = _detect_binding_sites_ensemble(ensemble_path, num_workers)
+    binding_sites = _detect_binding_sites_ensemble(manifest, ensemble_dir, num_workers)
 
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     with open(output_path, "w") as _f:
@@ -329,7 +329,3 @@ def detect_binding_sites(
 
     logger.info("Finished detecting binding sites", ensemble_path=ensemble_path)
     click.echo("Done!")
-
-
-if __name__ == "__main__":
-    detect_binding_sites()

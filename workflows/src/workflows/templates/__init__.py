@@ -9,16 +9,12 @@ from .candidates import (
     shard_candidates_template,
 )
 from .common import build_clean_prefix_template, merge_shards_template
-from .config import ImageConfig, TemplateConfig
 from .surrogate import surrogate_sample_template
 from .targets import download_pdbs_template
 
 __all__ = [
     # utils
     "TemplateFactory",
-    # config
-    "ImageConfig",
-    "TemplateConfig",
     # common
     "build_clean_prefix_template",
     "merge_shards_template",
