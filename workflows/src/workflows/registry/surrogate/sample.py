@@ -1,4 +1,4 @@
-# workflows/src/workflows/registry/surrogate/sample.py
+# workflows/src/workflows/registry/surrogate/dags/sample.py
 
 from hera.workflows import DAG, Task
 

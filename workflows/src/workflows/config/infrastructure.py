@@ -3,7 +3,7 @@
 from enum import StrEnum
 from typing import Annotated, Literal
 
-from pydantic import PositiveInt, StringConstraints
+from pydantic import Field, PositiveInt, StringConstraints
 
 from workflows.config.base import StrictModel
 
@@ -30,6 +30,8 @@ class TemplateName(StrEnum):
     GENERATE_MANIFEST = "generate_manifest"
     DETECT_BINDING_SITES = "detect_binding_sites"
     SURROGATE_SAMPLE = "surrogate_sample"
+    LIST_DOCKING_ITEMS = "list_docking_items"
+    RUN_DOCKING = "run_docking"
 
 
 class CandidatePrefixes(StrictModel):
@@ -52,10 +54,17 @@ class SurrogatePrefixes(StrictModel):
     samples: StoragePrefix
 
 
+class DockingPrefixes(StrictModel):
+    sites_file: StoragePrefix
+    ligands: StoragePrefix
+    results: StoragePrefix
+
+
 class StoragePrefixes(StrictModel):
     candidates: CandidatePrefixes
     target: TargetPrefixes
     surrogate: SurrogatePrefixes
+    docking: DockingPrefixes
 
 
 class StorageConfig(StrictModel):
@@ -67,6 +76,10 @@ class CandidatesInfraConfig(StrictModel):
     max_batch_gib: PositiveInt
 
 
+class DockingInfraConfig(StrictModel):
+    max_parallel: PositiveInt
+
+
 class ResourceQuantities(StrictModel):
     cpu: CpuQuantity
     memory: MemoryQuantity
@@ -75,6 +88,14 @@ class ResourceQuantities(StrictModel):
 class ResourceSpec(StrictModel):
     requests: ResourceQuantities
     limits: ResourceQuantities
+    gpu: PositiveInt | None = None
+
+
+class TolerationConfig(StrictModel):
+    key: str
+    operator: Literal["Exists", "Equal"] = "Exists"
+    value: str | None = None
+    effect: Literal["NoSchedule", "PreferNoSchedule", "NoExecute"] = "NoSchedule"
 
 
 class ScratchConfig(StrictModel):
@@ -98,6 +119,9 @@ class TemplateConfig(StrictModel):
     image: ImageConfig
     resources: ResourceSpec
     scratch: ScratchConfig | None = None
+    node_selector: dict[str, str] = Field(default_factory=dict)
+    tolerations: list[TolerationConfig] = Field(default_factory=list)
+    runtime_class_name: str | None = None
 
     @property
     def scratch_path(self) -> str:
@@ -110,4 +134,5 @@ class InfraConfig(StrictModel):
     storage: StorageConfig
     volume: VolumeConfig
     candidates: CandidatesInfraConfig
+    docking: DockingInfraConfig
     templates: dict[TemplateName, TemplateConfig]
