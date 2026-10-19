@@ -35,7 +35,7 @@ def flatten_features(df: pl.DataFrame, feature_cols=None) -> np.ndarray:
     return np.hstack(feature_arrays)
 
 
-def label(
+def compute_label(
     raw: pl.Series | np.ndarray,
     threshold: Optional[float] = None,
     percentile: Optional[float] = None,

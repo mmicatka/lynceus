@@ -1,4 +1,5 @@
-# modules/local/surrogate_model/src/surrogate_model/train.py
+# projects/surrogate-model/src/surrogate_model/cli/train.py
+
 
 import json
 import os
@@ -12,11 +13,15 @@ import polars as pl
 import structlog
 from lynceus_core.logging import wide_log
 from sklearn.model_selection import train_test_split
-from surrogate_model.data import flatten_features, label, load_and_clean_data
-from surrogate_model.metrics import evaluation_metrics, predict_active
+
+from surrogate_model.common.data import (
+    compute_label,
+    flatten_features,
+    load_and_clean_data,
+)
+from surrogate_model.common.metrics import evaluation_metrics, predict_active
 
 
-# Apply environment-aware structured logging
 def configure_logging():
     if sys.stdout.isatty():
         processor = structlog.dev.ConsoleRenderer(colors=True)
@@ -69,10 +74,6 @@ def _write_success_marker(output_path: str, active_percentile: float) -> None:
         json.dump({"active_percentile": active_percentile}, f)
 
 
-def _read_parquet(path: str) -> pl.DataFrame:
-    return pl.read_parquet(path)
-
-
 def _prepare_dataset(
     features_path: str,
     labels_path: str,
@@ -80,8 +81,8 @@ def _prepare_dataset(
     percentile: float = None,
     threshold: float = None,
 ) -> tuple:
-    raw_features = _read_parquet(features_path)
-    raw_labels = _read_parquet(labels_path)
+    raw_features = pl.read_parquet(features_path)
+    raw_labels = pl.read_parquet(labels_path)
 
     df_cleaned = load_and_clean_data(raw_features, raw_labels)
 
@@ -89,7 +90,7 @@ def _prepare_dataset(
     y_raw = df_cleaned["affinity_kcal_mol"]
 
     # "top" 1% (most negative == strongest binder) or use provided threshold
-    y_label, computed_threshold = label(
+    y_label, computed_threshold = compute_label(
         y_raw, percentile=percentile, threshold=threshold
     )
 
@@ -111,9 +112,6 @@ def _save_model(model, path: str):
     with open(path, "wb") as f:
         joblib.dump(model, f)
     logger.info("Model saved successfully", path=path)
-
-
-# --- CLI Interface ---
 
 
 @click.command()
