@@ -2,15 +2,13 @@
 
 import json
 import os
-import sys
 from concurrent.futures import Future, ProcessPoolExecutor
 
 import click
 import pyarrow as pa
 import pyarrow.parquet as pq
-import structlog
 from lynceus_core.cli import NumWorkers
-from lynceus_core.logging import wide_log
+from lynceus_core.logging import get_lynceus_logger, wide_log
 from rdkit import rdBase
 from rdkit.Chem import Mol, MolFromMolBlock
 
@@ -27,23 +25,7 @@ os.environ["NUMEXPR_NUM_THREADS"] = "1"
 os.environ["VECLIB_MAXIMUM_THREADS"] = "1"
 
 
-def configure_logging():
-    if sys.stdout.isatty():
-        processor = structlog.dev.ConsoleRenderer(colors=True)
-    else:
-        processor = structlog.processors.JSONRenderer()
-
-    structlog.configure(
-        processors=[
-            structlog.processors.TimeStamper(fmt="iso"),
-            structlog.processors.add_log_level,
-            processor,
-        ]
-    )
-
-
-configure_logging()
-logger = structlog.get_logger()
+logger = get_lynceus_logger()
 
 # RDKit prints a lot of low-level parsing warnings to stderr by default;
 # we handle/report parse failures ourselves, so silence RDKit's own logger.

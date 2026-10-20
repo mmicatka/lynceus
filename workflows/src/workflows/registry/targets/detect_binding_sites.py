@@ -47,9 +47,7 @@ def build_detect_binding_sites_dag(
                 name=_task_name("detect-binding-sites", ensemble.id),
                 arguments={
                     "ensemble_path": os.path.join(base_path, ensemble_prefix),
-                    "output_path": os.path.join(
-                        base_path, ensemble_prefix, "binding_sites.json"
-                    ),
+                    "min_pocket_score": screen_config.targets.min_pocket_score,
                 },
             )
 

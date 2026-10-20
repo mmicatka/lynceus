@@ -7,13 +7,11 @@ from pathlib import Path
 from typing import Any, Generator
 
 import click
-import structlog
-from lynceus_core.logging import wide_log
+from lynceus_core.logging import get_lynceus_logger, wide_log
 from protein_ensemble.accessors.pdbqt import member_to_pdbqt
 from protein_ensemble.manifest import Manifest
 
 from lynceus_dock.common.ligand import count_ligand_rows, iter_ligand_records
-from lynceus_dock.common.logging import configure_logging
 from lynceus_dock.common.manifest import (
     build_entry,
     build_manifest_path,
@@ -28,8 +26,7 @@ from lynceus_dock.registry.registry import get_provider
 
 from .common.types import DockingError, LigandRecord, SearchBox
 
-configure_logging()
-logger = structlog.get_logger()
+logger = get_lynceus_logger()
 
 
 @dataclass(frozen=True)

@@ -2,34 +2,15 @@
 
 import json
 import os
-import sys
 from pathlib import Path
 
 import click
 import duckdb
-import structlog
 from lynceus_core.cli import NumWorkers
 from lynceus_core.io import plan_batches, staged_io
-from lynceus_core.logging import wide_log
+from lynceus_core.logging import get_lynceus_logger, wide_log
 
-
-def configure_logging():
-    if sys.stdout.isatty():
-        processor = structlog.dev.ConsoleRenderer(colors=True)
-    else:
-        processor = structlog.processors.JSONRenderer()
-
-    structlog.configure(
-        processors=[
-            structlog.processors.TimeStamper(fmt="iso"),
-            structlog.processors.add_log_level,
-            processor,
-        ]
-    )
-
-
-configure_logging()
-logger = structlog.get_logger()
+logger = get_lynceus_logger()
 
 
 def _read_marker(path: Path) -> dict | None:

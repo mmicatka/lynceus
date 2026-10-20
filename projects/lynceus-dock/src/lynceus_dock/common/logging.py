@@ -1,27 +1,11 @@
 # projects/lynceus-dock/src/lynceus_dock/common/logging.py
 
 
-import sys
 from typing import Any, Iterable, Iterator, TypeVar
 
 import structlog
 
 T = TypeVar("T")
-
-
-def configure_logging() -> None:
-    renderer = (
-        structlog.dev.ConsoleRenderer(colors=True)
-        if sys.stdout.isatty()
-        else structlog.processors.JSONRenderer()
-    )
-    structlog.configure(
-        processors=[
-            structlog.processors.TimeStamper(fmt="iso"),
-            structlog.processors.add_log_level,
-            renderer,
-        ]
-    )
 
 
 def _progress_message(processed: int, total: int | None) -> str:

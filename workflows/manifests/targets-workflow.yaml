@@ -116,7 +116,7 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: output_prefix
-            value: target/pdbs/HSP90_N_TERMINAL
+            value: target/pdbs/HSP90_N_Terminal
       - name: generate-manifest-hsp90-n-terminal
         depends: download-pdbs-hsp90-n-terminal
         template: generate-manifest
@@ -125,11 +125,11 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: input_path
-            value: target/pdbs/HSP90_N_TERMINAL
+            value: target/pdbs/HSP90_N_Terminal
           - name: output_path
-            value: target/ensembles/HSP90_N_TERMINAL
+            value: target/ensembles/HSP90_N_Terminal
           - name: ensemble_id
-            value: HSP90_N_TERMINAL
+            value: HSP90_N_Terminal
           - name: structure_glob
             value: '*'
   - name: detect-binding-sites
@@ -140,7 +140,8 @@ spec:
     inputs:
       parameters:
       - name: ensemble_path
-      - name: output_path
+      - name: min_pocket_score
+        default: '20.0'
       - name: num_workers
         default: auto
     retryStrategy:
@@ -159,13 +160,13 @@ spec:
         import json
         try: ensemble_path = json.loads(r'''{{inputs.parameters.ensemble_path}}''')
         except: ensemble_path = r'''{{inputs.parameters.ensemble_path}}'''
+        try: min_pocket_score = json.loads(r'''{{inputs.parameters.min_pocket_score}}''')
+        except: min_pocket_score = r'''{{inputs.parameters.min_pocket_score}}'''
         try: num_workers = json.loads(r'''{{inputs.parameters.num_workers}}''')
         except: num_workers = r'''{{inputs.parameters.num_workers}}'''
-        try: output_path = json.loads(r'''{{inputs.parameters.output_path}}''')
-        except: output_path = r'''{{inputs.parameters.output_path}}'''
 
         import subprocess
-        subprocess.run(['detect-binding-sites', '--ensemble', str(ensemble_path), '--out', str(output_path), '--num-workers', str(num_workers)], check=True)
+        subprocess.run(['detect-binding-sites', '--ensemble', str(ensemble_path), '--min-pocket-score', str(min_pocket_score), '--num-workers', str(num_workers)], check=True)
       command:
       - python
       volumeMounts:
@@ -186,9 +187,9 @@ spec:
         arguments:
           parameters:
           - name: ensemble_path
-            value: /mnt/lynceus/target/ensembles/HSP90_N_TERMINAL
-          - name: output_path
-            value: /mnt/lynceus/target/ensembles/HSP90_N_TERMINAL/binding_sites.json
+            value: /mnt/lynceus/target/ensembles/HSP90_N_Terminal
+          - name: min_pocket_score
+            value: '20.0'
   - name: main-dag
     dag:
       tasks:

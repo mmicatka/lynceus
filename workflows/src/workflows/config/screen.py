@@ -38,7 +38,6 @@ class SurrogateConfig(StrictModel):
     validation: PositiveInt
     rounds: list[RoundConfig] = Field(min_length=1)
     seed: int
-    max_round: int = Field(ge=0)
     hyperparameters: HyperparametersConfig = Field(
         default_factory=HyperparametersConfig
     )
@@ -48,15 +47,6 @@ class SurrogateConfig(StrictModel):
         if self.rounds[0].active != 0:
             raise ValueError(
                 "rounds[0].active must be 0: no model exists before round 0"
-            )
-        return self
-
-    @model_validator(mode="after")
-    def _max_round_within_rounds(self) -> "SurrogateConfig":
-        if self.max_round >= len(self.rounds):
-            raise ValueError(
-                f"max_round ({self.max_round}) must be below the number of "
-                f"rounds ({len(self.rounds)})"
             )
         return self
 

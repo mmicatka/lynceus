@@ -45,7 +45,6 @@ filter:
     - usrcat
     - whim
   surrogate:
-    model_prefix: candidates/5m/models
     feature_list:
       - atom_pair
       - autocorr
