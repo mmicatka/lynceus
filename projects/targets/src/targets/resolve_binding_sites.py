@@ -7,7 +7,7 @@ import click
 
 from targets.models import EnsembleBindingSites
 
-BINDING_SITES_FILTER_PATH = Path("binding_sites") / "binding_sites_filter.json"
+BINDING_SITES_FILTER_PATH = Path("binding_sites") / "binding_sites_filtered.json"
 
 Coordinates = tuple[float, float, float]
 

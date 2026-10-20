@@ -371,7 +371,7 @@ def detect_binding_sites(
 
     os.makedirs(os.path.dirname(filtered_output_path), exist_ok=True)
     with open(filtered_output_path, "w") as _f:
-        json.dump(selected, _f)
+        json.dump(selected.to_dict(), _f)
 
     logger.info(
         "Finished detecting and filtering binding sites", ensemble_path=ensemble_path

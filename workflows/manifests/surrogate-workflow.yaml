@@ -1,51 +1,155 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Workflow
 metadata:
-  generateName: 5m-poc-surrogate-sample-
+  generateName: 5m-poc-surrogate-
 spec:
   entrypoint: main-dag
   serviceAccountName: argo-workflow
   templates:
-  - name: surrogate-sample-dag
-    parallelism: 3
-    dag:
-      tasks:
-      - name: sample-shards
-        template: surrogate-sample
-        withItems:
-        - 0
-        - 1
-        - 2
-        - 3
-        - 4
-        - 5
-        - 6
-        - 7
-        arguments:
-          parameters:
-          - name: base_path
-            value: /mnt/lynceus
-          - name: source
-            value: shard_{{item}}.parquet
-          - name: features_input_prefix
-            value: candidates/features
-          - name: conformers_input_prefix
-            value: candidates/conformers
-          - name: output_prefix
-            value: surrogate/samples_staging/round_0
-          - name: num_samples
-            value: '12500'
-      - name: merge-samples
-        depends: sample-shards
-        template: merge-shards
-        arguments:
-          parameters:
-          - name: base_path
-            value: /mnt/lynceus
-          - name: input_path
-            value: surrogate/samples_staging/round_0
-          - name: output_path
-            value: surrogate/samples/round_0.parquet
+  - name: resolve-binding-sites
+    volumes:
+    - name: lynceus
+      persistentVolumeClaim:
+        claimName: lynceus-pvc
+    inputs:
+      parameters:
+      - name: base_path
+      - name: ensembles_prefix
+      - name: ensemble_ids
+    retryStrategy:
+      limit: 5
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 10m
+    script:
+      image: registry.nebula.lan:5000/lynceus/targets:0.1.0
+      imagePullPolicy: Always
+      source: |-
+        import os
+        import sys
+        sys.path.append(os.getcwd())
+        import json
+        try: base_path = json.loads(r'''{{inputs.parameters.base_path}}''')
+        except: base_path = r'''{{inputs.parameters.base_path}}'''
+        try: ensemble_ids = json.loads(r'''{{inputs.parameters.ensemble_ids}}''')
+        except: ensemble_ids = r'''{{inputs.parameters.ensemble_ids}}'''
+        try: ensembles_prefix = json.loads(r'''{{inputs.parameters.ensembles_prefix}}''')
+        except: ensembles_prefix = r'''{{inputs.parameters.ensembles_prefix}}'''
+
+        import os
+        import subprocess
+        cmd = ['resolve-binding-sites', '--ensembles-root', os.path.join(base_path, ensembles_prefix)]
+        for ensemble_id in ensemble_ids:
+            cmd.extend(['--ensemble-id', ensemble_id])
+        subprocess.run(cmd, check=True)
+      command:
+      - python
+      volumeMounts:
+      - name: lynceus
+        mountPath: /mnt/lynceus
+      resources:
+        limits:
+          cpu: '2'
+          memory: 1Gi
+        requests:
+          cpu: '2'
+          memory: 1Gi
+  - name: run-docking
+    volumes:
+    - name: lynceus
+      persistentVolumeClaim:
+        claimName: lynceus-pvc
+    inputs:
+      parameters:
+      - name: ensemble
+      - name: member_id
+      - name: ligands_path
+      - name: center
+      - name: site_id
+      - name: out_parquet
+      - name: size
+        default: 'null'
+      - name: search_mode
+        default: balance
+      - name: num_modes
+        default: '1'
+      - name: batch_size
+        default: 'null'
+      - name: out_dir
+        default: 'null'
+      - name: parquet_batch_rows
+        default: '10000'
+      - name: default_altloc
+        default: A
+      - name: allow_bad_residues
+        default: 'false'
+    retryStrategy:
+      limit: 5
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 10m
+    script:
+      image: registry.nebula.lan:5000/lynceus/lynceus-dock:0.1.0
+      imagePullPolicy: Always
+      source: |-
+        import os
+        import sys
+        sys.path.append(os.getcwd())
+        import json
+        try: allow_bad_residues = json.loads(r'''{{inputs.parameters.allow_bad_residues}}''')
+        except: allow_bad_residues = r'''{{inputs.parameters.allow_bad_residues}}'''
+        try: batch_size = json.loads(r'''{{inputs.parameters.batch_size}}''')
+        except: batch_size = r'''{{inputs.parameters.batch_size}}'''
+        try: center = json.loads(r'''{{inputs.parameters.center}}''')
+        except: center = r'''{{inputs.parameters.center}}'''
+        try: default_altloc = json.loads(r'''{{inputs.parameters.default_altloc}}''')
+        except: default_altloc = r'''{{inputs.parameters.default_altloc}}'''
+        try: ensemble = json.loads(r'''{{inputs.parameters.ensemble}}''')
+        except: ensemble = r'''{{inputs.parameters.ensemble}}'''
+        try: ligands_path = json.loads(r'''{{inputs.parameters.ligands_path}}''')
+        except: ligands_path = r'''{{inputs.parameters.ligands_path}}'''
+        try: member_id = json.loads(r'''{{inputs.parameters.member_id}}''')
+        except: member_id = r'''{{inputs.parameters.member_id}}'''
+        try: num_modes = json.loads(r'''{{inputs.parameters.num_modes}}''')
+        except: num_modes = r'''{{inputs.parameters.num_modes}}'''
+        try: out_dir = json.loads(r'''{{inputs.parameters.out_dir}}''')
+        except: out_dir = r'''{{inputs.parameters.out_dir}}'''
+        try: out_parquet = json.loads(r'''{{inputs.parameters.out_parquet}}''')
+        except: out_parquet = r'''{{inputs.parameters.out_parquet}}'''
+        try: parquet_batch_rows = json.loads(r'''{{inputs.parameters.parquet_batch_rows}}''')
+        except: parquet_batch_rows = r'''{{inputs.parameters.parquet_batch_rows}}'''
+        try: search_mode = json.loads(r'''{{inputs.parameters.search_mode}}''')
+        except: search_mode = r'''{{inputs.parameters.search_mode}}'''
+        try: site_id = json.loads(r'''{{inputs.parameters.site_id}}''')
+        except: site_id = r'''{{inputs.parameters.site_id}}'''
+        try: size = json.loads(r'''{{inputs.parameters.size}}''')
+        except: size = r'''{{inputs.parameters.size}}'''
+
+        import subprocess
+        cmd = ['run-docking', '--ensemble', str(ensemble), '--member-id', str(member_id), '--ligands-path', str(ligands_path), '--center', str(center[0]), str(center[1]), str(center[2]), '--site-id', str(site_id), '--out-parquet', str(out_parquet), '--search-mode', str(search_mode), '--num-modes', str(num_modes), '--parquet-batch-rows', str(parquet_batch_rows), '--default-altloc', str(default_altloc)]
+        if size is not None:
+            cmd.extend(['--size', str(size[0]), str(size[1]), str(size[2])])
+        if batch_size is not None:
+            cmd.extend(['--batch-size', str(batch_size)])
+        if out_dir is not None:
+            cmd.extend(['--out-dir', str(out_dir)])
+        if allow_bad_residues:
+            cmd.append('--allow-bad-residues')
+        subprocess.run(cmd, check=True)
+      command:
+      - python
+      volumeMounts:
+      - name: lynceus
+        mountPath: /mnt/lynceus
+      resources:
+        limits:
+          cpu: '8'
+          memory: 32Gi
+        requests:
+          cpu: '8'
+          memory: 16Gi
   - name: surrogate-sample
     volumes:
     - name: lynceus
@@ -151,8 +255,252 @@ spec:
         requests:
           cpu: '8'
           memory: 8Gi
+  - name: surrogate-sample-validation-dag
+    parallelism: 3
+    dag:
+      tasks:
+      - name: sample-shards
+        template: surrogate-sample
+        withItems:
+        - 0
+        - 1
+        - 2
+        - 3
+        - 4
+        - 5
+        - 6
+        - 7
+        arguments:
+          parameters:
+          - name: base_path
+            value: /mnt/lynceus
+          - name: source
+            value: shard_{{item}}.parquet
+          - name: features_input_prefix
+            value: candidates/features
+          - name: conformers_input_prefix
+            value: candidates/conformers
+          - name: output_prefix
+            value: surrogate/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/staging
+          - name: num_samples
+            value: '12500'
+          - name: seed
+            value: '1000'
+      - name: merge-samples
+        depends: sample-shards
+        template: merge-shards
+        arguments:
+          parameters:
+          - name: base_path
+            value: /mnt/lynceus
+          - name: input_path
+            value: surrogate/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/staging
+          - name: output_path
+            value: surrogate/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/docking_input.parquet
+    inputs:
+      parameters:
+      - name: ensemble
+      - name: site_id
+  - name: surrogate-sample-round-0-dag
+    parallelism: 3
+    dag:
+      tasks:
+      - name: sample-shards
+        template: surrogate-sample
+        withItems:
+        - 0
+        - 1
+        - 2
+        - 3
+        - 4
+        - 5
+        - 6
+        - 7
+        arguments:
+          parameters:
+          - name: base_path
+            value: /mnt/lynceus
+          - name: source
+            value: shard_{{item}}.parquet
+          - name: features_input_prefix
+            value: candidates/features
+          - name: conformers_input_prefix
+            value: candidates/conformers
+          - name: output_prefix
+            value: surrogate/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/staging
+          - name: num_samples
+            value: '12500'
+          - name: seed
+            value: '1001'
+      - name: merge-samples
+        depends: sample-shards
+        template: merge-shards
+        arguments:
+          parameters:
+          - name: base_path
+            value: /mnt/lynceus
+          - name: input_path
+            value: surrogate/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/staging
+          - name: output_path
+            value: surrogate/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/docking_input.parquet
+    inputs:
+      parameters:
+      - name: ensemble
+      - name: site_id
+  - name: surrogate-sample-round-1-dag
+    parallelism: 3
+    dag:
+      tasks:
+      - name: sample-shards
+        template: surrogate-sample
+        withItems:
+        - 0
+        - 1
+        - 2
+        - 3
+        - 4
+        - 5
+        - 6
+        - 7
+        arguments:
+          parameters:
+          - name: base_path
+            value: /mnt/lynceus
+          - name: source
+            value: shard_{{item}}.parquet
+          - name: features_input_prefix
+            value: candidates/features
+          - name: conformers_input_prefix
+            value: candidates/conformers
+          - name: output_prefix
+            value: surrogate/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/staging
+          - name: num_samples
+            value: '6250'
+          - name: seed
+            value: '1002'
+      - name: merge-samples
+        depends: sample-shards
+        template: merge-shards
+        arguments:
+          parameters:
+          - name: base_path
+            value: /mnt/lynceus
+          - name: input_path
+            value: surrogate/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/staging
+          - name: output_path
+            value: surrogate/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/docking_input.parquet
+    inputs:
+      parameters:
+      - name: ensemble
+      - name: site_id
+  - name: surrogate-site-dag
+    dag:
+      tasks:
+      - name: sample-validation
+        template: surrogate-sample-validation-dag
+        arguments:
+          parameters:
+          - name: ensemble
+            value: '{{inputs.parameters.ensemble}}'
+          - name: site_id
+            value: '{{inputs.parameters.site_id}}'
+      - name: dock-validation
+        depends: sample-validation
+        template: run-docking
+        arguments:
+          parameters:
+          - name: ensemble
+            value: /mnt/lynceus/target/ensembles/{{inputs.parameters.ensemble}}
+          - name: member_id
+            value: '{{inputs.parameters.member_id}}'
+          - name: ligands_path
+            value: /mnt/lynceus/surrogate/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/docking_input.parquet
+          - name: center
+            value: '{{inputs.parameters.center}}'
+          - name: site_id
+            value: '{{inputs.parameters.site_id}}'
+          - name: out_parquet
+            value: /mnt/lynceus/surrogate/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/docking.parquet
+      - name: sample-round-0
+        template: surrogate-sample-round-0-dag
+        arguments:
+          parameters:
+          - name: ensemble
+            value: '{{inputs.parameters.ensemble}}'
+          - name: site_id
+            value: '{{inputs.parameters.site_id}}'
+      - name: dock-round-0
+        depends: sample-round-0
+        template: run-docking
+        arguments:
+          parameters:
+          - name: ensemble
+            value: /mnt/lynceus/target/ensembles/{{inputs.parameters.ensemble}}
+          - name: member_id
+            value: '{{inputs.parameters.member_id}}'
+          - name: ligands_path
+            value: /mnt/lynceus/surrogate/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/docking_input.parquet
+          - name: center
+            value: '{{inputs.parameters.center}}'
+          - name: site_id
+            value: '{{inputs.parameters.site_id}}'
+          - name: out_parquet
+            value: /mnt/lynceus/surrogate/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/docking.parquet
+      - name: sample-round-1
+        template: surrogate-sample-round-1-dag
+        arguments:
+          parameters:
+          - name: ensemble
+            value: '{{inputs.parameters.ensemble}}'
+          - name: site_id
+            value: '{{inputs.parameters.site_id}}'
+      - name: dock-round-1
+        depends: sample-round-1
+        template: run-docking
+        arguments:
+          parameters:
+          - name: ensemble
+            value: /mnt/lynceus/target/ensembles/{{inputs.parameters.ensemble}}
+          - name: member_id
+            value: '{{inputs.parameters.member_id}}'
+          - name: ligands_path
+            value: /mnt/lynceus/surrogate/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/docking_input.parquet
+          - name: center
+            value: '{{inputs.parameters.center}}'
+          - name: site_id
+            value: '{{inputs.parameters.site_id}}'
+          - name: out_parquet
+            value: /mnt/lynceus/surrogate/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/docking.parquet
+    inputs:
+      parameters:
+      - name: ensemble
+      - name: site_id
+      - name: member_id
+      - name: center
   - name: main-dag
     dag:
       tasks:
-      - name: surrogate-sample
-        template: surrogate-sample-dag
+      - name: resolve-sites
+        template: resolve-binding-sites
+        arguments:
+          parameters:
+          - name: base_path
+            value: /mnt/lynceus
+          - name: ensembles_prefix
+            value: target/ensembles
+          - name: ensemble_ids
+            value: '["HSP90_N_Terminal"]'
+      - name: surrogate-site
+        depends: resolve-sites
+        template: surrogate-site-dag
+        withParam: '{{tasks.resolve-sites.outputs.result}}'
+        arguments:
+          parameters:
+          - name: ensemble
+            value: '{{item.ensemble}}'
+          - name: site_id
+            value: '{{item.site_id}}'
+          - name: member_id
+            value: '{{item.member_id}}'
+          - name: center
+            value: '{{item.center}}'
