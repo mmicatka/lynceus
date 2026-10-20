@@ -30,6 +30,7 @@ targets:
           weight: 0.5
         - pdb_id: 1YET
           weight: 0.5
+  min_pocket_score: 20.0
 
 filter:
   feature_list:
@@ -56,6 +57,7 @@ filter:
       - topological_torsion
       - usrcat
       - whim
+    seed: 1000
     validation: 100000
     rounds:
       - active: 0

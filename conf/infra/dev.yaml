@@ -76,7 +76,7 @@ templates:
       image: registry.nebula.lan:5000/lynceus/surrogate-model:0.1.0
   run_docking:
     image:
-      image: your-registry/lynceus-docking:tag
+      image: registry.nebula.lan:5000/lynceus/lynceus-dock:0.1.0
     resources:
       requests:
         cpu: "8"

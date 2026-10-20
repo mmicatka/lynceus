@@ -30,7 +30,7 @@ class TemplateName(StrEnum):
     GENERATE_MANIFEST = "generate_manifest"
     DETECT_BINDING_SITES = "detect_binding_sites"
     SURROGATE_SAMPLE = "surrogate_sample"
-    LIST_DOCKING_ITEMS = "list_docking_items"
+    RESOLVE_SURROGATE_SITES = "resolve_surrogate_sites"
     RUN_DOCKING = "run_docking"
 
 
