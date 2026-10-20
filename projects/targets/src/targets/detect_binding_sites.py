@@ -186,7 +186,7 @@ def _pocket_row_to_binding_site(
     return BindingSite(
         schema_version="1.0.0",
         site_id=f"{member_id}:p2rank:{pocket_rank}",
-        conformational_state_id=member_id,
+        member_id=member_id,
         center=center,
         extent=Sphere(center=center, radius=radius),
         pocket_score=float(row["score"]),
