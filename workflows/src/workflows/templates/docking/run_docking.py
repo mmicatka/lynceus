@@ -6,10 +6,9 @@ def run_docking_template(
     member_id: str,
     ligands_path: str,
     center: tuple[float, float, float],
-    size: tuple[float, float, float],
-    conformational_state_id: str,
     site_id: str,
     out_parquet: str,
+    size: tuple[float, float, float] | None = None,
     search_mode: str = "balance",
     num_modes: int = 1,
     batch_size: int | None = None,
@@ -17,7 +16,6 @@ def run_docking_template(
     parquet_batch_rows: int = 10000,
     default_altloc: str = "A",
     allow_bad_residues: bool = False,
-    num_workers: str = "auto",
 ):
     import subprocess
 
@@ -33,12 +31,6 @@ def run_docking_template(
         str(center[0]),
         str(center[1]),
         str(center[2]),
-        "--size",
-        str(size[0]),
-        str(size[1]),
-        str(size[2]),
-        "--conformational-state-id",
-        str(conformational_state_id),
         "--site-id",
         str(site_id),
         "--out-parquet",
@@ -51,9 +43,10 @@ def run_docking_template(
         str(parquet_batch_rows),
         "--default-altloc",
         str(default_altloc),
-        "--num-workers",
-        str(num_workers),
     ]
+
+    if size is not None:
+        cmd.extend(["--size", str(size[0]), str(size[1]), str(size[2])])
 
     if batch_size is not None:
         cmd.extend(["--batch-size", str(batch_size)])

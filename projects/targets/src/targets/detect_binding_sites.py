@@ -14,7 +14,7 @@ from lynceus_core.cli import NumWorkers
 from lynceus_core.logging import get_lynceus_logger, wide_log
 from protein_ensemble import Manifest
 
-from targets.models import BindingSite, Sphere
+from targets.models import BindingSite, EnsembleBindingSites, Sphere
 
 logger = get_lynceus_logger()
 
@@ -252,7 +252,7 @@ def _get_all_binding_sites(
     ensemble_dir: Path,
     manifest: Manifest,
     num_workers: int,
-) -> list[dict]:
+) -> list[BindingSite]:
     num_members = len(list(manifest.members))
 
     if _is_valid(output_path, num_members):
@@ -263,7 +263,8 @@ def _get_all_binding_sites(
             num_members=num_members,
         )
         with open(output_path, "r") as f:
-            return json.load(f)
+            raw_data = json.load(f)
+            return [BindingSite(**site) for site in raw_data]
 
     logger.info(
         "Detecting binding sites for ensemble",
@@ -283,26 +284,22 @@ def _get_all_binding_sites(
 
     _write_success_marker(output_path, num_members)
 
-    return binding_sites_dicts
+    return binding_sites
 
 
 def _filter_binding_sites(
-    all_sites: list[dict],
+    all_sites: list[BindingSite],
     ensemble_id: str,
     min_pocket_score: float,
-) -> list[dict]:
-    return [
-        {
-            "ensemble": ensemble_id,
-            "site_id": site["site_id"],
-            "member_id": site["member_id"],
-            "center": site["center"],
-            "pocket_score": site["pocket_score"],
-        }
+) -> EnsembleBindingSites:
+
+    filtered_sites = [
+        site
         for site in all_sites
-        if site.get("pocket_score") is not None
-        and site["pocket_score"] >= min_pocket_score
+        if site.pocket_score is not None and site.pocket_score >= min_pocket_score
     ]
+
+    return EnsembleBindingSites(ensemble_id=ensemble_id, binding_sites=filtered_sites)
 
 
 @click.command("detect_binding_sites")

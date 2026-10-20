@@ -46,3 +46,8 @@ class BindingSite(_StrictModel):
 
     def to_dict(self) -> dict[str, Any]:
         return self.model_dump(exclude_none=True, exclude_defaults=False)
+
+
+class EnsembleBindingSites(_StrictModel):
+    ensemble_id: str = Field(min_length=1)
+    binding_sites: list[BindingSite] = Field(default_factory=list)

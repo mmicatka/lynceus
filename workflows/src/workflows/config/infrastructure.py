@@ -29,8 +29,8 @@ class TemplateName(StrEnum):
     DOWNLOAD_PDBS = "download_pdbs"
     GENERATE_MANIFEST = "generate_manifest"
     DETECT_BINDING_SITES = "detect_binding_sites"
+    RESOLVE_BINDING_SITES = "resolve_binding_sites"
     SURROGATE_SAMPLE = "surrogate_sample"
-    RESOLVE_SURROGATE_SITES = "resolve_surrogate_sites"
     RUN_DOCKING = "run_docking"
 
 

@@ -8,7 +8,7 @@ from hera.workflows import DAG
 from workflows.config import InfraConfig, ScreenConfig
 from workflows.config.infrastructure import TemplateName
 from workflows.templates import TemplateFactory
-from workflows.templates.targets.detect_binding_sites import (
+from workflows.templates.targets import (
     detect_binding_sites_template,
 )
 

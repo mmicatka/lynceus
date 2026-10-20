@@ -30,7 +30,7 @@ targets:
           weight: 0.5
         - pdb_id: 1YET
           weight: 0.5
-  min_pocket_score: 20.0
+  min_pocket_score: 15.0
 
 filter:
   feature_list:

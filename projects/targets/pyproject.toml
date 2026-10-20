@@ -14,7 +14,7 @@ dependencies = [
 
 [project.scripts]
 detect-binding-sites = "targets:detect_binding_sites"
-filter-binding-sites = "targets:filter_binding_sites"
+resolve-binding-sites = "targets:resolve_binding_sites"
 download-pdbs = "targets:download_pdbs"
 
 [build-system]
