@@ -5,9 +5,6 @@ from hera.workflows import DAG, Workflow
 from workflows.config import InfraConfig, ScreenConfig
 from workflows.config.infrastructure import TemplateName
 from workflows.registry.common import ENTRYPOINT_DAG, get_template_factory, new_workflow
-from workflows.registry.surrogate.layout import (
-    SITE_PARAMETERS,
-)
 from workflows.registry.surrogate.sample_site import build_surrogate_site_dag
 from workflows.templates.targets.resolve_binding_sites import (
     resolve_binding_sites_template,
@@ -38,7 +35,12 @@ def build_surrogate_workflow(
             )
             site_task = surrogate_site_dag(
                 name="surrogate-site",
-                arguments={name: f"{{{{item.{name}}}}}" for name in SITE_PARAMETERS},
+                arguments={
+                    "ensemble": "{{item.ensemble}}",
+                    "site_id": "{{item.site_id}}",
+                    "member_id": "{{item.member_id}}",
+                    "center": "{{item.center}}",
+                },
                 with_param=resolve_task.result,
             )
             resolve_task >> site_task  # type: ignore

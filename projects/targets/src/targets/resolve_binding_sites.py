@@ -45,6 +45,17 @@ def resolve_binding_sites(ensembles_root: Path, ensemble_ids: tuple[str, ...]) -
         load_sites(ensembles_root, ensemble_id) for ensemble_id in ensemble_ids
     ]
 
-    click.echo(
-        json.dumps([e.model_dump(mode="json", exclude_none=True) for e in ensembles])
-    )
+    flat_sites = []
+    for ensemble in ensembles:
+        data = ensemble.model_dump(mode="json", exclude_none=True)
+
+        for site in data.get("binding_sites", []):
+            flat_sites.append(
+                {
+                    "ensemble": data["ensemble_id"],
+                    "site_id": site["site_id"],
+                    "member_id": site["member_id"],
+                    "center": json.dumps(site["center"]),
+                }
+            )
+    click.echo(json.dumps(flat_sites))
