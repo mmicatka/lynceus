@@ -253,8 +253,6 @@ spec:
       - name: base_path
       - name: input_path
       - name: output_path
-      - name: num_workers
-        default: auto
     retryStrategy:
       limit: 5
       backoff:
@@ -273,14 +271,12 @@ spec:
         except: base_path = r'''{{inputs.parameters.base_path}}'''
         try: input_path = json.loads(r'''{{inputs.parameters.input_path}}''')
         except: input_path = r'''{{inputs.parameters.input_path}}'''
-        try: num_workers = json.loads(r'''{{inputs.parameters.num_workers}}''')
-        except: num_workers = r'''{{inputs.parameters.num_workers}}'''
         try: output_path = json.loads(r'''{{inputs.parameters.output_path}}''')
         except: output_path = r'''{{inputs.parameters.output_path}}'''
 
         import os
         import subprocess
-        subprocess.run(['merge-shards', '--input', os.path.join(base_path, input_path), '--output', os.path.join(base_path, output_path), '--num-workers', str(num_workers)], check=True)
+        subprocess.run(['merge-shards', '--input', os.path.join(base_path, input_path), '--output', os.path.join(base_path, output_path), '--memory-limit', '4GB'], check=True)
       command:
       - python
       volumeMounts:

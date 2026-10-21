@@ -27,9 +27,11 @@ targets:
     - id: "HSP90_N_Terminal"
       members:
         - pdb_id: 1UYM
-          weight: 0.5
-        - pdb_id: 1YET
-          weight: 0.5
+          weight: 1.0
+          # - pdb_id: 1UYM
+          #   weight: 0.5
+          # - pdb_id: 1YET
+          #   weight: 0.5
   min_pocket_score: 15.0
 
 filter:
@@ -61,5 +63,5 @@ filter:
     rounds:
       - active: 0
         uniform: 5000
-      # - active: 2500
-      #   uniform: 2500
+        # - active: 2500
+        #   uniform: 2500

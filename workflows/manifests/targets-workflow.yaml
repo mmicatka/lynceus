@@ -112,7 +112,7 @@ spec:
         arguments:
           parameters:
           - name: pdb_ids
-            value: 1UYM,1YET
+            value: 1UYM
           - name: base_path
             value: /mnt/lynceus
           - name: output_prefix

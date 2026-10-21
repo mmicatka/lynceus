@@ -16,10 +16,13 @@ from workflows.registry.surrogate.sample import (
     SampleSpec,
     build_sample_dag,
 )
-from workflows.templates import merge_shards_template, surrogate_sample_template
+from workflows.templates import (
+    merge_shards_template,
+    run_docking_template,
+    surrogate_sample_template,
+    surrogate_train_template,
+)
 from workflows.templates.builders import TemplateFactory
-from workflows.templates.docking.run_docking import run_docking_template
-from workflows.templates.surrogate.surrogate_train import surrogate_train_template
 
 SURROGATE_SITE_DAG = "surrogate-site-dag"
 
