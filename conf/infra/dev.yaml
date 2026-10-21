@@ -13,8 +13,7 @@ storage:
       pdbs: target/pdbs
       ensembles: target/ensembles
     surrogate:
-      samples_staging: surrogate/samples_staging
-      samples: surrogate/samples
+      root: surrogate
 
 candidates:
   max_batch_gib: 20
@@ -71,21 +70,27 @@ templates:
   detect_binding_sites:
     resources: *low_cpu
     image: *targets_image
+  resolve_binding_sites:
+    resources: *low_cpu
+    image: *targets_image
   surrogate_sample:
     resources: *high_cpu
     image: &surrogate_image
       image: registry.nebula.lan:5000/lynceus/surrogate-model:0.1.0
   run_docking:
     image:
-      image: your-registry/lynceus-docking:tag
+      image: registry.nebula.lan:5000/lynceus/lynceus-dock:0.1.0
     resources:
       requests:
-        cpu: "8"
-        memory: 16Gi
+        cpu: "4"
+        memory: 8Gi
       limits:
-        cpu: "8"
-        memory: 32Gi
+        cpu: "4"
+        memory: 8Gi
       gpu: 1
+    env:
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
     node_selector:
       nvidia.com/gpu.present: "true"
     tolerations:

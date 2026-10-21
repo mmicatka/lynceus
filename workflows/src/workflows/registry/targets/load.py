@@ -10,7 +10,7 @@ from workflows.templates import (
     TemplateFactory,
     download_pdbs_template,
 )
-from workflows.templates.targets.generate_manifest import generate_manifest_template
+from workflows.templates.targets import generate_manifest_template
 
 LOAD_TARGETS_DAG = "load-targets"
 

@@ -2,7 +2,13 @@
 
 from typing import Optional
 
-from pydantic import Field, PositiveFloat, PositiveInt, model_validator
+from pydantic import (
+    Field,
+    NonNegativeFloat,
+    PositiveFloat,
+    PositiveInt,
+    model_validator,
+)
 
 from workflows.config.base import StrictModel
 
@@ -28,10 +34,10 @@ class HyperparametersConfig(StrictModel):
 
 
 class SurrogateConfig(StrictModel):
-    model_prefix: str
     feature_list: list[str] = Field(min_length=1)
     validation: PositiveInt
     rounds: list[RoundConfig] = Field(min_length=1)
+    seed: int
     hyperparameters: HyperparametersConfig = Field(
         default_factory=HyperparametersConfig
     )
@@ -80,6 +86,7 @@ class EnsembleConfig(StrictModel):
 
 class TargetConfig(StrictModel):
     ensembles: list[EnsembleConfig]
+    min_pocket_score: NonNegativeFloat
 
 
 class ScreenConfig(StrictModel):

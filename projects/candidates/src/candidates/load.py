@@ -4,34 +4,15 @@ import glob
 import gzip
 import io
 import os
-import sys
 from concurrent.futures import ProcessPoolExecutor
 
 import click
 import pyarrow as pa
 import pyarrow.parquet as pq
-import structlog
 from lynceus_core.cli import NumWorkers
-from lynceus_core.logging import wide_log
+from lynceus_core.logging import get_lynceus_logger, wide_log
 
-
-def configure_logging():
-    if sys.stdout.isatty():
-        processor = structlog.dev.ConsoleRenderer(colors=True)
-    else:
-        processor = structlog.processors.JSONRenderer()
-
-    structlog.configure(
-        processors=[
-            structlog.processors.TimeStamper(fmt="iso"),
-            structlog.processors.add_log_level,
-            processor,
-        ]
-    )
-
-
-configure_logging()
-logger = structlog.get_logger()
+logger = get_lynceus_logger()
 
 DEFAULT_CHUNK_SIZE = 1024 * 1024 * 32
 DEFAULT_BATCH_ROWS = 100_000

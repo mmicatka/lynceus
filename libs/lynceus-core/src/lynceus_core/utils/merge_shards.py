@@ -3,35 +3,17 @@
 import glob
 import json
 import os
-import sys
 
 import click
 import duckdb
-import structlog
 
-from lynceus_core.logging import wide_log
+from lynceus_core.logging import get_lynceus_logger, wide_log
 
 DEFAULT_ROW_GROUP_SIZE = 5_000
 PARQUET_GLOB = "*.parquet"
 
 
-def configure_logging():
-    if sys.stdout.isatty():
-        processor = structlog.dev.ConsoleRenderer(colors=True)
-    else:
-        processor = structlog.processors.JSONRenderer()
-
-    structlog.configure(
-        processors=[
-            structlog.processors.TimeStamper(fmt="iso"),
-            structlog.processors.add_log_level,
-            processor,
-        ]
-    )
-
-
-configure_logging()
-logger = structlog.get_logger()
+logger = get_lynceus_logger()
 
 
 def _marker_path(output_dir: str, identifier: str) -> str:

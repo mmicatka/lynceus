@@ -3,14 +3,19 @@
 from .cli import NumWorkers
 from .features import FEATURE_COLS
 from .io import plan_batches, staged_io
-from .logging import wide_log
+from .logging import get_lynceus_logger, wide_log
 from .utils import merge_shards
 
 __all__ = [
     "FEATURE_COLS",
-    "NumWorkers",
+    # logging
+    "get_lynceus_logger",
     "wide_log",
-    "merge_shards",
+    # cli
+    "NumWorkers",
+    # io
     "plan_batches",
     "staged_io",
+    # utils
+    "merge_shards",
 ]

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 from collections.abc import Iterable, Iterator
 from pathlib import Path
 
@@ -18,7 +17,7 @@ POSE_COLUMN = "pose_pdbqt"
 DOCKING_RESULTS_SCHEMA = pa.schema(
     [
         pa.field("id", pa.string(), nullable=False),
-        pa.field("conformational_state_id", pa.string(), nullable=False),
+        pa.field("member_id", pa.string(), nullable=False),
         pa.field("site_id", pa.string(), nullable=False),
         pa.field("mode", pa.int32(), nullable=False),
         pa.field("affinity_kcal_mol", pa.float64(), nullable=False),
@@ -40,14 +39,14 @@ def _output_schema(drop_pose_column: bool) -> pa.Schema:
 def _iter_pose_rows(
     results_iter: Iterable[tuple[str, list[DockingResult]]],
     *,
-    conformational_state_id: str,
+    member_id: str,
     site_id: str,
 ) -> Iterator[tuple]:
     for ligand_id, results in results_iter:
         for result in results:
             yield (
                 ligand_id,
-                conformational_state_id,
+                member_id,
                 site_id,
                 result.mode,
                 result.affinity_kcal_mol,
@@ -69,7 +68,7 @@ def _rows_to_record_batch(rows: list[tuple]) -> pa.RecordBatch:
 def iter_docking_result_batches(
     results_iter: Iterable[tuple[str, list[DockingResult]]],
     *,
-    conformational_state_id: str,
+    member_id: str,
     site_id: str,
     batch_rows: int = DEFAULT_STREAM_BATCH_ROWS,
 ) -> Iterator[pa.RecordBatch]:
@@ -80,7 +79,7 @@ def iter_docking_result_batches(
     n_batches_emitted = 0
     for row in _iter_pose_rows(
         results_iter,
-        conformational_state_id=conformational_state_id,
+        member_id=member_id,
         site_id=site_id,
     ):
         buffer.append(row)
@@ -96,13 +95,13 @@ def iter_docking_result_batches(
 def docking_results_to_table(
     results_iter: Iterable[tuple[str, list[DockingResult]]],
     *,
-    conformational_state_id: str,
+    member_id: str,
     site_id: str,
 ) -> pa.Table:
     batches = list(
         iter_docking_result_batches(
             results_iter,
-            conformational_state_id=conformational_state_id,
+            member_id=member_id,
             site_id=site_id,
         )
     )
@@ -126,29 +125,23 @@ def write_results(
     results_iter: Iterable[tuple[str, list[DockingResult]]],
     out_path: Path | str,
     *,
-    conformational_state_id: str,
+    member_id: str,
     site_id: str,
     batch_rows: int = DEFAULT_STREAM_BATCH_ROWS,
     drop_pose_column: bool = False,
 ) -> int:
     local_path = Path(out_path)
     local_path.parent.mkdir(parents=True, exist_ok=True)
-    tmp_path = local_path.with_suffix(local_path.suffix + ".tmp")
 
     batches = iter_docking_result_batches(
         results_iter,
-        conformational_state_id=conformational_state_id,
+        member_id=member_id,
         site_id=site_id,
         batch_rows=batch_rows,
     )
 
-    try:
-        row_count = _write_result_batches(
-            batches, tmp_path, _output_schema(drop_pose_column)
-        )
-    except BaseException:
-        tmp_path.unlink(missing_ok=True)
-        raise
+    row_count = _write_result_batches(
+        batches, local_path, _output_schema(drop_pose_column)
+    )
 
-    os.replace(tmp_path, local_path)
     return row_count
