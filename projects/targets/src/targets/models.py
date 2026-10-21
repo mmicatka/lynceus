@@ -35,7 +35,7 @@ class ResidueRef(_StrictModel):
 class BindingSite(_StrictModel):
     schema_version: str = Field(pattern=r"^\d+\.\d+\.\d+$")
     site_id: str = Field(min_length=1)
-    conformational_state_id: str = Field(min_length=1)
+    member_id: str = Field(min_length=1)
     center: Point3
     extent: BoundingVolume
     correspondence_cluster: str | None = None
@@ -43,6 +43,14 @@ class BindingSite(_StrictModel):
     pocket_score: float | None = None
     weight: float | None = None
     provenance: dict[str, Any] = Field(default_factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
+        return self.model_dump(exclude_none=True, exclude_defaults=False)
+
+
+class EnsembleBindingSites(_StrictModel):
+    ensemble_id: str = Field(min_length=1)
+    binding_sites: list[BindingSite] = Field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return self.model_dump(exclude_none=True, exclude_defaults=False)

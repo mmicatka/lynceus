@@ -3,7 +3,6 @@
 import glob
 import json
 import os
-import sys
 from collections.abc import Iterable, Iterator
 from pathlib import Path
 
@@ -11,8 +10,7 @@ import click
 import numpy as np
 import pyarrow as pa
 import pyarrow.parquet as pq
-import structlog
-from lynceus_core.logging import wide_log
+from lynceus_core.logging import get_lynceus_logger, wide_log
 
 PARQUET_PATTERN = "*.parquet"
 MARKER_SUFFIX = ".success"
@@ -21,23 +19,7 @@ COMPRESSION = "zstd"
 DEFAULT_BATCH_SIZE = 50_000
 
 
-def configure_logging():
-    if sys.stdout.isatty():
-        processor = structlog.dev.ConsoleRenderer(colors=True)
-    else:
-        processor = structlog.processors.JSONRenderer()
-
-    structlog.configure(
-        processors=[
-            structlog.processors.TimeStamper(fmt="iso"),
-            structlog.processors.add_log_level,
-            processor,
-        ]
-    )
-
-
-configure_logging()
-logger = structlog.get_logger()
+logger = get_lynceus_logger()
 
 
 def _marker_path(output_path: str) -> str:

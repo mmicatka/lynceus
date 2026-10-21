@@ -29,8 +29,8 @@ class TemplateName(StrEnum):
     DOWNLOAD_PDBS = "download_pdbs"
     GENERATE_MANIFEST = "generate_manifest"
     DETECT_BINDING_SITES = "detect_binding_sites"
+    RESOLVE_BINDING_SITES = "resolve_binding_sites"
     SURROGATE_SAMPLE = "surrogate_sample"
-    LIST_DOCKING_ITEMS = "list_docking_items"
     RUN_DOCKING = "run_docking"
 
 
@@ -50,21 +50,13 @@ class TargetPrefixes(StrictModel):
 
 
 class SurrogatePrefixes(StrictModel):
-    samples_staging: StoragePrefix
-    samples: StoragePrefix
-
-
-class DockingPrefixes(StrictModel):
-    sites_file: StoragePrefix
-    ligands: StoragePrefix
-    results: StoragePrefix
+    root: StoragePrefix
 
 
 class StoragePrefixes(StrictModel):
     candidates: CandidatePrefixes
     target: TargetPrefixes
     surrogate: SurrogatePrefixes
-    docking: DockingPrefixes
 
 
 class StorageConfig(StrictModel):
@@ -74,10 +66,6 @@ class StorageConfig(StrictModel):
 class CandidatesInfraConfig(StrictModel):
     num_shards: PositiveInt
     max_batch_gib: PositiveInt
-
-
-class DockingInfraConfig(StrictModel):
-    max_parallel: PositiveInt
 
 
 class ResourceQuantities(StrictModel):
@@ -119,6 +107,7 @@ class TemplateConfig(StrictModel):
     image: ImageConfig
     resources: ResourceSpec
     scratch: ScratchConfig | None = None
+    env: dict[str, str] = Field(default_factory=dict)
     node_selector: dict[str, str] = Field(default_factory=dict)
     tolerations: list[TolerationConfig] = Field(default_factory=list)
     runtime_class_name: str | None = None
@@ -134,5 +123,4 @@ class InfraConfig(StrictModel):
     storage: StorageConfig
     volume: VolumeConfig
     candidates: CandidatesInfraConfig
-    docking: DockingInfraConfig
     templates: dict[TemplateName, TemplateConfig]

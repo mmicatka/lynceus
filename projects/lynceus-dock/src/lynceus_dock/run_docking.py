@@ -7,13 +7,11 @@ from pathlib import Path
 from typing import Any, Generator
 
 import click
-import structlog
-from lynceus_core.logging import wide_log
+from lynceus_core.logging import get_lynceus_logger, wide_log
 from protein_ensemble.accessors.pdbqt import member_to_pdbqt
 from protein_ensemble.manifest import Manifest
 
 from lynceus_dock.common.ligand import count_ligand_rows, iter_ligand_records
-from lynceus_dock.common.logging import configure_logging
 from lynceus_dock.common.manifest import (
     build_entry,
     build_manifest_path,
@@ -28,8 +26,7 @@ from lynceus_dock.registry.registry import get_provider
 
 from .common.types import DockingError, LigandRecord, SearchBox
 
-configure_logging()
-logger = structlog.get_logger()
+logger = get_lynceus_logger()
 
 
 @dataclass(frozen=True)
@@ -117,7 +114,7 @@ def _prepare_receptor_pdbqt(
 
 
 @contextmanager
-def _receptor_file(member_id: str, pdbqt_string: str) -> Generator[Path]:
+def _receptor_file(member_id: str, pdbqt_string: str) -> Generator[Path, None, None]:
     with tempfile.TemporaryDirectory(prefix="docking_receptor_") as tmp:
         receptor_path = Path(tmp) / f"{member_id}.pdbqt"
         receptor_path.write_text(pdbqt_string)
@@ -131,7 +128,7 @@ def _dock_and_write(
     box: SearchBox,
     identity: RunIdentity,
     *,
-    conformational_state_id: str,
+    member_id: str,
     batch_size: int | None,
     parquet_batch_rows: int,
 ) -> int:
@@ -145,7 +142,7 @@ def _dock_and_write(
         return write_results(
             results,
             identity.out_parquet,
-            conformational_state_id=conformational_state_id,
+            member_id=member_id,
             site_id=identity.site_id,
             batch_rows=parquet_batch_rows,
             drop_pose_column=True,
@@ -202,12 +199,6 @@ def _record_run(
     default=(25.0, 25.0, 25.0),
     show_default=True,
     help="Search box size, Angstroms (X Y Z).",
-)
-@click.option(
-    "--conformational-state-id",
-    type=str,
-    required=True,
-    help="Identifier of the receptor conformational state.",
 )
 @click.option(
     "--site-id", type=str, required=True, help="Identifier of the binding site."
@@ -270,7 +261,6 @@ def run_docking(
     ligands_path: str,
     center: tuple[float, float, float],
     size: tuple[float, float, float],
-    conformational_state_id: str,
     site_id: str,
     search_mode: str,
     num_modes: int,
@@ -317,7 +307,7 @@ def run_docking(
             ligands,
             box,
             identity,
-            conformational_state_id=conformational_state_id,
+            member_id=member_id,
             batch_size=batch_size,
             parquet_batch_rows=parquet_batch_rows,
         )

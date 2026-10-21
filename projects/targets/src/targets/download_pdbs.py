@@ -3,14 +3,12 @@
 from __future__ import annotations
 
 import json
-import sys
 import time
 from pathlib import Path
 
 import click
 import httpx
-import structlog
-from lynceus_core.logging import wide_log
+from lynceus_core.logging import get_lynceus_logger, wide_log
 
 _RCSB_CIF_TEMPLATE = "https://files.rcsb.org/download/{pdb_id}.cif"
 _RCSB_PDB_TEMPLATE = "https://files.rcsb.org/download/{pdb_id}.pdb"
@@ -20,23 +18,7 @@ _RETRY_WAIT_SECONDS = 2
 _TIMEOUT_SECONDS = 30.0
 
 
-def configure_logging():
-    if sys.stdout.isatty():
-        processor = structlog.dev.ConsoleRenderer(colors=True)
-    else:
-        processor = structlog.processors.JSONRenderer()
-
-    structlog.configure(
-        processors=[
-            structlog.processors.TimeStamper(fmt="iso"),
-            structlog.processors.add_log_level,
-            processor,
-        ]
-    )
-
-
-configure_logging()
-logger = structlog.get_logger(__name__)
+logger = get_lynceus_logger()
 
 
 def _marker_path(outdir: Path) -> Path:

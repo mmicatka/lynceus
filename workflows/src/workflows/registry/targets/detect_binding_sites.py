@@ -8,7 +8,7 @@ from hera.workflows import DAG
 from workflows.config import InfraConfig, ScreenConfig
 from workflows.config.infrastructure import TemplateName
 from workflows.templates import TemplateFactory
-from workflows.templates.targets.detect_binding_sites import (
+from workflows.templates.targets import (
     detect_binding_sites_template,
 )
 
@@ -47,9 +47,7 @@ def build_detect_binding_sites_dag(
                 name=_task_name("detect-binding-sites", ensemble.id),
                 arguments={
                     "ensemble_path": os.path.join(base_path, ensemble_prefix),
-                    "output_path": os.path.join(
-                        base_path, ensemble_prefix, "binding_sites.json"
-                    ),
+                    "min_pocket_score": screen_config.targets.min_pocket_score,
                 },
             )
 

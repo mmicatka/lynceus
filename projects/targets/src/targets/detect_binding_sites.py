@@ -4,38 +4,19 @@ import csv
 import json
 import os
 import subprocess
-import sys
 import tempfile
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
 import click
 import gemmi
-import structlog
 from lynceus_core.cli import NumWorkers
-from lynceus_core.logging import wide_log
+from lynceus_core.logging import get_lynceus_logger, wide_log
 from protein_ensemble import Manifest
 
-from targets.models import BindingSite, Sphere
+from targets.models import BindingSite, EnsembleBindingSites, Sphere
 
-
-def configure_logging():
-    if sys.stdout.isatty():
-        processor = structlog.dev.ConsoleRenderer(colors=True)
-    else:
-        processor = structlog.processors.JSONRenderer()
-
-    structlog.configure(
-        processors=[
-            structlog.processors.TimeStamper(fmt="iso"),
-            structlog.processors.add_log_level,
-            processor,
-        ]
-    )
-
-
-configure_logging()
-logger = structlog.get_logger()
+logger = get_lynceus_logger()
 
 MANIFEST_FILENAME = "manifest.json"
 
@@ -186,7 +167,7 @@ def _pocket_row_to_binding_site(
     return BindingSite(
         schema_version="1.0.0",
         site_id=f"{member_id}:p2rank:{pocket_rank}",
-        conformational_state_id=member_id,
+        member_id=member_id,
         center=center,
         extent=Sphere(center=center, radius=radius),
         pocket_score=float(row["score"]),
@@ -266,6 +247,61 @@ def _detect_binding_sites_ensemble(
     return binding_sites
 
 
+def _get_all_binding_sites(
+    output_path: str,
+    ensemble_dir: Path,
+    manifest: Manifest,
+    num_workers: int,
+) -> list[BindingSite]:
+    num_members = len(list(manifest.members))
+
+    if _is_valid(output_path, num_members):
+        logger.info(
+            "Binding sites already detected, loading from disk to apply filtering.",
+            ensemble_path=str(ensemble_dir),
+            output_path=output_path,
+            num_members=num_members,
+        )
+        with open(output_path, "r") as f:
+            raw_data = json.load(f)
+            return [BindingSite(**site) for site in raw_data]
+
+    logger.info(
+        "Detecting binding sites for ensemble",
+        ensemble_path=str(ensemble_dir),
+        num_members=num_members,
+        output_path=output_path,
+        workers=num_workers,
+    )
+
+    binding_sites = _detect_binding_sites_ensemble(manifest, ensemble_dir, num_workers)
+
+    binding_sites_dicts = [_b.to_dict() for _b in binding_sites]
+
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    with open(output_path, "w") as _f:
+        json.dump(binding_sites_dicts, _f)
+
+    _write_success_marker(output_path, num_members)
+
+    return binding_sites
+
+
+def _filter_binding_sites(
+    all_sites: list[BindingSite],
+    ensemble_id: str,
+    min_pocket_score: float,
+) -> EnsembleBindingSites:
+
+    filtered_sites = [
+        site
+        for site in all_sites
+        if site.pocket_score is not None and site.pocket_score >= min_pocket_score
+    ]
+
+    return EnsembleBindingSites(ensemble_id=ensemble_id, binding_sites=filtered_sites)
+
+
 @click.command("detect_binding_sites")
 @click.option(
     "--ensemble",
@@ -275,11 +311,18 @@ def _detect_binding_sites_ensemble(
     help="Path to the input ensemble folder.",
 )
 @click.option(
-    "--out",
-    "output_path",
-    required=True,
+    "--ensemble-id",
+    "ensemble_id",
     type=str,
-    help="Path to the output JSON file.",
+    default=None,
+    help="Ensemble identifier. Defaults to the ensemble folder name.",
+)
+@click.option(
+    "--min-pocket-score",
+    "min_pocket_score",
+    required=True,
+    type=float,
+    help="Minimum pocket score required to retain a binding site.",
 )
 @click.option(
     "--num-workers",
@@ -292,40 +335,45 @@ def _detect_binding_sites_ensemble(
 @wide_log(logger)
 def detect_binding_sites(
     ensemble_path: str,
-    output_path: str,
+    ensemble_id: str | None,
+    min_pocket_score: float,
     num_workers: int,
 ):
     click.echo(f"Processing ensemble at {ensemble_path}...")
 
     ensemble_dir = Path(ensemble_path)
+    ensemble_id = ensemble_id or ensemble_dir.name
     manifest = _load_manifest(ensemble_dir)
-    num_members = len(list(manifest.members))
 
-    if _is_valid(output_path, num_members):
-        logger.info(
-            "Binding sites already detected, skipping",
-            ensemble_path=ensemble_path,
-            output_path=output_path,
-            num_members=num_members,
-        )
-        click.echo("Done!")
-        return
-
-    logger.info(
-        "Detecting binding sites for ensemble",
-        ensemble_path=ensemble_path,
-        num_members=num_members,
-        output_path=output_path,
-        workers=num_workers,
+    output_path = str(ensemble_dir / "binding_sites" / "binding_sites.json")
+    filtered_output_path = str(
+        ensemble_dir / "binding_sites" / "binding_sites_filtered.json"
     )
 
-    binding_sites = _detect_binding_sites_ensemble(manifest, ensemble_dir, num_workers)
+    all_sites = _get_all_binding_sites(
+        output_path=output_path,
+        ensemble_dir=ensemble_dir,
+        manifest=manifest,
+        num_workers=num_workers,
+    )
 
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    with open(output_path, "w") as _f:
-        json.dump([_b.to_dict() for _b in binding_sites], _f)
+    selected = _filter_binding_sites(
+        all_sites=all_sites,
+        ensemble_id=ensemble_id,
+        min_pocket_score=min_pocket_score,
+    )
 
-    _write_success_marker(output_path, num_members)
+    if not selected:
+        raise click.ClickException(
+            f"no binding sites in ensemble '{ensemble_id}' have "
+            f"pocket_score >= {min_pocket_score}"
+        )
 
-    logger.info("Finished detecting binding sites", ensemble_path=ensemble_path)
+    os.makedirs(os.path.dirname(filtered_output_path), exist_ok=True)
+    with open(filtered_output_path, "w") as _f:
+        json.dump(selected.to_dict(), _f)
+
+    logger.info(
+        "Finished detecting and filtering binding sites", ensemble_path=ensemble_path
+    )
     click.echo("Done!")

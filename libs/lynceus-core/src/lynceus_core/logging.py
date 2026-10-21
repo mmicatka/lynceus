@@ -3,6 +3,7 @@
 
 import functools
 import inspect
+import sys
 import time
 from collections.abc import Callable, Iterable
 from typing import Any, TypeVar, cast
@@ -108,3 +109,23 @@ def wide_log(
         return cast(F, sync_wrapper)
 
     return decorator
+
+
+def _configure_logging():
+    if sys.stdout.isatty():
+        processor = structlog.dev.ConsoleRenderer(colors=True)
+    else:
+        processor = structlog.processors.JSONRenderer()
+
+    structlog.configure(
+        processors=[
+            structlog.processors.TimeStamper(fmt="iso"),
+            structlog.processors.add_log_level,
+            processor,
+        ]
+    )
+
+
+def get_lynceus_logger() -> Any:
+    _configure_logging()
+    return structlog.get_logger()
