@@ -4,7 +4,7 @@ from hera.workflows import DAG, Parameter, Task
 
 from workflows.config import InfraConfig, ScreenConfig
 from workflows.config.infrastructure import TemplateName
-from workflows.config.screen import SurrogateConfig
+from workflows.config.screen import RoundConfig, SurrogateConfig
 from workflows.registry.surrogate.layout import (
     SITE_PARAMETERS,
     VALIDATION_LABEL,
@@ -14,8 +14,8 @@ from workflows.registry.surrogate.layout import (
 from workflows.registry.surrogate.sample import (
     SAMPLE_PARAMETERS,
     PredictionSampleSpec,
+    RandomSampleSpec,
     SampleSpec,
-    UniformSampleSpec,
     build_sample_dag,
 )
 from workflows.templates import (
@@ -56,7 +56,7 @@ def _round_label(index: int) -> str:
 
 
 def _validation_spec(surrogate: SurrogateConfig) -> SampleSpec:
-    return UniformSampleSpec(
+    return RandomSampleSpec(
         label=VALIDATION_LABEL,
         seed=surrogate.seed,
         num_samples=surrogate.validation,
@@ -65,16 +65,16 @@ def _validation_spec(surrogate: SurrogateConfig) -> SampleSpec:
 
 def _round_spec(
     index: int,
-    round_config,
+    round_config: RoundConfig,
     surrogate: SurrogateConfig,
     layout: SiteLayout,
 ) -> SampleSpec:
     seed = surrogate.seed + 1 + index
     if index == 0:
-        return UniformSampleSpec(
+        return RandomSampleSpec(
             label=_round_label(index),
             seed=seed,
-            num_samples=round_config.uniform,
+            num_samples=round_config.random,
         )
     return PredictionSampleSpec(
         label=_round_label(index),
@@ -139,7 +139,7 @@ def build_surrogate_site_dag(
         TemplateName.SURROGATE_TRAIN, surrogate_train_template
     )
     sample_templates = {
-        UniformSampleSpec: templates.build(
+        RandomSampleSpec: templates.build(
             TemplateName.SURROGATE_SAMPLE, surrogate_sample_template
         ),
         PredictionSampleSpec: templates.build(

@@ -34,7 +34,7 @@ class SampleSpec(ABC):
 
 
 @dataclass(frozen=True)
-class UniformSampleSpec(SampleSpec):
+class RandomSampleSpec(SampleSpec):
     num_samples: int
 
     def shard_arguments(self, num_shards: int) -> dict[str, Any]:
