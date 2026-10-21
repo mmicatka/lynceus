@@ -24,6 +24,7 @@ dependencies = [
 [project.scripts]
 surrogate-sample = "surrogate_model:sample_candidates"
 surrogate-train = "surrogate_model:train_model"
+surrogate-sample-by-prediction = "surrogate_model:sample_by_prediction"
 
 [build-system]
 requires = ["uv_build>=0.12.23,<0.13.0"]

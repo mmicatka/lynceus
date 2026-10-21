@@ -12,10 +12,14 @@ import joblib
 import lightgbm as lgb
 import polars as pl
 import structlog
-from lynceus_core.features import FEATURE_COLS
 from lynceus_core.logging import wide_log
 from sklearn.model_selection import train_test_split
 
+from surrogate_model.common.cli import (
+    features_option,
+    label_definition_options,
+    require_single_label_definition,
+)
 from surrogate_model.common.data import (
     compute_label,
     flatten_features,
@@ -46,22 +50,55 @@ RANDOM_SEED = 1000
 
 
 def _marker_path(output_path: str) -> str:
-    return f"{output_path}.SUCCESS"
+    base_path = output_path.removesuffix(".joblib")
+    return f"{base_path}.results.json"
 
 
-def _model_is_valid(output_path: str, active_percentile: float) -> bool:
+def _model_is_valid(
+    output_path: str, active_percentile: Optional[float], threshold: Optional[float]
+) -> bool:
     marker_path = _marker_path(output_path)
     if not os.path.exists(marker_path):
         return False
     with open(marker_path, "r") as f:
         data = json.load(f)
-        return data.get("active_percentile") == active_percentile
+        # Validate against whichever parameter the user provided
+        if active_percentile is not None:
+            return data.get("active_percentile") == active_percentile
+        if threshold is not None:
+            return data.get("threshold") == threshold
+        return False
 
 
-def _write_success_marker(output_path: str, active_percentile: float) -> None:
+def _write_success_marker(
+    output_path: str,
+    active_percentile: Optional[float],
+    threshold: Optional[float],
+    train_features: str,
+    train_labels: str,
+    validation_features: str,
+    validation_labels: str,
+    metrics: list[dict],
+) -> None:
     os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
     with open(_marker_path(output_path), "w") as f:
-        json.dump({"active_percentile": active_percentile}, f)
+        json.dump(
+            {
+                "active_percentile": active_percentile,
+                "threshold": threshold,
+                "train_files": {
+                    "features": train_features,
+                    "labels": train_labels,
+                },
+                "validation_files": {
+                    "features": validation_features,
+                    "labels": validation_labels,
+                },
+                "metrics": metrics,
+            },
+            f,
+            indent=2,
+        )
 
 
 def _prepare_dataset(
@@ -79,7 +116,7 @@ def _prepare_dataset(
     x = flatten_features(df_cleaned, features)
     y_raw = df_cleaned["affinity_kcal_mol"]
 
-    # "top" 1% (most negative == strongest binder) or use provided threshold
+    # "top" % (most negative == strongest binder) or use provided threshold
     y_label, computed_threshold = compute_label(
         y_raw, percentile=percentile, threshold=threshold
     )
@@ -140,22 +177,8 @@ def _save_model(model, path: str):
     required=True,
     help="Output path to save the model.",
 )
-@click.option(
-    "--features",
-    "-f",
-    multiple=True,
-    type=click.Choice(list(FEATURE_COLS), case_sensitive=False),
-    default=list(FEATURE_COLS),
-    show_default=True,
-    help="Features to use.",
-)
-@click.option(
-    "--active-percentile",
-    type=float,
-    default=1.0,
-    show_default=True,
-    help="Active percentile.",
-)
+@features_option
+@label_definition_options
 @wide_log(logger)
 def train_model(
     train_features_path: str,
@@ -164,15 +187,21 @@ def train_model(
     validation_labels_path: str,
     features: list[str],
     model_path: str,
-    active_percentile: float,
+    active_percentile: float | None,
+    threshold: float | None,
 ):
+    require_single_label_definition(active_percentile, threshold)
+
     click.echo(f"Training surrogate model using features from {train_features_path}...")
 
-    if _model_is_valid(model_path, active_percentile):
+    if _model_is_valid(
+        model_path, active_percentile=active_percentile, threshold=threshold
+    ):
         logger.info(
             "Model already valid, skipping training",
             model_path=model_path,
             active_percentile=active_percentile,
+            threshold=threshold,
         )
         click.echo("Done!")
         return
@@ -185,11 +214,12 @@ def train_model(
         validation_labels_path=validation_labels_path,
     )
 
-    x_initial, y_initial_label, threshold = _prepare_dataset(
+    x_initial, y_initial_label, dataset_threshold = _prepare_dataset(
         train_features_path,
         train_labels_path,
         features,
         percentile=active_percentile,
+        threshold=threshold,
     )
 
     x_initial_train, x_initial_test, y_initial_train, y_initial_test = train_test_split(
@@ -224,15 +254,30 @@ def train_model(
         validation_features_path,
         validation_labels_path,
         features,
-        threshold=threshold,
+        threshold=dataset_threshold,
     )
 
-    _evaluate_and_log(
+    val_metrics_df = _evaluate_and_log(
         model, x_validation, y_validation_label, dataset_name="Validation"
+    )
+
+    metrics_list = (
+        val_metrics_df.to_dicts()
+        if isinstance(val_metrics_df, pl.DataFrame)
+        else val_metrics_df
     )
 
     _save_model(model, model_path)
 
-    _write_success_marker(model_path, active_percentile)
+    _write_success_marker(
+        output_path=model_path,
+        active_percentile=active_percentile,
+        threshold=threshold,
+        train_features=train_features_path,
+        train_labels=train_labels_path,
+        validation_features=validation_features_path,
+        validation_labels=validation_labels_path,
+        metrics=metrics_list,
+    )
 
     click.echo("Done!")
