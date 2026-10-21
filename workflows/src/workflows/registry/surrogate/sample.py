@@ -1,5 +1,6 @@
 # workflows/src/workflows/registry/surrogate/dags/sample.py
 
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any
 
@@ -16,9 +17,8 @@ MAX_PARALLEL_SOURCES = 3
 
 
 @dataclass(frozen=True)
-class SampleSpec:
+class SampleSpec(ABC):
     label: str
-    num_samples: int
     seed: int
 
     @property
@@ -28,6 +28,35 @@ class SampleSpec:
     @property
     def dag_name(self) -> str:
         return f"surrogate-sample-{self.task_suffix}-dag"
+
+    @abstractmethod
+    def shard_arguments(self, num_shards: int) -> dict[str, Any]: ...
+
+
+@dataclass(frozen=True)
+class UniformSampleSpec(SampleSpec):
+    num_samples: int
+
+    def shard_arguments(self, num_shards: int) -> dict[str, Any]:
+        return {
+            "num_samples": self.num_samples // num_shards,
+            "seed": self.seed,
+        }
+
+
+@dataclass(frozen=True)
+class PredictionSampleSpec(SampleSpec):
+    model_path: str
+    num_top: int
+    num_random: int
+
+    def shard_arguments(self, num_shards: int) -> dict[str, Any]:
+        return {
+            "model_path": self.model_path,
+            "num_top": self.num_top // num_shards,
+            "num_random": self.num_random // num_shards,
+            "seed": self.seed,
+        }
 
 
 def _shard_filename(shard: str) -> str:
@@ -52,8 +81,7 @@ def _sample_shards_task(
             "features_input_prefix": candidate_prefixes.features,
             "conformers_input_prefix": candidate_prefixes.conformers,
             "output_prefix": layout.staging_prefix(spec.label),
-            "num_samples": spec.num_samples // num_shards,
-            "seed": spec.seed,
+            **spec.shard_arguments(num_shards),
         },
     )
 

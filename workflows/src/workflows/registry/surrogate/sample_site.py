@@ -13,16 +13,19 @@ from workflows.registry.surrogate.layout import (
 )
 from workflows.registry.surrogate.sample import (
     SAMPLE_PARAMETERS,
+    PredictionSampleSpec,
     SampleSpec,
+    UniformSampleSpec,
     build_sample_dag,
 )
 from workflows.templates import (
+    TemplateFactory,
     merge_shards_template,
     run_docking_template,
+    surrogate_sample_by_prediction_template,
     surrogate_sample_template,
     surrogate_train_template,
 )
-from workflows.templates.builders import TemplateFactory
 
 SURROGATE_SITE_DAG = "surrogate-site-dag"
 
@@ -48,13 +51,43 @@ def _train_arguments(spec: SampleSpec, layout: SiteLayout) -> dict:
     }
 
 
+def _round_label(index: int) -> str:
+    return f"round_{index}"
+
+
 def _validation_spec(surrogate: SurrogateConfig) -> SampleSpec:
-    return SampleSpec(VALIDATION_LABEL, surrogate.validation, surrogate.seed)
+    return UniformSampleSpec(
+        label=VALIDATION_LABEL,
+        seed=surrogate.seed,
+        num_samples=surrogate.validation,
+    )
 
 
-def _round_specs(surrogate: SurrogateConfig) -> list[SampleSpec]:
+def _round_spec(
+    index: int,
+    round_config,
+    surrogate: SurrogateConfig,
+    layout: SiteLayout,
+) -> SampleSpec:
+    seed = surrogate.seed + 1 + index
+    if index == 0:
+        return UniformSampleSpec(
+            label=_round_label(index),
+            seed=seed,
+            num_samples=round_config.uniform,
+        )
+    return PredictionSampleSpec(
+        label=_round_label(index),
+        seed=seed,
+        model_path=layout.model_path(_round_label(index - 1)),
+        num_top=round_config.top,
+        num_random=round_config.random,
+    )
+
+
+def _round_specs(surrogate: SurrogateConfig, layout: SiteLayout) -> list[SampleSpec]:
     return [
-        SampleSpec(f"round_{index}", round_config.uniform, surrogate.seed + 1 + index)
+        _round_spec(index, round_config, surrogate, layout)
         for index, round_config in enumerate(surrogate.rounds)
     ]
 
@@ -62,10 +95,10 @@ def _round_specs(surrogate: SurrogateConfig) -> list[SampleSpec]:
 def _sample_and_dock(
     spec: SampleSpec,
     layout: SiteLayout,
-    sample_dags: dict,
+    sample_dag,
     dock,
 ) -> tuple[Task, Task]:
-    sample_task = sample_dags[spec.label](
+    sample_task = sample_dag(
         name=f"sample-{spec.task_suffix}",
         arguments={name: ref(name) for name in SAMPLE_PARAMETERS},
     )
@@ -98,20 +131,26 @@ def build_surrogate_site_dag(
 
     surrogate = screen_config.filter.surrogate
     validation_spec = _validation_spec(surrogate)
-    round_specs = _round_specs(surrogate)
+    round_specs = _round_specs(surrogate, layout)
 
     dock = templates.build(TemplateName.RUN_DOCKING, run_docking_template)
-    surrogate_sample = templates.build(
-        TemplateName.SURROGATE_SAMPLE, surrogate_sample_template
-    )
     merge_shards = templates.build(TemplateName.MERGE_SHARDS, merge_shards_template)
     surrogate_train = templates.build(
         TemplateName.SURROGATE_TRAIN, surrogate_train_template
     )
+    sample_templates = {
+        UniformSampleSpec: templates.build(
+            TemplateName.SURROGATE_SAMPLE, surrogate_sample_template
+        ),
+        PredictionSampleSpec: templates.build(
+            TemplateName.SURROGATE_SAMPLE_BY_PREDICTION,
+            surrogate_sample_by_prediction_template,
+        ),
+    }
 
     sample_dags = {
         spec.label: build_sample_dag(
-            surrogate_sample, merge_shards, infra_config, layout, spec
+            sample_templates[type(spec)], merge_shards, infra_config, layout, spec
         )
         for spec in [validation_spec, *round_specs]
     }
@@ -120,14 +159,18 @@ def build_surrogate_site_dag(
         name=SURROGATE_SITE_DAG,
         inputs=[Parameter(name=name) for name in SITE_PARAMETERS],
     ) as site_dag:
-        _, previous = _sample_and_dock(validation_spec, layout, sample_dags, dock)
+        _, previous_task = _sample_and_dock(
+            validation_spec, layout, sample_dags[validation_spec.label], dock
+        )
 
         for spec in round_specs:
-            sample_task, dock_task = _sample_and_dock(spec, layout, sample_dags, dock)
+            sample_task, dock_task = _sample_and_dock(
+                spec, layout, sample_dags[spec.label], dock
+            )
             train_task = _train(spec, layout, surrogate_train)
 
-            previous >> sample_task  # type: ignore
+            previous_task >> sample_task  # type: ignore
             dock_task >> train_task  # type: ignore
-            previous = train_task
+            previous_task = train_task
 
     return site_dag

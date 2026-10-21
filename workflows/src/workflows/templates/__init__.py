@@ -10,7 +10,11 @@ from .candidates import (
 )
 from .common import build_clean_prefix_template, merge_shards_template
 from .docking import run_docking_template
-from .surrogate import surrogate_sample_template, surrogate_train_template
+from .surrogate import (
+    surrogate_sample_by_prediction_template,
+    surrogate_sample_template,
+    surrogate_train_template,
+)
 from .targets import download_pdbs_template
 
 __all__ = [
@@ -31,5 +35,6 @@ __all__ = [
     "download_pdbs_template",
     # surrogate
     "surrogate_sample_template",
+    "surrogate_sample_by_prediction_template",
     "surrogate_train_template",
 ]
