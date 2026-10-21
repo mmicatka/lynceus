@@ -1,17 +1,19 @@
 # workflows/src/workflows/templates/builders.py
 
+import json
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Self
 
 from hera.workflows import (
     EmptyDirVolume,
+    Env,
     ExistingVolume,
     Resources,
     RetryStrategy,
     script,
 )
-from hera.workflows.models import Quantity
+from hera.workflows.models import Quantity, Toleration
 
 from workflows.config.infrastructure import (
     InfraConfig,
@@ -19,11 +21,27 @@ from workflows.config.infrastructure import (
     ScratchConfig,
     TemplateConfig,
     TemplateName,
+    TolerationConfig,
     VolumeConfig,
 )
 
 SCRATCH_VOLUME_NAME = "scratch"
 MEMORY_MEDIUM = "Memory"
+GPU_RESOURCE_NAME = "nvidia.com/gpu"
+
+
+def _to_hera_env(env: dict[str, str]) -> list[Env] | None:
+    return [Env(name=key, value=value) for key, value in env.items()] or None
+
+
+def _to_hera_tolerations(items: list[TolerationConfig]) -> list[Toleration] | None:
+    return [Toleration(**item.model_dump(exclude_none=True)) for item in items] or None
+
+
+def _to_pod_spec_patch(runtime_class_name: str | None) -> str | None:
+    if runtime_class_name is None:
+        return None
+    return json.dumps({"runtimeClassName": runtime_class_name})
 
 
 def _to_hera_quantity(value: str | None) -> Quantity | None:
@@ -36,6 +54,8 @@ def _to_hera_resources(spec: ResourceSpec) -> Resources:
         cpu_limit=spec.limits.cpu,
         memory_request=spec.requests.memory,
         memory_limit=spec.limits.memory,
+        gpus=spec.gpu,
+        gpu_flag=GPU_RESOURCE_NAME,
     )
 
 
@@ -95,4 +115,8 @@ class TemplateFactory:
             resources=_to_hera_resources(template.resources),
             volumes=self._volumes_for(template),
             retry_strategy=self.retry_strategy,
+            env=_to_hera_env(template.env),
+            node_selector=template.node_selector or None,
+            tolerations=_to_hera_tolerations(template.tolerations),
+            pod_spec_patch=_to_pod_spec_patch(template.runtime_class_name),
         )(func)

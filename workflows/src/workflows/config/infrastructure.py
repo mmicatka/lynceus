@@ -107,6 +107,7 @@ class TemplateConfig(StrictModel):
     image: ImageConfig
     resources: ResourceSpec
     scratch: ScratchConfig | None = None
+    env: dict[str, str] = Field(default_factory=dict)
     node_selector: dict[str, str] = Field(default_factory=dict)
     tolerations: list[TolerationConfig] = Field(default_factory=list)
     runtime_class_name: str | None = None

@@ -88,6 +88,9 @@ templates:
         cpu: "8"
         memory: 32Gi
       gpu: 1
+    env:
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
     node_selector:
       nvidia.com/gpu.present: "true"
     tolerations:
