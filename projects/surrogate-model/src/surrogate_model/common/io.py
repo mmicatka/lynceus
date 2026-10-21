@@ -120,6 +120,7 @@ def write_aligned_selection(
     batch_size: int,
     extra_columns: dict[str, np.ndarray] | None = None,
 ) -> None:
+    positions = np.sort(positions)
     extra = extra_columns or {}
     writer: pq.ParquetWriter | None = None
     offset = 0

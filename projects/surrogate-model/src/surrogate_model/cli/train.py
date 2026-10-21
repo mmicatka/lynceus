@@ -70,7 +70,7 @@ def _model_is_valid(
         return False
 
 
-def _write_success_marker(
+def _write_manifest(
     output_path: str,
     active_percentile: Optional[float],
     threshold: Optional[float],
@@ -222,6 +222,8 @@ def train_model(
         threshold=threshold,
     )
 
+    threshold = dataset_threshold
+
     x_initial_train, x_initial_test, y_initial_train, y_initial_test = train_test_split(
         x_initial, y_initial_label, train_size=0.8, random_state=RANDOM_SEED
     )
@@ -254,7 +256,7 @@ def train_model(
         validation_features_path,
         validation_labels_path,
         features,
-        threshold=dataset_threshold,
+        threshold=threshold,
     )
 
     val_metrics_df = _evaluate_and_log(
@@ -269,7 +271,7 @@ def train_model(
 
     _save_model(model, model_path)
 
-    _write_success_marker(
+    _write_manifest(
         output_path=model_path,
         active_percentile=active_percentile,
         threshold=threshold,
