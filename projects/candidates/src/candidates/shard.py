@@ -21,11 +21,9 @@ def _read_marker(path: Path) -> dict | None:
         return None
 
 
-def _write_marker(path: Path, payload: dict) -> None:
-    temporary = path.with_name(f"{path.name}.tmp")
-    with open(temporary, "w") as f:
+def _write_marker(output_path: Path, payload: dict) -> None:
+    with open(output_path, "w") as f:
         json.dump(payload, f)
-    os.replace(temporary, path)
 
 
 def _partition_marker_path(output_path: Path, input_folder: str) -> Path:

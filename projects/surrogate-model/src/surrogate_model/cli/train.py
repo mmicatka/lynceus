@@ -5,6 +5,7 @@ import json
 import os
 import sys
 import time
+from typing import Optional
 
 import click
 import joblib
@@ -67,8 +68,8 @@ def _prepare_dataset(
     features_path: str,
     labels_path: str,
     features: list[str],
-    percentile: float = None,
-    threshold: float = None,
+    threshold: Optional[float] = None,
+    percentile: Optional[float] = None,
 ) -> tuple:
     raw_features = pl.read_parquet(features_path)
     raw_labels = pl.read_parquet(labels_path)
