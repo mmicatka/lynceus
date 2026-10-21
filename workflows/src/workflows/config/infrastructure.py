@@ -32,6 +32,7 @@ class TemplateName(StrEnum):
     RESOLVE_BINDING_SITES = "resolve_binding_sites"
     SURROGATE_SAMPLE = "surrogate_sample"
     RUN_DOCKING = "run_docking"
+    SURROGATE_TRAIN = "surrogate_train"
 
 
 class CandidatePrefixes(StrictModel):

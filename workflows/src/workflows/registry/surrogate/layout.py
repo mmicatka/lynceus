@@ -3,12 +3,13 @@
 import os
 from dataclasses import dataclass
 
-DOCKING_INPUT_FILENAME = "docking_input.parquet"
-DOCKING_RESULTS_FILENAME = "docking.parquet"
+FEATURES_FILENAME = "features.parquet"
+DOCKING_RESULTS_FILENAME = "docking_results.parquet"
 STAGING_DIRNAME = "staging"
 VALIDATION_LABEL = "validation"
 SITE_PARAMETERS = ("ensemble", "site_id", "member_id", "center")
 SURROGATE_ENSEMBLES_DIRNAME = "ensembles"
+MODEL_FILENAME = "model.joblib"
 
 
 def ref(name: str) -> str:
@@ -42,13 +43,28 @@ class SiteLayout:
     def staging_prefix(self, label: str) -> str:
         return f"{self.label_prefix(label)}/{STAGING_DIRNAME}"
 
-    def docking_input_file(self, label: str) -> str:
-        return f"{self.label_prefix(label)}/{DOCKING_INPUT_FILENAME}"
+    def features_file(self, label: str) -> str:
+        return f"{self.label_prefix(label)}/{FEATURES_FILENAME}"
 
+    def features_path(self, label: str) -> str:
+        return os.path.join(self.base_path, self.features_file(label))
+
+    # This is the same as the features
     def docking_input_path(self, label: str) -> str:
-        return os.path.join(self.base_path, self.docking_input_file(label))
+        return self.features_path(label)
+
+    def docking_results_file(self, label: str) -> str:
+        return f"{self.label_prefix(label)}/{DOCKING_RESULTS_FILENAME}"
 
     def docking_results_path(self, label: str) -> str:
-        return os.path.join(
-            self.base_path, self.label_prefix(label), DOCKING_RESULTS_FILENAME
-        )
+        return os.path.join(self.base_path, self.docking_results_file(label))
+
+    # This is the same as the docking results
+    def labels_path(self, label: str) -> str:
+        return self.docking_results_path(label)
+
+    def model_file(self, label: str) -> str:
+        return f"{self.label_prefix(label)}/{MODEL_FILENAME}"
+
+    def model_path(self, label: str) -> str:
+        return os.path.join(self.base_path, self.model_file(label))

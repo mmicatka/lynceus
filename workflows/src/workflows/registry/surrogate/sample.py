@@ -68,7 +68,7 @@ def _merge_samples_task(
         arguments={
             "base_path": layout.base_path,
             "input_path": layout.staging_prefix(spec.label),
-            "output_path": layout.docking_input_file(spec.label),
+            "output_path": layout.features_file(spec.label),
         },
     )
 
