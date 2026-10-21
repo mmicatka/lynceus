@@ -13,7 +13,7 @@ storage:
       pdbs: target/pdbs
       ensembles: target/ensembles
     surrogate:
-      ensembles: surrogate/ensembles
+      root: surrogate
 
 candidates:
   max_batch_gib: 20
@@ -82,10 +82,10 @@ templates:
       image: registry.nebula.lan:5000/lynceus/lynceus-dock:0.1.0
     resources:
       requests:
-        cpu: "8"
+        cpu: "4"
         memory: 8Gi
       limits:
-        cpu: "8"
+        cpu: "4"
         memory: 8Gi
       gpu: 1
     env:

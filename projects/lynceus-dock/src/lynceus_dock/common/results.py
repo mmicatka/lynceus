@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 from collections.abc import Iterable, Iterator
 from pathlib import Path
 
@@ -133,7 +132,6 @@ def write_results(
 ) -> int:
     local_path = Path(out_path)
     local_path.parent.mkdir(parents=True, exist_ok=True)
-    tmp_path = local_path.with_suffix(local_path.suffix + ".tmp")
 
     batches = iter_docking_result_batches(
         results_iter,
@@ -142,13 +140,8 @@ def write_results(
         batch_rows=batch_rows,
     )
 
-    try:
-        row_count = _write_result_batches(
-            batches, tmp_path, _output_schema(drop_pose_column)
-        )
-    except BaseException:
-        tmp_path.unlink(missing_ok=True)
-        raise
+    row_count = _write_result_batches(
+        batches, local_path, _output_schema(drop_pose_column)
+    )
 
-    os.replace(tmp_path, local_path)
     return row_count

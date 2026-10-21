@@ -88,7 +88,7 @@ spec:
       - name: default_altloc
         default: A
       - name: allow_bad_residues
-        default: 'false'
+        default: 'true'
     nodeSelector:
       nvidia.com/gpu.present: 'true'
     retryStrategy:
@@ -157,11 +157,11 @@ spec:
         mountPath: /mnt/lynceus
       resources:
         limits:
-          cpu: '8'
+          cpu: '4'
           memory: 8Gi
           nvidia.com/gpu: '1'
         requests:
-          cpu: '8'
+          cpu: '4'
           memory: 8Gi
           nvidia.com/gpu: '1'
   - name: surrogate-sample
@@ -295,9 +295,9 @@ spec:
           - name: conformers_input_prefix
             value: candidates/conformers
           - name: output_prefix
-            value: surrogate/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/staging
+            value: surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/staging
           - name: num_samples
-            value: '3125'
+            value: '625'
           - name: seed
             value: '1000'
       - name: merge-samples
@@ -308,9 +308,9 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: input_path
-            value: surrogate/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/staging
+            value: surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/staging
           - name: output_path
-            value: surrogate/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/docking_input.parquet
+            value: surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/docking_input.parquet
     inputs:
       parameters:
       - name: ensemble
@@ -341,9 +341,9 @@ spec:
           - name: conformers_input_prefix
             value: candidates/conformers
           - name: output_prefix
-            value: surrogate/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/staging
+            value: surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/staging
           - name: num_samples
-            value: '1250'
+            value: '625'
           - name: seed
             value: '1001'
       - name: merge-samples
@@ -354,55 +354,9 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: input_path
-            value: surrogate/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/staging
+            value: surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/staging
           - name: output_path
-            value: surrogate/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/docking_input.parquet
-    inputs:
-      parameters:
-      - name: ensemble
-      - name: site_id
-  - name: surrogate-sample-round-1-dag
-    parallelism: 3
-    dag:
-      tasks:
-      - name: sample-shards
-        template: surrogate-sample
-        withItems:
-        - 0
-        - 1
-        - 2
-        - 3
-        - 4
-        - 5
-        - 6
-        - 7
-        arguments:
-          parameters:
-          - name: base_path
-            value: /mnt/lynceus
-          - name: source
-            value: shard_{{item}}.parquet
-          - name: features_input_prefix
-            value: candidates/features
-          - name: conformers_input_prefix
-            value: candidates/conformers
-          - name: output_prefix
-            value: surrogate/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/staging
-          - name: num_samples
-            value: '625'
-          - name: seed
-            value: '1002'
-      - name: merge-samples
-        depends: sample-shards
-        template: merge-shards
-        arguments:
-          parameters:
-          - name: base_path
-            value: /mnt/lynceus
-          - name: input_path
-            value: surrogate/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/staging
-          - name: output_path
-            value: surrogate/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/docking_input.parquet
+            value: surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/docking_input.parquet
     inputs:
       parameters:
       - name: ensemble
@@ -428,13 +382,13 @@ spec:
           - name: member_id
             value: '{{inputs.parameters.member_id}}'
           - name: ligands_path
-            value: /mnt/lynceus/surrogate/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/docking_input.parquet
+            value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/docking_input.parquet
           - name: center
             value: '{{inputs.parameters.center}}'
           - name: site_id
             value: '{{inputs.parameters.site_id}}'
           - name: out_parquet
-            value: /mnt/lynceus/surrogate/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/docking.parquet
+            value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/docking.parquet
       - name: sample-round-0
         template: surrogate-sample-round-0-dag
         arguments:
@@ -453,38 +407,13 @@ spec:
           - name: member_id
             value: '{{inputs.parameters.member_id}}'
           - name: ligands_path
-            value: /mnt/lynceus/surrogate/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/docking_input.parquet
+            value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/docking_input.parquet
           - name: center
             value: '{{inputs.parameters.center}}'
           - name: site_id
             value: '{{inputs.parameters.site_id}}'
           - name: out_parquet
-            value: /mnt/lynceus/surrogate/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/docking.parquet
-      - name: sample-round-1
-        template: surrogate-sample-round-1-dag
-        arguments:
-          parameters:
-          - name: ensemble
-            value: '{{inputs.parameters.ensemble}}'
-          - name: site_id
-            value: '{{inputs.parameters.site_id}}'
-      - name: dock-round-1
-        depends: sample-round-1
-        template: run-docking
-        arguments:
-          parameters:
-          - name: ensemble
-            value: /mnt/lynceus/target/ensembles/{{inputs.parameters.ensemble}}
-          - name: member_id
-            value: '{{inputs.parameters.member_id}}'
-          - name: ligands_path
-            value: /mnt/lynceus/surrogate/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/docking_input.parquet
-          - name: center
-            value: '{{inputs.parameters.center}}'
-          - name: site_id
-            value: '{{inputs.parameters.site_id}}'
-          - name: out_parquet
-            value: /mnt/lynceus/surrogate/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/docking.parquet
+            value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/docking.parquet
     inputs:
       parameters:
       - name: ensemble

@@ -50,7 +50,7 @@ class TargetPrefixes(StrictModel):
 
 
 class SurrogatePrefixes(StrictModel):
-    ensembles: StoragePrefix
+    root: StoragePrefix
 
 
 class StoragePrefixes(StrictModel):

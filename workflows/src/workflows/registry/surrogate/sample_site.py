@@ -49,9 +49,11 @@ def build_surrogate_site_dag(
 ) -> DAG:
     layout = SiteLayout(
         base_path=infra_config.volume.mount_path,
-        surrogate_prefix=infra_config.storage.prefixes.surrogate.ensembles,
+        surrogate_prefix=infra_config.storage.prefixes.surrogate.root,
         target_prefix=infra_config.storage.prefixes.target.ensembles,
+        screen_name=screen_config.name,
     )
+
     specs = _sample_specs(screen_config.filter.surrogate)
 
     dock = templates.build(TemplateName.RUN_DOCKING, run_docking_template)

@@ -57,9 +57,9 @@ filter:
       - usrcat
       - whim
     seed: 1000
-    validation: 25000
+    validation: 5000
     rounds:
       - active: 0
-        uniform: 10000
-      - active: 5000
         uniform: 5000
+      # - active: 2500
+      #   uniform: 2500

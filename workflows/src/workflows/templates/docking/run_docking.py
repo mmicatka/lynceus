@@ -15,7 +15,7 @@ def run_docking_template(
     out_dir: str | None = None,
     parquet_batch_rows: int = 10000,
     default_altloc: str = "A",
-    allow_bad_residues: bool = False,
+    allow_bad_residues: bool = True,
 ):
     import subprocess
 
