@@ -443,7 +443,7 @@ spec:
           - name: output_prefix
             value: surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/staging
           - name: num_samples
-            value: '125'
+            value: '1250'
           - name: seed
             value: '1000'
       - name: merge-samples
@@ -489,7 +489,7 @@ spec:
           - name: output_prefix
             value: surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/staging
           - name: num_samples
-            value: '125'
+            value: '1250'
           - name: seed
             value: '1001'
       - name: merge-samples
@@ -537,9 +537,9 @@ spec:
           - name: model_path
             value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/model.joblib
           - name: num_top
-            value: '62'
+            value: '625'
           - name: num_random
-            value: '62'
+            value: '625'
           - name: seed
             value: '1002'
       - name: merge-samples
@@ -587,9 +587,9 @@ spec:
           - name: model_path
             value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/model.joblib
           - name: num_top
-            value: '62'
+            value: '625'
           - name: num_random
-            value: '62'
+            value: '625'
           - name: seed
             value: '1003'
       - name: merge-samples

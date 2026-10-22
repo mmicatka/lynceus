@@ -11,7 +11,6 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 PARQUET_PATTERN = "*.parquet"
-MARKER_SUFFIX = ".success"
 CONFORMER_COLUMN = "conformer"
 COMPRESSION = "zstd"
 DEFAULT_BATCH_SIZE = 50_000
