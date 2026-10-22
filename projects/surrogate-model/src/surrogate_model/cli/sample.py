@@ -7,19 +7,20 @@ import click
 import numpy as np
 import pyarrow.parquet as pq
 from lynceus_core.logging import get_lynceus_logger, wide_log
+from lynceus_core.manifest.common import Manifest
 
 from surrogate_model.common.io import (
     aligned_chunks,
     count_rows,
-    manifest_valid,
     resolve_parquet_files,
     select_aligned,
     verify_written,
     write_manifest,
 )
 
+DEFAULT_RANDOM_SEED = 1000
+
 PARQUET_PATTERN = "*.parquet"
-MARKER_SUFFIX = ".success"
 CONFORMER_COLUMN = "conformer"
 COMPRESSION = "zstd"
 DEFAULT_BATCH_SIZE = 50_000
@@ -113,7 +114,7 @@ def _write_sample(
 @click.option(
     "--seed",
     "seed",
-    default=None,
+    default=DEFAULT_RANDOM_SEED,
     type=int,
     help="Seed for reproducible sampling.",
 )
@@ -125,7 +126,7 @@ def sample_candidates(
     num_samples: int,
     id_column: str,
     batch_size: int,
-    seed: int | None,
+    seed: int,
 ) -> None:
     click.echo(
         f"Processing aligned samples from {features_input} and {conformers_input}..."
@@ -143,15 +144,29 @@ def sample_candidates(
         "seed": seed,
     }
 
+    target_manifest = Manifest(data=manifest)
+
     manifest_path = f"{output_path}.manifest.json"
 
-    if manifest_valid(manifest_path, manifest):
-        logger.info(
-            "Sample already valid, skipping generation",
-            manifest_path=manifest_path,
-        )
-        click.echo("Done!")
-        return
+    disk_manifest = Manifest(filepath=manifest_path)
+
+    if disk_manifest.exists():
+        try:
+            disk_manifest.load()
+            if target_manifest <= disk_manifest:
+                logger.info(
+                    "Sample already valid, skipping generation",
+                    features_files=features_files,
+                    conformers_files=conformers_files,
+                    num_samples=num_samples,
+                    seed=seed,
+                )
+                click.echo("Done!")
+                return
+        except Exception as e:
+            logger.warning(
+                "Failed to load existing manifest, re-generating.", error=str(e)
+            )
 
     total_rows = count_rows(features_files)
     conformer_rows = count_rows(conformers_files)

@@ -1,35 +1,18 @@
 # projects/candidates/src/candidates/sample.py
 
-import json
 import os
 
 import click
 import duckdb
 from lynceus_core.cli import NumWorkers
 from lynceus_core.logging import get_lynceus_logger, wide_log
+from lynceus_core.manifest.common import Manifest
 
 logger = get_lynceus_logger()
 
 
 def _sql_literal(value: str) -> str:
     return "'" + value.replace("'", "''") + "'"
-
-
-def _marker_path(output_path: str) -> str:
-    return f"{output_path}.success"
-
-
-def _sample_is_valid(output_path: str, num_samples: int) -> bool:
-    marker_path = _marker_path(output_path)
-    if not (os.path.exists(output_path) and os.path.exists(marker_path)):
-        return False
-    with open(marker_path, "r") as f:
-        return json.load(f).get("num_samples") == num_samples
-
-
-def _write_success_marker(output_path: str, num_samples: int) -> None:
-    with open(_marker_path(output_path), "w") as f:
-        json.dump({"num_samples": num_samples}, f)
 
 
 def _ensure_parent_dir(path: str) -> None:
@@ -66,24 +49,51 @@ def _ensure_parent_dir(path: str) -> None:
     show_default=True,
     help="Number of parallel workers (integer >= 1 or 'auto').",
 )
+@click.option(
+    "--seed",
+    "seed",
+    default=42,
+    type=int,
+    show_default=True,
+    help="Random seed for repeatable reservoir sampling.",
+)
 @wide_log(logger)
 def sample_candidates(
     input_path: str,
     output_path: str,
     num_samples: int,
     num_workers: int,
+    seed: int,
 ) -> None:
     click.echo(f"Processing {input_path}...")
 
-    if _sample_is_valid(output_path, num_samples):
-        logger.info(
-            "Sample already valid, skipping generation",
-            source=input_path,
-            num_samples=num_samples,
-            output_path=output_path,
-        )
-        click.echo("Done!")
-        return
+    manifest_path = f"{output_path}.manifest"
+    disk_manifest = Manifest(filepath=manifest_path)
+
+    expected_state = {
+        "num_samples": num_samples,
+        "seed": seed,
+        "input_path": os.path.abspath(input_path),
+    }
+    target_manifest = Manifest(data=expected_state)
+
+    if disk_manifest.exists():
+        try:
+            disk_manifest.load()
+            if target_manifest <= disk_manifest:
+                logger.info(
+                    "Sample already valid, skipping generation",
+                    source=input_path,
+                    num_samples=num_samples,
+                    seed=seed,
+                    output_path=output_path,
+                )
+                click.echo("Done!")
+                return
+        except Exception as e:
+            logger.warning(
+                "Failed to load existing manifest, re-generating.", error=str(e)
+            )
 
     conn = duckdb.connect()
     conn.execute("SET threads = ?", [num_workers])
@@ -92,6 +102,7 @@ def sample_candidates(
         "Executing reservoir sampling",
         source=input_path,
         num_samples=num_samples,
+        seed=seed,
         output_path=output_path,
         workers=num_workers,
     )
@@ -103,19 +114,21 @@ def sample_candidates(
         COPY (
             SELECT *
             FROM read_parquet({_sql_literal(input_path)})
-            USING SAMPLE reservoir({num_samples} ROWS)
+            USING SAMPLE reservoir({num_samples} ROWS) REPEATABLE ({seed})
         )
         TO {_sql_literal(output_path)}
         (FORMAT parquet, COMPRESSION zstd)
         """
     )
 
-    _write_success_marker(output_path, num_samples)
+    disk_manifest.data = expected_state
+    disk_manifest.save()
 
     logger.info(
         "Finished reservoir sampling",
         source=input_path,
         num_samples=num_samples,
+        seed=seed,
         output_path=output_path,
     )
 
