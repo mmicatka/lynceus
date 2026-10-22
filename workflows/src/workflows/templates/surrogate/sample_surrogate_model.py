@@ -42,8 +42,8 @@ def surrogate_sample_by_prediction_template(
     num_random: int,
     id_column: str = "id",
     batch_size: int = 50000,
-    seed: int = None,
-    features: list = None,
+    seed: int | None = None,
+    features: list[str] | None = None,
 ):
     import os
     import subprocess

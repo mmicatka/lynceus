@@ -25,9 +25,13 @@ def write_manifest(manifest_path: str, manifest: dict) -> None:
 def manifest_valid(manifest_path: str, manifest: dict) -> bool:
     try:
         with open(manifest_path, "r") as f:
-            return json.load(f) == manifest
+            saved = json.load(f)
     except FileNotFoundError, json.JSONDecodeError:
         return False
+
+    return isinstance(saved, dict) and all(
+        key in saved and saved[key] == value for key, value in manifest.items()
+    )
 
 
 def resolve_parquet_files(pattern: str) -> list[str]:

@@ -139,7 +139,7 @@ def _select_random(
     "num_random",
     required=True,
     type=click.IntRange(min=0),
-    help="Number of uniformly sampled rows to add from the remaining rows.",
+    help="Number of randomly sampled rows to add from the remaining rows.",
 )
 @click.option("--id-column", "id_column", default="id", show_default=True, type=str)
 @click.option(

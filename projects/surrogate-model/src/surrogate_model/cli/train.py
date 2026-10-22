@@ -1,7 +1,5 @@
 # projects/surrogate-model/src/surrogate_model/cli/train.py
 
-
-import json
 import os
 import sys
 import time
@@ -25,6 +23,7 @@ from surrogate_model.common.data import (
     flatten_features,
     load_and_clean_data,
 )
+from surrogate_model.common.io import manifest_valid, write_manifest
 from surrogate_model.common.metrics import evaluation_metrics, predict_active
 
 
@@ -49,56 +48,43 @@ logger = structlog.get_logger()
 RANDOM_SEED = 1000
 
 
-def _marker_path(output_path: str) -> str:
-    base_path = output_path.removesuffix(".joblib")
-    return f"{base_path}.results.json"
+def _manifest_path(model_path: str) -> str:
+    return f"{model_path}.manifest.json"
 
 
-def _model_is_valid(
-    output_path: str, active_percentile: Optional[float], threshold: Optional[float]
-) -> bool:
-    marker_path = _marker_path(output_path)
-    if not os.path.exists(marker_path):
-        return False
-    with open(marker_path, "r") as f:
-        data = json.load(f)
-        # Validate against whichever parameter the user provided
-        if active_percentile is not None:
-            return data.get("active_percentile") == active_percentile
-        if threshold is not None:
-            return data.get("threshold") == threshold
-        return False
+def _metrics_path(model_path: str) -> str:
+    return f"{model_path}.metrics.json"
 
 
-def _write_manifest(
-    output_path: str,
+def _count_rows(path: str) -> int:
+    return pl.scan_parquet(path).select(pl.len()).collect().item()
+
+
+def _build_manifest(
+    train_features_path: str,
+    train_labels_path: str,
+    validation_features_path: str,
+    validation_labels_path: str,
+    features: list[str],
     active_percentile: Optional[float],
     threshold: Optional[float],
-    train_features: str,
-    train_labels: str,
-    validation_features: str,
-    validation_labels: str,
-    metrics: list[dict],
-) -> None:
-    os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
-    with open(_marker_path(output_path), "w") as f:
-        json.dump(
-            {
-                "active_percentile": active_percentile,
-                "threshold": threshold,
-                "train_files": {
-                    "features": train_features,
-                    "labels": train_labels,
-                },
-                "validation_files": {
-                    "features": validation_features,
-                    "labels": validation_labels,
-                },
-                "metrics": metrics,
-            },
-            f,
-            indent=2,
-        )
+) -> dict:
+    return {
+        "train_files": {
+            "features": train_features_path,
+            "labels": train_labels_path,
+        },
+        "validation_files": {
+            "features": validation_features_path,
+            "labels": validation_labels_path,
+        },
+        "features": list(features),
+        "active_percentile": active_percentile,
+        "threshold": threshold,
+        "num_samples": _count_rows(train_features_path),
+        "num_validation_samples": _count_rows(validation_features_path),
+        "seed": RANDOM_SEED,
+    }
 
 
 def _prepare_dataset(
@@ -116,7 +102,6 @@ def _prepare_dataset(
     x = flatten_features(df_cleaned, features)
     y_raw = df_cleaned["affinity_kcal_mol"]
 
-    # "top" % (most negative == strongest binder) or use provided threshold
     y_label, computed_threshold = compute_label(
         y_raw, percentile=percentile, threshold=threshold
     )
@@ -194,14 +179,21 @@ def train_model(
 
     click.echo(f"Training surrogate model using features from {train_features_path}...")
 
-    if _model_is_valid(
-        model_path, active_percentile=active_percentile, threshold=threshold
-    ):
+    manifest = _build_manifest(
+        train_features_path=train_features_path,
+        train_labels_path=train_labels_path,
+        validation_features_path=validation_features_path,
+        validation_labels_path=validation_labels_path,
+        features=features,
+        active_percentile=active_percentile,
+        threshold=threshold,
+    )
+    manifest_path = _manifest_path(model_path)
+
+    if manifest_valid(manifest_path, manifest):
         logger.info(
             "Model already valid, skipping training",
-            model_path=model_path,
-            active_percentile=active_percentile,
-            threshold=threshold,
+            manifest_path=manifest_path,
         )
         click.echo("Done!")
         return
@@ -212,6 +204,7 @@ def train_model(
         train_labels_path=train_labels_path,
         validation_features_path=validation_features_path,
         validation_labels_path=validation_labels_path,
+        num_samples=manifest["num_samples"],
     )
 
     x_initial, y_initial_label, dataset_threshold = _prepare_dataset(
@@ -221,8 +214,6 @@ def train_model(
         percentile=active_percentile,
         threshold=threshold,
     )
-
-    threshold = dataset_threshold
 
     x_initial_train, x_initial_test, y_initial_train, y_initial_test = train_test_split(
         x_initial, y_initial_label, train_size=0.8, random_state=RANDOM_SEED
@@ -256,7 +247,7 @@ def train_model(
         validation_features_path,
         validation_labels_path,
         features,
-        threshold=threshold,
+        threshold=dataset_threshold,
     )
 
     val_metrics_df = _evaluate_and_log(
@@ -271,15 +262,14 @@ def train_model(
 
     _save_model(model, model_path)
 
-    _write_manifest(
-        output_path=model_path,
-        active_percentile=active_percentile,
-        threshold=threshold,
-        train_features=train_features_path,
-        train_labels=train_labels_path,
-        validation_features=validation_features_path,
-        validation_labels=validation_labels_path,
-        metrics=metrics_list,
+    write_manifest(
+        manifest_path,
+        {
+            **manifest,
+            "dataset_threshold": dataset_threshold,
+            "num_train_samples": len(x_initial_train),
+            "metrics": metrics_list,
+        },
     )
 
     click.echo("Done!")

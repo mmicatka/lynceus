@@ -67,5 +67,3 @@ filter:
         random: 500
       - top: 500
         random: 500
-      - top: 500
-        random: 500
