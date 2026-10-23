@@ -1,6 +1,8 @@
 # projects/surrogate-model/src/surrogate_model/cli/sample.py
 
+import datetime
 import os
+import time
 from pathlib import Path
 
 import click
@@ -15,7 +17,6 @@ from surrogate_model.common.io import (
     resolve_parquet_files,
     select_aligned,
     verify_written,
-    write_manifest,
 )
 
 DEFAULT_RANDOM_SEED = 1000
@@ -140,14 +141,13 @@ def sample_candidates(
     manifest = {
         "features_files": features_files,
         "conformers_files": conformers_files,
+        "output_path": output_path,
         "num_samples": num_samples,
         "seed": seed,
     }
 
-    target_manifest = Manifest(data=manifest)
-
-    manifest_path = f"{output_path}.manifest.json"
-
+    manifest_path = f"{identifier}.manifest.json"
+    target_manifest = Manifest(data=manifest, filepath=manifest_path)
     disk_manifest = Manifest(filepath=manifest_path)
 
     if disk_manifest.exists():
@@ -195,6 +195,8 @@ def sample_candidates(
 
     os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
 
+    start_time = time.perf_counter()
+
     positions = _select_positions(total_rows, effective_samples, seed)
 
     _write_sample(
@@ -207,12 +209,16 @@ def sample_candidates(
     )
 
     verify_written(output_path, num_samples)
-    write_manifest(manifest_path, manifest)
+
+    elapsed_time = time.perf_counter() - start_time
+    target_manifest.data["run_time"] = str(datetime.timedelta(seconds=elapsed_time))
+    target_manifest.save()
 
     logger.info(
         "Finished aligned position sampling",
         identifier=identifier,
         num_samples=effective_samples,
         output_path=output_path,
+        elapsed_time=elapsed_time,
     )
     click.echo("Done!")

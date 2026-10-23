@@ -2,6 +2,7 @@
 
 import os
 import time
+from pathlib import Path
 
 import click
 import joblib
@@ -164,7 +165,8 @@ def train_model(
         features=features,
         threshold=threshold,
     )
-    manifest_path = f"{model_path}.manifest.json"
+
+    manifest_path = f"{Path(model_path).stem}.manifest.json"
 
     target_manifest = Manifest(data=manifest_data, filepath=manifest_path)
     disk_manifest = Manifest(filepath=manifest_path)

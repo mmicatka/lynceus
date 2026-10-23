@@ -2,7 +2,6 @@
 
 
 import glob
-import json
 import os
 from collections.abc import Iterable, Iterator
 
@@ -14,23 +13,6 @@ PARQUET_PATTERN = "*.parquet"
 CONFORMER_COLUMN = "conformer"
 COMPRESSION = "zstd"
 DEFAULT_BATCH_SIZE = 50_000
-
-
-def write_manifest(manifest_path: str, manifest: dict) -> None:
-    with open(manifest_path, "w") as f:
-        json.dump(manifest, f)
-
-
-def manifest_valid(manifest_path: str, manifest: dict) -> bool:
-    try:
-        with open(manifest_path, "r") as f:
-            saved = json.load(f)
-    except FileNotFoundError, json.JSONDecodeError:
-        return False
-
-    return isinstance(saved, dict) and all(
-        key in saved and saved[key] == value for key, value in manifest.items()
-    )
 
 
 def resolve_parquet_files(pattern: str) -> list[str]:

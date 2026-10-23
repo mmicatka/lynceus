@@ -1,6 +1,7 @@
 # projects/surrogate-model/src/surrogate_model/cli/sample_by_prediction.py
 
 
+import time
 from pathlib import Path
 
 import click
@@ -10,18 +11,17 @@ import polars as pl
 import pyarrow as pa
 import pyarrow.parquet as pq
 from lynceus_core.logging import get_lynceus_logger, wide_log
+from lynceus_core.manifest.common import Manifest
 
 from surrogate_model.common.cli import features_option
 from surrogate_model.common.data import flatten_features
 from surrogate_model.common.io import (
     DEFAULT_BATCH_SIZE,
     count_rows,
-    manifest_valid,
     resolve_parquet_files,
     stream_tables,
     verify_written,
     write_aligned_selection,
-    write_manifest,
 )
 from surrogate_model.common.metrics import predict_active
 from surrogate_model.common.model import ProbabilisticClassifier
@@ -182,15 +182,24 @@ def sample_candidates_by_prediction(
         "seed": seed,
     }
 
-    manifest_path = f"{output_path}.manifest.json"
+    manifest_path = f"{identifier}.manifest.json"
+    target_manifest = Manifest(data=manifest, filepath=manifest_path)
+    disk_manifest = Manifest(filepath=manifest_path)
 
-    if manifest_valid(manifest_path, manifest):
-        logger.info(
-            "Sample already valid, skipping generation",
-            manifest_path=manifest_path,
-        )
-        click.echo("Done!")
-        return
+    if disk_manifest.exists():
+        try:
+            disk_manifest.load()
+            if target_manifest <= disk_manifest:
+                logger.info(
+                    "Valid manifest found.",
+                    manifest=disk_manifest,
+                )
+                click.echo("Done!")
+                return
+        except Exception as e:
+            logger.warning(
+                "Failed to load existing manifest, re-generating.", error=str(e)
+            )
 
     total_rows = count_rows(features_files)
     conformer_rows = count_rows(conformers_files)
@@ -198,6 +207,8 @@ def sample_candidates_by_prediction(
         raise RuntimeError(
             f"Row count mismatch: {total_rows} features vs {conformer_rows} conformers"
         )
+
+    start_time = time.perf_counter()
 
     model = _load_model(model_path)
     valid_cols = _valid_columns(features_files[0])
@@ -255,7 +266,10 @@ def sample_candidates_by_prediction(
         batch_size=batch_size,
     )
     verify_written(output_path, len(positions))
-    write_manifest(manifest_path, manifest)
+
+    elapsed_time = time.perf_counter() - start_time
+    target_manifest.data["run_time"] = str(datetime.timedelta(seconds=elapsed_time))
+    target_manifest.save()
 
     logger.info(
         "Finished prediction-based sampling",

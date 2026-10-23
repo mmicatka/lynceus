@@ -22,7 +22,6 @@ dependencies = [
 ]
 
 [project.scripts]
-surrogate-prepare-validation = "surrogate_model:prepare_validation"
 surrogate-sample = "surrogate_model:sample_candidates"
 surrogate-train = "surrogate_model:train_model"
 surrogate-sample-by-prediction = "surrogate_model:sample_candidates_by_prediction"
