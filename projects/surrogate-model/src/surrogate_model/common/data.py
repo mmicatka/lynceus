@@ -37,12 +37,10 @@ def flatten_features(df: pl.DataFrame, feature_cols=None) -> np.ndarray:
     return np.hstack(feature_arrays)
 
 
-def compute_labels(
-    raw: pl.Series | np.ndarray, threshold: float
-) -> tuple[np.ndarray, float]:
+def compute_labels(raw: pl.Series | np.ndarray, threshold: float) -> np.ndarray:
     if isinstance(raw, pl.Series):
         raw = raw.to_numpy()
 
     labels = (raw <= threshold).astype(int)
 
-    return labels, threshold
+    return labels

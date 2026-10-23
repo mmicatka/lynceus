@@ -8,6 +8,7 @@ import joblib
 import lightgbm as lgb
 import polars as pl
 from lynceus_core.logging import get_lynceus_logger, wide_log
+from lynceus_core.manifest.common import Manifest
 from sklearn.model_selection import train_test_split
 
 from surrogate_model.common.cli import (
@@ -18,16 +19,11 @@ from surrogate_model.common.data import (
     flatten_features,
     load_and_clean_data,
 )
-from surrogate_model.common.io import manifest_valid, write_manifest
 from surrogate_model.common.metrics import evaluation_metrics, predict_active
 
 RANDOM_SEED = 1000
 
 logger = get_lynceus_logger()
-
-
-def _manifest_path(model_path: str) -> str:
-    return f"{model_path}.manifest.json"
 
 
 def _count_rows(path: str) -> int:
@@ -92,6 +88,18 @@ def _save_model(model, path: str):
     logger.info("Model saved successfully", path=path)
 
 
+def _get_validation_threshold(validation_path: str) -> float:
+    validation_manifest_path = f"{validation_path}.manifest.json"
+
+    validation_manifest = Manifest(filepath=validation_manifest_path)
+
+    try:
+        validation_manifest.load()
+        return float(validation_manifest.data.threshold)
+    except Exception as e:
+        logger.warning("Failed to load existing manifest, re-generating.", error=str(e))
+
+
 @click.command()
 @click.option(
     "--train-features",
@@ -143,11 +151,12 @@ def train_model(
     validation_labels_path: str,
     features: list[str],
     model_path: str,
-    threshold: float,
 ):
     click.echo(f"Training surrogate model using features from {train_features_path}...")
 
-    manifest = _build_manifest(
+    threshold = _get_validation_threshold(validation_labels_path)
+
+    manifest_data = _build_manifest(
         train_features_path=train_features_path,
         train_labels_path=train_labels_path,
         validation_features_path=validation_features_path,
@@ -155,23 +164,29 @@ def train_model(
         features=features,
         threshold=threshold,
     )
-    manifest_path = _manifest_path(model_path)
+    manifest_path = f"{model_path}.manifest.json"
 
-    if manifest_valid(manifest_path, manifest):
-        logger.info(
-            "Model already valid, skipping training",
-            manifest_path=manifest_path,
-        )
-        click.echo("Done!")
-        return
+    target_manifest = Manifest(data=manifest_data, filepath=manifest_path)
+    disk_manifest = Manifest(filepath=manifest_path)
+
+    if disk_manifest.exists():
+        try:
+            disk_manifest.load()
+            if target_manifest <= disk_manifest:
+                logger.info(
+                    "Validation already valid, skipping generation",
+                    manifest=disk_manifest,
+                )
+                click.echo("Done!")
+                return
+        except Exception as e:
+            logger.warning(
+                "Failed to load existing manifest, re-generating.", error=str(e)
+            )
 
     logger.info(
         "Training surrogate model",
-        train_features_path=train_features_path,
-        train_labels_path=train_labels_path,
-        validation_features_path=validation_features_path,
-        validation_labels_path=validation_labels_path,
-        num_samples=manifest["num_samples"],
+        manifest=manifest_data,
     )
 
     x_initial, y_initial_label = _prepare_dataset(
@@ -228,14 +243,12 @@ def train_model(
 
     _save_model(model, model_path)
 
-    write_manifest(
-        manifest_path,
-        {
-            **manifest,
-            "threshold": threshold,
-            "num_train_samples": len(x_initial_train),
-            "metrics": metrics_list,
-        },
-    )
+    target_manifest.data = {
+        **manifest_data,
+        "num_train_samples": len(x_initial_train),
+        "metrics": metrics_list,
+    }
+
+    target_manifest.save()
 
     click.echo("Done!")
