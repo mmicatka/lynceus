@@ -210,22 +210,15 @@ spec:
         requests:
           cpu: '8'
           memory: 8Gi
-  - name: surrogate-train
+  - name: surrogate-prepare-validation
     volumes:
     - name: lynceus
       persistentVolumeClaim:
         claimName: lynceus-pvc
     inputs:
       parameters:
-      - name: train_features
-      - name: train_labels
-      - name: validation_features
-      - name: validation_labels
-      - name: model_path
-      - name: features
-        default: 'null'
+      - name: validation_path
       - name: active_percentile
-        default: '1.0'
     retryStrategy:
       limit: 5
       backoff:
@@ -242,10 +235,59 @@ spec:
         import json
         try: active_percentile = json.loads(r'''{{inputs.parameters.active_percentile}}''')
         except: active_percentile = r'''{{inputs.parameters.active_percentile}}'''
+        try: validation_path = json.loads(r'''{{inputs.parameters.validation_path}}''')
+        except: validation_path = r'''{{inputs.parameters.validation_path}}'''
+
+        import subprocess
+        cmd = ['surrogate-prepare-validation', '--validation-path', validation_path, '--active-percentile', str(active_percentile)]
+        subprocess.run(cmd, check=True)
+      command:
+      - python
+      volumeMounts:
+      - name: lynceus
+        mountPath: /mnt/lynceus
+      resources:
+        limits:
+          cpu: '2'
+          memory: 1Gi
+        requests:
+          cpu: '2'
+          memory: 1Gi
+  - name: surrogate-train
+    volumes:
+    - name: lynceus
+      persistentVolumeClaim:
+        claimName: lynceus-pvc
+    inputs:
+      parameters:
+      - name: train_features
+      - name: train_labels
+      - name: validation_features
+      - name: validation_labels
+      - name: model_path
+      - name: threshold
+      - name: features
+        default: 'null'
+    retryStrategy:
+      limit: 5
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 10m
+    script:
+      image: registry.nebula.lan:5000/lynceus/surrogate-model:0.1.0
+      imagePullPolicy: Always
+      source: |-
+        import os
+        import sys
+        sys.path.append(os.getcwd())
+        import json
         try: features = json.loads(r'''{{inputs.parameters.features}}''')
         except: features = r'''{{inputs.parameters.features}}'''
         try: model_path = json.loads(r'''{{inputs.parameters.model_path}}''')
         except: model_path = r'''{{inputs.parameters.model_path}}'''
+        try: threshold = json.loads(r'''{{inputs.parameters.threshold}}''')
+        except: threshold = r'''{{inputs.parameters.threshold}}'''
         try: train_features = json.loads(r'''{{inputs.parameters.train_features}}''')
         except: train_features = r'''{{inputs.parameters.train_features}}'''
         try: train_labels = json.loads(r'''{{inputs.parameters.train_labels}}''')
@@ -256,7 +298,7 @@ spec:
         except: validation_labels = r'''{{inputs.parameters.validation_labels}}'''
 
         import subprocess
-        cmd = ['surrogate-train', '--train-features', train_features, '--train-labels', train_labels, '--validation-features', validation_features, '--validation-labels', validation_labels, '--model-path', model_path, '--active-percentile', str(active_percentile)]
+        cmd = ['surrogate-train', '--train-features', train_features, '--train-labels', train_labels, '--validation-features', validation_features, '--validation-labels', validation_labels, '--model-path', model_path, '--threshold', str(threshold)]
         if features:
             for feature in features:
                 cmd.extend(['--features', feature])
@@ -635,6 +677,15 @@ spec:
             value: '{{inputs.parameters.site_id}}'
           - name: out_parquet
             value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/docking_results.parquet
+      - name: prepare-validation
+        depends: dock-validation
+        template: surrogate-prepare-validation
+        arguments:
+          parameters:
+          - name: validation_path
+            value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/docking_results.parquet
+          - name: active_percentile
+            value: '1.0'
       - name: sample-round-0
         depends: dock-validation
         template: surrogate-sample-round-0-dag
@@ -662,7 +713,7 @@ spec:
           - name: out_parquet
             value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/docking_results.parquet
       - name: train-round-0
-        depends: dock-round-0
+        depends: prepare-validation && dock-round-0
         template: surrogate-train
         arguments:
           parameters:
@@ -676,6 +727,8 @@ spec:
             value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/docking_results.parquet
           - name: model_path
             value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/model.joblib
+          - name: threshold
+            value: '{{tasks.prepare-validation.outputs.result}}'
       - name: sample-round-1
         depends: train-round-0
         template: surrogate-sample-round-1-dag
@@ -703,7 +756,7 @@ spec:
           - name: out_parquet
             value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/docking_results.parquet
       - name: train-round-1
-        depends: dock-round-1
+        depends: prepare-validation && dock-round-1
         template: surrogate-train
         arguments:
           parameters:
@@ -717,6 +770,8 @@ spec:
             value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/docking_results.parquet
           - name: model_path
             value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/model.joblib
+          - name: threshold
+            value: '{{tasks.prepare-validation.outputs.result}}'
       - name: sample-round-2
         depends: train-round-1
         template: surrogate-sample-round-2-dag
@@ -744,7 +799,7 @@ spec:
           - name: out_parquet
             value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/docking_results.parquet
       - name: train-round-2
-        depends: dock-round-2
+        depends: prepare-validation && dock-round-2
         template: surrogate-train
         arguments:
           parameters:
@@ -758,6 +813,8 @@ spec:
             value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/docking_results.parquet
           - name: model_path
             value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/model.joblib
+          - name: threshold
+            value: '{{tasks.prepare-validation.outputs.result}}'
     inputs:
       parameters:
       - name: ensemble

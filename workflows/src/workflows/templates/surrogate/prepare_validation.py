@@ -7,7 +7,7 @@ def surrogate_prepare_validation_template(
     import subprocess
 
     cmd = [
-        "surrogate-prepare-validation ",
+        "surrogate-prepare-validation",
         "--validation-path",
         validation_path,
         "--active-percentile",
