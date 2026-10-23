@@ -1,59 +1,33 @@
 # projects/surrogate-model/src/surrogate_model/cli/train.py
 
 import os
-import sys
 import time
-from typing import Optional
 
 import click
 import joblib
 import lightgbm as lgb
 import polars as pl
-import structlog
-from lynceus_core.logging import wide_log
+from lynceus_core.logging import get_lynceus_logger, wide_log
 from sklearn.model_selection import train_test_split
 
 from surrogate_model.common.cli import (
     features_option,
-    label_definition_options,
-    require_single_label_definition,
 )
 from surrogate_model.common.data import (
-    compute_label,
+    compute_labels,
     flatten_features,
     load_and_clean_data,
 )
 from surrogate_model.common.io import manifest_valid, write_manifest
 from surrogate_model.common.metrics import evaluation_metrics, predict_active
 
-
-def configure_logging():
-    if sys.stdout.isatty():
-        processor = structlog.dev.ConsoleRenderer(colors=True)
-    else:
-        processor = structlog.processors.JSONRenderer()
-
-    structlog.configure(
-        processors=[
-            structlog.processors.TimeStamper(fmt="iso"),
-            structlog.processors.add_log_level,
-            processor,
-        ]
-    )
-
-
-configure_logging()
-logger = structlog.get_logger()
-
 RANDOM_SEED = 1000
+
+logger = get_lynceus_logger()
 
 
 def _manifest_path(model_path: str) -> str:
     return f"{model_path}.manifest.json"
-
-
-def _metrics_path(model_path: str) -> str:
-    return f"{model_path}.metrics.json"
 
 
 def _count_rows(path: str) -> int:
@@ -66,8 +40,7 @@ def _build_manifest(
     validation_features_path: str,
     validation_labels_path: str,
     features: list[str],
-    active_percentile: Optional[float],
-    threshold: Optional[float],
+    threshold: float,
 ) -> dict:
     return {
         "train_files": {
@@ -79,7 +52,6 @@ def _build_manifest(
             "labels": validation_labels_path,
         },
         "features": list(features),
-        "active_percentile": active_percentile,
         "threshold": threshold,
         "num_samples": _count_rows(train_features_path),
         "num_validation_samples": _count_rows(validation_features_path),
@@ -88,11 +60,7 @@ def _build_manifest(
 
 
 def _prepare_dataset(
-    features_path: str,
-    labels_path: str,
-    features: list[str],
-    threshold: Optional[float] = None,
-    percentile: Optional[float] = None,
+    features_path: str, labels_path: str, features: list[str], threshold: float
 ) -> tuple:
     raw_features = pl.read_parquet(features_path)
     raw_labels = pl.read_parquet(labels_path)
@@ -102,11 +70,9 @@ def _prepare_dataset(
     x = flatten_features(df_cleaned, features)
     y_raw = df_cleaned["affinity_kcal_mol"]
 
-    y_label, computed_threshold = compute_label(
-        y_raw, percentile=percentile, threshold=threshold
-    )
+    y_label = compute_labels(y_raw, threshold=threshold)
 
-    return x, y_label, computed_threshold
+    return x, y_label
 
 
 def _evaluate_and_log(model, x, y_true, dataset_name: str) -> pl.DataFrame:
@@ -162,8 +128,13 @@ def _save_model(model, path: str):
     required=True,
     help="Output path to save the model.",
 )
+@click.option(
+    "--threshold",
+    type=float,
+    default=None,
+    help="Affinity cutoff (kcal/mol) defining active. ",
+)
 @features_option
-@label_definition_options
 @wide_log(logger)
 def train_model(
     train_features_path: str,
@@ -172,11 +143,8 @@ def train_model(
     validation_labels_path: str,
     features: list[str],
     model_path: str,
-    active_percentile: float | None,
-    threshold: float | None,
+    threshold: float,
 ):
-    require_single_label_definition(active_percentile, threshold)
-
     click.echo(f"Training surrogate model using features from {train_features_path}...")
 
     manifest = _build_manifest(
@@ -185,7 +153,6 @@ def train_model(
         validation_features_path=validation_features_path,
         validation_labels_path=validation_labels_path,
         features=features,
-        active_percentile=active_percentile,
         threshold=threshold,
     )
     manifest_path = _manifest_path(model_path)
@@ -207,11 +174,10 @@ def train_model(
         num_samples=manifest["num_samples"],
     )
 
-    x_initial, y_initial_label, dataset_threshold = _prepare_dataset(
+    x_initial, y_initial_label = _prepare_dataset(
         train_features_path,
         train_labels_path,
         features,
-        percentile=active_percentile,
         threshold=threshold,
     )
 
@@ -247,7 +213,7 @@ def train_model(
         validation_features_path,
         validation_labels_path,
         features,
-        threshold=dataset_threshold,
+        threshold=threshold,
     )
 
     val_metrics_df = _evaluate_and_log(
@@ -266,7 +232,7 @@ def train_model(
         manifest_path,
         {
             **manifest,
-            "dataset_threshold": dataset_threshold,
+            "threshold": threshold,
             "num_train_samples": len(x_initial_train),
             "metrics": metrics_list,
         },

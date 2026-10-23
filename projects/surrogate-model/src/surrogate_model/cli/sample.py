@@ -155,11 +155,8 @@ def sample_candidates(
             disk_manifest.load()
             if target_manifest <= disk_manifest:
                 logger.info(
-                    "Sample already valid, skipping generation",
-                    features_files=features_files,
-                    conformers_files=conformers_files,
-                    num_samples=num_samples,
-                    seed=seed,
+                    "Valid manifest found.",
+                    manifest=disk_manifest,
                 )
                 click.echo("Done!")
                 return
