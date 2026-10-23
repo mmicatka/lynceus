@@ -47,6 +47,7 @@ filter:
     - usrcat
     - whim
   surrogate:
+    active_percentile: 1.0
     feature_list:
       - atom_pair
       - autocorr

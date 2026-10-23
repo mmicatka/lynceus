@@ -38,6 +38,7 @@ class SurrogateConfig(StrictModel):
     validation: PositiveInt
     rounds: list[RoundConfig] = Field(min_length=1)
     seed: int
+    active_percentile: float
     hyperparameters: HyperparametersConfig = Field(
         default_factory=HyperparametersConfig
     )

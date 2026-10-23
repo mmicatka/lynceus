@@ -33,6 +33,7 @@ class TemplateName(StrEnum):
     RUN_DOCKING = "run_docking"
     SURROGATE_SAMPLE = "surrogate_sample"
     SURROGATE_SAMPLE_BY_PREDICTION = "surrogate_sample_by_prediction"
+    SURROGATE_PREPARE_VALIDATION = "surrogate_prepare_validation"
     SURROGATE_TRAIN = "surrogate_train"
 
 
