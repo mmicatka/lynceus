@@ -1,5 +1,6 @@
 # projects/surrogate-model/src/surrogate_model/cli/train.py
 
+import datetime
 import os
 import time
 from pathlib import Path
@@ -152,24 +153,18 @@ def train_model(
 
     manifest_path = f"{Path(model_path).stem}.manifest.json"
 
-    target_manifest = Manifest(data=manifest_data, filepath=manifest_path)
-    disk_manifest = Manifest(filepath=manifest_path)
+    manifest = Manifest(data=manifest_data, filepath=manifest_path)
 
-    if disk_manifest.exists():
-        try:
-            disk_manifest.load()
-            if target_manifest <= disk_manifest:
-                logger.info(
-                    "Validation already valid, skipping generation",
-                    manifest=disk_manifest,
-                )
-                click.echo("Done!")
-                return
-        except Exception as e:
-            logger.warning(
-                "Failed to load existing manifest, re-generating.", error=str(e)
+    try:
+        if manifest.exists_superset():
+            logger.info(
+                "Valid manifest found.",
+                manifest=manifest.data,
             )
-
+            click.echo("Done!")
+            return
+    except Exception as e:
+        logger.warning("Failed to load existing manifest, re-generating.", error=str(e))
     logger.info(
         "Training surrogate model",
         manifest=manifest_data,
@@ -197,13 +192,13 @@ def train_model(
         force_row_wise=True,
     )
 
-    time_start = time.perf_counter()
+    start_time = time.perf_counter()
     model.fit(x_initial_train, y_initial_train)
 
     logger.info(
         "Trained model",
         samples=len(x_initial_train),
-        duration_seconds=round(time.perf_counter() - time_start, 3),
+        duration_seconds=round(time.perf_counter() - start_time, 3),
     )
 
     _evaluate_and_log(
@@ -229,12 +224,14 @@ def train_model(
 
     _save_model(model, model_path)
 
-    target_manifest.data = {
-        **manifest_data,
+    elapsed_time = time.perf_counter() - start_time
+    manifest.data["run_time"] = str(datetime.timedelta(seconds=elapsed_time))
+    manifest.data = {
+        **manifest.data,
         "num_train_samples": len(x_initial_train),
         "metrics": metrics_list,
     }
 
-    target_manifest.save()
+    manifest.save()
 
     click.echo("Done!")
