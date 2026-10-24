@@ -4,7 +4,7 @@ from .cli import NumWorkers
 from .features import FEATURE_COLS
 from .io import plan_batches, staged_io
 from .logging import get_lynceus_logger, wide_log
-from .manifest import Manifest
+from .manifest import MANIFEST_SUFFIX, Manifest, verify_manifest
 from .shards import merge_shards
 
 __all__ = [
@@ -19,6 +19,8 @@ __all__ = [
     "staged_io",
     # manifest
     "Manifest",
+    "MANIFEST_SUFFIX",
+    "verify_manifest",
     # utils
     "merge_shards",
 ]

@@ -1,13 +1,15 @@
 # libs/lynceus_core/utils/merge_shards.py
 
+import datetime
 import glob
 import os
+import time
 
 import click
 import duckdb
 
 from lynceus_core.logging import get_lynceus_logger, wide_log
-from lynceus_core.manifest.common import Manifest
+from lynceus_core.manifest.common import MANIFEST_SUFFIX, Manifest
 
 DEFAULT_ROW_GROUP_SIZE = 5_000
 PARQUET_GLOB = "*.parquet"
@@ -90,30 +92,23 @@ def merge_shards(
     if output_dir:
         os.makedirs(output_dir, exist_ok=True)
 
-    manifest_path = f"{output_file}.manifest"
-    disk_manifest = Manifest(filepath=manifest_path)
-
-    expected_state = {
+    manifest_path = f"{output_file}.{MANIFEST_SUFFIX}"
+    manifest_data = {
         "input_files": input_files,
     }
-    target_manifest = Manifest(data=expected_state)
 
-    if disk_manifest.exists():
-        try:
-            disk_manifest.load()
-            if target_manifest <= disk_manifest:
-                logger.info(
-                    "Merge already valid, skipping generation",
-                    input_path=input_path,
-                    output_file=output_file,
-                    num_files=len(input_files),
-                )
-                click.echo("Done!")
-                return
-        except Exception as e:
-            logger.warning(
-                "Failed to load existing manifest, re-generating.", error=str(e)
+    manifest = Manifest(data=manifest_data, filepath=manifest_path)
+
+    try:
+        if manifest.exists_superset():
+            logger.info(
+                "Valid manifest found.",
+                manifest=manifest.data,
             )
+            click.echo("Done!")
+            return
+    except Exception as e:
+        logger.warning("Failed to load existing manifest, re-generating.", error=str(e))
 
     logger.info(
         "Merging shard into single file",
@@ -124,14 +119,18 @@ def merge_shards(
         row_group_size=row_group_size,
     )
 
+    start_time = time.perf_counter()
+
     conn = _connect(memory_limit)
     try:
         _write_merged_file(conn, input_files, output_file, row_group_size)
     finally:
         conn.close()
 
-    disk_manifest.data = expected_state
-    disk_manifest.save()
+    elapsed_time = time.perf_counter() - start_time
+    manifest.data = manifest_data
+    manifest.data["run_time"] = str(datetime.timedelta(seconds=elapsed_time))
+    manifest.save()
 
     logger.info(
         "Finished merging shard", input_path=input_path, output_file=output_file

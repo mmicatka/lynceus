@@ -7,7 +7,7 @@ from typing import Any
 from hera.workflows import DAG, Parameter, Task
 
 from workflows.config import InfraConfig
-from workflows.registry.common import ITEM_PARAM, shard_ids
+from workflows.registry.common.core import ITEM_PARAM, shard_ids
 from workflows.registry.surrogate.layout import SiteLayout
 
 SHARD_FILENAME_PATTERN = "shard_{shard}.parquet"

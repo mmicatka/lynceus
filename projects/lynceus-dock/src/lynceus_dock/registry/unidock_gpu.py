@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Iterator
 
 from lynceus_dock.common.ligand import materialize_ligands
+from lynceus_dock.common.logging import log_progress
 from lynceus_dock.common.types import (
     DockingError,
     DockingResult,
@@ -89,55 +90,64 @@ class UnidockGPUProvider(DockingProvider):
         scoring_mode: str = _SCORING_MODE_VINA,
     ) -> Iterator[tuple[str, list[DockingResult]]]:
         chunk_size = batch_size or _DEFAULT_BATCH_SIZE
-        n_chunks = -(-len(ligands) // chunk_size)  # ceil div
 
-        n_ligands_seen = 0
-        n_ligands_failed = 0
-        n_ligands_quarantined = 0
+        def _generate() -> Iterator[tuple[str, list[DockingResult]]]:
+            n_chunks = -(-len(ligands) // chunk_size)  # ceil div
 
-        for chunk_idx, start in enumerate(range(0, len(ligands), chunk_size), 1):
-            chunk = ligands[start : start + chunk_size]
-            n_ligands_seen += len(chunk)
-            n_yielded_this_chunk = 0
-            n_quarantined_before = len(self.quarantine)
+            n_ligands_seen = 0
+            n_ligands_failed = 0
+            n_ligands_quarantined = 0
 
-            for ligand_id, results in self._run_gpu_batch_contained(
-                receptor_path, chunk, box, scoring_mode
-            ):
-                n_yielded_this_chunk += 1
-                yield ligand_id, results
+            for chunk_idx, start in enumerate(range(0, len(ligands), chunk_size), 1):
+                chunk = ligands[start : start + chunk_size]
+                n_ligands_seen += len(chunk)
+                n_yielded_this_chunk = 0
+                n_quarantined_before = len(self.quarantine)
 
-            n_quarantined_this_chunk = len(self.quarantine) - n_quarantined_before
-            n_ligands_quarantined += n_quarantined_this_chunk
-            n_failed_this_chunk = len(chunk) - n_yielded_this_chunk
-            n_ligands_failed += n_failed_this_chunk
-            logger.info(
-                "unidock chunk %d/%d: %d/%d ligands produced results "
-                "(%d failed, %d quarantined due to crashes)",
-                chunk_idx,
-                n_chunks,
-                n_yielded_this_chunk,
-                len(chunk),
-                n_failed_this_chunk,
-                n_quarantined_this_chunk,
-            )
+                for ligand_id, results in self._run_gpu_batch_contained(
+                    receptor_path, chunk, box, scoring_mode
+                ):
+                    n_yielded_this_chunk += 1
+                    yield ligand_id, results
 
-        if n_ligands_failed:
-            logger.warning(
-                "unidock dock_batch complete: %d/%d ligands failed to produce "
-                "results across %d chunk(s). See preceding WARNING/ERROR log "
-                "lines for per-ligand detail.",
-                n_ligands_failed,
-                n_ligands_seen,
-                n_chunks,
-            )
-        if self.quarantine:
-            logger.warning(
-                "unidock dock_batch complete: %d ligand(s) quarantined after "
-                "repeated subprocess crashes (isolated via bisection). See "
-                "provider.quarantine.entries for the full list.",
-                n_ligands_quarantined,
-            )
+                n_quarantined_this_chunk = len(self.quarantine) - n_quarantined_before
+                n_ligands_quarantined += n_quarantined_this_chunk
+                n_failed_this_chunk = len(chunk) - n_yielded_this_chunk
+                n_ligands_failed += n_failed_this_chunk
+                logger.info(
+                    "unidock chunk %d/%d: %d/%d ligands produced results "
+                    "(%d failed, %d quarantined due to crashes)",
+                    chunk_idx,
+                    n_chunks,
+                    n_yielded_this_chunk,
+                    len(chunk),
+                    n_failed_this_chunk,
+                    n_quarantined_this_chunk,
+                )
+
+            if n_ligands_failed:
+                logger.warning(
+                    "unidock dock_batch complete: %d/%d ligands failed to produce "
+                    "results across %d chunk(s). See preceding WARNING/ERROR log "
+                    "lines for per-ligand detail.",
+                    n_ligands_failed,
+                    n_ligands_seen,
+                    n_chunks,
+                )
+            if self.quarantine:
+                logger.warning(
+                    "unidock dock_batch complete: %d ligand(s) quarantined after "
+                    "repeated subprocess crashes (isolated via bisection). See "
+                    "provider.quarantine.entries for the full list.",
+                    n_ligands_quarantined,
+                )
+
+        yield from log_progress(
+            _generate(),
+            total=len(ligands),
+            every=chunk_size,
+            logger=logger,
+        )
 
     def _run_gpu_batch_contained(
         self,

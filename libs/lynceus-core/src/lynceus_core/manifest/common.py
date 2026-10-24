@@ -5,6 +5,8 @@ import json
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
+MANIFEST_SUFFIX = "manifest.json"
+
 
 class Manifest:
     def __init__(
@@ -38,7 +40,7 @@ class Manifest:
         with open(self.filepath, "w", encoding="utf-8") as f:
             json.dump(self.data, f, indent=4)
 
-    def is_subset_of(self, other: Union[Dict[str, Any], "Manifest"]) -> bool:
+    def _is_subset_of(self, other: Union[Dict[str, Any], "Manifest"]) -> bool:
         other_data = other.data if isinstance(other, Manifest) else other
         if not isinstance(other_data, dict):
             return False
@@ -67,8 +69,8 @@ class Manifest:
 
         return _is_subset(self.data, other_data)
 
-    def is_file_superset(self) -> bool:
-        if not self.exists():
+    def exists_superset(self) -> bool:
+        if not self.filepath or not self.exists():
             return False
 
         try:
@@ -81,7 +83,7 @@ class Manifest:
             return False
 
     def __le__(self, other: Any) -> bool:
-        return self.is_subset_of(other)
+        return self._is_subset_of(other)
 
     def __eq__(self, other: Any) -> bool:
         if isinstance(other, dict):

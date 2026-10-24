@@ -5,6 +5,7 @@ from hera.workflows import DAG, Parameter, Task
 from workflows.config import InfraConfig, ScreenConfig
 from workflows.config.infrastructure import TemplateName
 from workflows.config.screen import RoundConfig, SurrogateConfig
+from workflows.registry.common.verify_manifest import verify_manifest_task
 from workflows.registry.surrogate.layout import (
     SITE_PARAMETERS,
     VALIDATION_LABEL,
@@ -28,6 +29,17 @@ from workflows.templates import (
 )
 
 SURROGATE_SITE_DAG = "surrogate-site-dag"
+
+
+def _verify_merge_manifest(
+    spec: SampleSpec, layout: SiteLayout, check_manifest
+) -> Task:
+    return verify_manifest_task(
+        check_manifest,
+        name=f"check-manifest-{spec.task_suffix}",
+        manifest_path=layout.manifest_path(spec.label),
+        expected={"input_path": layout.staging_prefix(spec.label)},
+    )
 
 
 def _docking_arguments(spec: SampleSpec, layout: SiteLayout) -> dict:

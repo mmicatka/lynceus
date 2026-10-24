@@ -1,4 +1,4 @@
-# workflows/src/workflows/registry/common.py
+# workflows/src/workflows/registry/common/core.py
 
 
 from hera.workflows import Workflow

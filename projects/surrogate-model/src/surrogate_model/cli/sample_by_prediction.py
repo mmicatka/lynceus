@@ -174,7 +174,7 @@ def sample_candidates_by_prediction(
     features_files = resolve_parquet_files(features_input)
     conformers_files = resolve_parquet_files(conformers_input)
 
-    manifest = {
+    manifest_data = {
         "features_files": features_files,
         "conformers_files": conformers_files,
         "num_top": num_top,
@@ -184,23 +184,18 @@ def sample_candidates_by_prediction(
     }
 
     manifest_path = f"{identifier}.manifest.json"
-    target_manifest = Manifest(data=manifest, filepath=manifest_path)
-    disk_manifest = Manifest(filepath=manifest_path)
+    manifest = Manifest(data=manifest_data, filepath=manifest_path)
 
-    if disk_manifest.exists():
-        try:
-            disk_manifest.load()
-            if target_manifest <= disk_manifest:
-                logger.info(
-                    "Valid manifest found.",
-                    manifest=disk_manifest,
-                )
-                click.echo("Done!")
-                return
-        except Exception as e:
-            logger.warning(
-                "Failed to load existing manifest, re-generating.", error=str(e)
+    try:
+        if manifest.exists_superset():
+            logger.info(
+                "Valid manifest found.",
+                manifest=manifest.data,
             )
+            click.echo("Done!")
+            return
+    except Exception as e:
+        logger.warning("Failed to load existing manifest, re-generating.", error=str(e))
 
     total_rows = count_rows(features_files)
     conformer_rows = count_rows(conformers_files)
@@ -269,8 +264,8 @@ def sample_candidates_by_prediction(
     verify_written(output_path, len(positions))
 
     elapsed_time = time.perf_counter() - start_time
-    target_manifest.data["run_time"] = str(datetime.timedelta(seconds=elapsed_time))
-    target_manifest.save()
+    manifest.data["run_time"] = str(datetime.timedelta(seconds=elapsed_time))
+    manifest.save()
 
     logger.info(
         "Finished prediction-based sampling",

@@ -3,6 +3,8 @@
 import os
 from dataclasses import dataclass
 
+from lynceus_core.manifest.common import MANIFEST_SUFFIX
+
 FEATURES_FILENAME = "features.parquet"
 DOCKING_RESULTS_FILENAME = "docking_results.parquet"
 STAGING_DIRNAME = "staging"
@@ -68,3 +70,9 @@ class SiteLayout:
 
     def model_path(self, label: str) -> str:
         return os.path.join(self.base_path, self.model_file(label))
+
+    def manifest_file(self, label: str) -> str:
+        return f"{self.features_file(label)}.{MANIFEST_SUFFIX}"
+
+    def manifest_path(self, label: str) -> str:
+        return os.path.join(self.base_path, self.manifest_file(label))
