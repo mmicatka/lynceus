@@ -1,6 +1,8 @@
 # projects/candidates/src/candidates/sample.py
 
+import datetime
 import os
+import time
 
 import click
 import duckdb
@@ -67,14 +69,15 @@ def sample_candidates(
 ) -> None:
     click.echo(f"Processing {input_path}...")
 
-    manifest_path = f"{output_path}.manifest"
-    disk_manifest = Manifest(filepath=manifest_path)
-
     expected_state = {
         "num_samples": num_samples,
         "seed": seed,
         "input_path": os.path.abspath(input_path),
     }
+
+    manifest_path = f"{output_path}.manifest"
+    disk_manifest = Manifest(filepath=manifest_path)
+
     target_manifest = Manifest(data=expected_state)
 
     if disk_manifest.exists():
@@ -94,6 +97,8 @@ def sample_candidates(
             logger.warning(
                 "Failed to load existing manifest, re-generating.", error=str(e)
             )
+
+    start_time = time.perf_counter()
 
     conn = duckdb.connect()
     conn.execute("SET threads = ?", [num_workers])
@@ -121,8 +126,10 @@ def sample_candidates(
         """
     )
 
-    disk_manifest.data = expected_state
-    disk_manifest.save()
+    target_manifest.data = expected_state
+    elapsed_time = time.perf_counter() - start_time
+    target_manifest.data["run_time"] = str(datetime.timedelta(seconds=elapsed_time))
+    target_manifest.save()
 
     logger.info(
         "Finished reservoir sampling",

@@ -120,7 +120,7 @@ def _write_sample(
     help="Seed for reproducible sampling.",
 )
 @wide_log(logger)
-def sample_candidates(
+def sample_surrogate_candidates(
     features_input: str,
     conformers_input: str,
     output_path: str,

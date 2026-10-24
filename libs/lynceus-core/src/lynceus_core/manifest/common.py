@@ -67,6 +67,19 @@ class Manifest:
 
         return _is_subset(self.data, other_data)
 
+    def is_file_superset(self) -> bool:
+        if not self.exists():
+            return False
+
+        try:
+            with open(self.filepath, "r", encoding="utf-8") as f:
+                file_data = json.load(f)
+
+            return self <= file_data
+
+        except json.JSONDecodeError, OSError:
+            return False
+
     def __le__(self, other: Any) -> bool:
         return self.is_subset_of(other)
 
