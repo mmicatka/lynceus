@@ -10,7 +10,6 @@ def surrogate_train_template(
     validation_features: str,
     validation_labels: str,
     model_path: str,
-    threshold: float,
     features: Optional[List[str]] = None,
 ):
     import subprocess
@@ -27,8 +26,6 @@ def surrogate_train_template(
         validation_labels,
         "--model-path",
         model_path,
-        "--threshold",
-        str(threshold),
     ]
 
     if features:

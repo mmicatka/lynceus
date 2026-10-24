@@ -85,9 +85,6 @@ templates:
   surrogate_sample_by_prediction:
     resources: *high_cpu
     image: *surrogate_image
-  surrogate_prepare_validation:
-    resources: *low_cpu
-    image: *surrogate_image
   surrogate_train:
     resources: *high_cpu
     image: *surrogate_image
