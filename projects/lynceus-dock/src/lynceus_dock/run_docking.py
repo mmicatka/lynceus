@@ -10,8 +10,9 @@ from typing import Any, Generator
 
 import click
 from lynceus_core.logging import get_lynceus_logger, wide_log
+from lynceus_core.manifest.common import Manifest as LynceusManifest
+from protein_ensemble import Manifest
 from protein_ensemble.accessors.pdbqt import member_to_pdbqt
-from protein_ensemble.manifest import Manifest
 
 from lynceus_dock.common.ligand import count_ligand_rows, iter_ligand_records
 from lynceus_dock.common.manifest import (
@@ -293,8 +294,8 @@ def run_docking(
     identifier = Path(out_parquet).stem
 
     manifest_path = f"{identifier}.manifest.json"
-    target_manifest = Manifest(data=manifest, filepath=manifest_path)
-    disk_manifest = Manifest(filepath=manifest_path)
+    target_manifest = LynceusManifest(data=manifest, filepath=manifest_path)
+    disk_manifest = LynceusManifest(filepath=manifest_path)
 
     if disk_manifest.exists():
         try:
