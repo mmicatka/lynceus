@@ -7,6 +7,7 @@ from pathlib import Path
 import click
 import joblib
 import lightgbm as lgb
+import numpy as np
 import polars as pl
 from lynceus_core.logging import get_lynceus_logger, wide_log
 from lynceus_core.manifest.common import Manifest
@@ -21,6 +22,7 @@ from surrogate_model.common.data import (
     load_and_clean_data,
 )
 from surrogate_model.common.metrics import evaluation_metrics, predict_active
+from surrogate_model.common.threshold import get_validation_threshold
 
 RANDOM_SEED = 1000
 
@@ -58,7 +60,7 @@ def _build_manifest(
 
 def _prepare_dataset(
     features_path: str, labels_path: str, features: list[str], threshold: float
-) -> tuple:
+) -> tuple[np.ndarray, np.ndarray]:
     raw_features = pl.read_parquet(features_path)
     raw_labels = pl.read_parquet(labels_path)
 
@@ -87,18 +89,6 @@ def _save_model(model, path: str):
     with open(path, "wb") as f:
         joblib.dump(model, f)
     logger.info("Model saved successfully", path=path)
-
-
-def _get_validation_threshold(validation_path: str) -> float:
-    validation_manifest_path = f"{validation_path}.manifest.json"
-
-    validation_manifest = Manifest(filepath=validation_manifest_path)
-
-    try:
-        validation_manifest.load()
-        return float(validation_manifest.data.threshold)
-    except Exception as e:
-        logger.warning("Failed to load existing manifest, re-generating.", error=str(e))
 
 
 @click.command()
@@ -137,12 +127,6 @@ def _get_validation_threshold(validation_path: str) -> float:
     required=True,
     help="Output path to save the model.",
 )
-@click.option(
-    "--threshold",
-    type=float,
-    default=None,
-    help="Affinity cutoff (kcal/mol) defining active. ",
-)
 @features_option
 @wide_log(logger)
 def train_model(
@@ -155,7 +139,7 @@ def train_model(
 ):
     click.echo(f"Training surrogate model using features from {train_features_path}...")
 
-    threshold = _get_validation_threshold(validation_labels_path)
+    threshold = get_validation_threshold(validation_labels_path)
 
     manifest_data = _build_manifest(
         train_features_path=train_features_path,
@@ -226,7 +210,7 @@ def train_model(
         model, x_initial_test, y_initial_test, dataset_name="Initial Split"
     )
 
-    x_validation, y_validation_label, _ = _prepare_dataset(
+    x_validation, y_validation_label = _prepare_dataset(
         validation_features_path,
         validation_labels_path,
         features,
