@@ -34,6 +34,7 @@ class TemplateName(StrEnum):
     SURROGATE_SAMPLE = "surrogate_sample"
     SURROGATE_SAMPLE_BY_PREDICTION = "surrogate_sample_by_prediction"
     SURROGATE_TRAIN = "surrogate_train"
+    VERIFY_MANIFEST = "verify_manifest"
 
 
 class CandidatePrefixes(StrictModel):

@@ -1,11 +1,11 @@
 # workflows/src/workflows/registry/surrogate/sample_site.py
 
 from hera.workflows import DAG, Parameter, Task
+from hera.workflows.models import ValueFrom
 
 from workflows.config import InfraConfig, ScreenConfig
 from workflows.config.infrastructure import TemplateName
 from workflows.config.screen import RoundConfig, SurrogateConfig
-from workflows.registry.common.verify_manifest import verify_manifest_task
 from workflows.registry.surrogate.layout import (
     SITE_PARAMETERS,
     VALIDATION_LABEL,
@@ -26,20 +26,15 @@ from workflows.templates import (
     surrogate_sample_by_prediction_template,
     surrogate_sample_template,
     surrogate_train_template,
+    verify_manifest_template,
 )
 
 SURROGATE_SITE_DAG = "surrogate-site-dag"
+VERIFY_RESULT_OUTPUT = "result"
 
 
-def _verify_merge_manifest(
-    spec: SampleSpec, layout: SiteLayout, check_manifest
-) -> Task:
-    return verify_manifest_task(
-        check_manifest,
-        name=f"check-manifest-{spec.task_suffix}",
-        manifest_path=layout.manifest_path(spec.label),
-        expected={"input_path": layout.staging_prefix(spec.label)},
-    )
+def _run_unless_verified(verify_task: Task) -> str:
+    return f"{verify_task.get_parameter(VERIFY_RESULT_OUTPUT)} != true"
 
 
 def _docking_arguments(spec: SampleSpec, layout: SiteLayout) -> dict:
@@ -109,17 +104,26 @@ def _sample_and_dock(
     layout: SiteLayout,
     sample_dag,
     dock,
-) -> tuple[Task, Task]:
+    verify_manifest,
+) -> tuple[Task, Task, Task]:
+    verify_task = verify_manifest(
+        name=f"verify-manifest-{spec.task_suffix}",
+        arguments={
+            "manifest_path": layout.manifest_path(spec.label),
+            "expect": {"input_path": layout.staging_prefix(spec.label)},
+        },
+    )
     sample_task = sample_dag(
         name=f"sample-{spec.task_suffix}",
         arguments={name: ref(name) for name in SAMPLE_PARAMETERS},
+        when=_run_unless_verified(verify_task),
     )
     dock_task = dock(
         name=f"dock-{spec.task_suffix}",
         arguments=_docking_arguments(spec, layout),
     )
-    sample_task >> dock_task  # type: ignore
-    return sample_task, dock_task
+    verify_task >> sample_task >> dock_task  # type: ignore
+    return verify_task, sample_task, dock_task
 
 
 def _train(spec: SampleSpec, layout: SiteLayout, surrogate_train) -> Task:
@@ -145,6 +149,16 @@ def build_surrogate_site_dag(
     validation_spec = _validation_spec(surrogate)
     round_specs = _round_specs(surrogate, layout)
 
+    verify_manifest = templates.build(
+        TemplateName.VERIFY_MANIFEST,
+        verify_manifest_template,
+        outputs=[
+            Parameter(
+                name=VERIFY_RESULT_OUTPUT,
+                value_from=ValueFrom(path="/tmp/manifest_matches.txt"),
+            )
+        ],
+    )
     dock = templates.build(TemplateName.RUN_DOCKING, run_docking_template)
     merge_shards = templates.build(TemplateName.MERGE_SHARDS, merge_shards_template)
     surrogate_train = templates.build(
@@ -171,17 +185,25 @@ def build_surrogate_site_dag(
         name=SURROGATE_SITE_DAG,
         inputs=[Parameter(name=name) for name in SITE_PARAMETERS],
     ) as site_dag:
-        _, previous_task = _sample_and_dock(
-            validation_spec, layout, sample_dags[validation_spec.label], dock
+        _, _, previous_task = _sample_and_dock(
+            validation_spec,
+            layout,
+            sample_dags[validation_spec.label],
+            dock,
+            verify_manifest,
         )
 
         for spec in round_specs:
-            sample_task, dock_task = _sample_and_dock(
-                spec, layout, sample_dags[spec.label], dock
+            verify_manifest_task, sample_task, dock_task = _sample_and_dock(
+                spec,
+                layout,
+                sample_dags[spec.label],
+                dock,
+                verify_manifest,
             )
             train_task = _train(spec, layout, surrogate_train)
 
-            previous_task >> sample_task  # type: ignore
+            previous_task >> verify_manifest_task  # type: ignore
             dock_task >> train_task  # type: ignore
             previous_task = train_task
 

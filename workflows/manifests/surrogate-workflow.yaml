@@ -55,6 +55,55 @@ spec:
         requests:
           cpu: '2'
           memory: 1Gi
+  - name: verify-manifest
+    volumes:
+    - name: lynceus
+      persistentVolumeClaim:
+        claimName: lynceus-pvc
+    inputs:
+      parameters:
+      - name: manifest_path
+      - name: expect
+        default: 'null'
+    outputs:
+      parameters:
+      - name: result
+        valueFrom:
+          path: /tmp/manifest_matches.txt
+    retryStrategy:
+      limit: 5
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 10m
+    script:
+      image: registry.nebula.lan:5000/lynceus/surrogate-model:0.1.0
+      imagePullPolicy: Always
+      source: |-
+        import os
+        import sys
+        sys.path.append(os.getcwd())
+        import json
+        try: expect = json.loads(r'''{{inputs.parameters.expect}}''')
+        except: expect = r'''{{inputs.parameters.expect}}'''
+        try: manifest_path = json.loads(r'''{{inputs.parameters.manifest_path}}''')
+        except: manifest_path = r'''{{inputs.parameters.manifest_path}}'''
+
+        import json
+        import subprocess
+        subprocess.run(['verify-manifest', '--manifest', manifest_path, '--expect', json.dumps(expect or {}), '--result-file', '/tmp/manifest_matches.txt'], check=True)
+      command:
+      - python
+      volumeMounts:
+      - name: lynceus
+        mountPath: /mnt/lynceus
+      resources:
+        limits:
+          cpu: '2'
+          memory: 1Gi
+        requests:
+          cpu: '2'
+          memory: 1Gi
   - name: run-docking
     podSpecPatch: '{"runtimeClassName": "nvidia"}'
     tolerations:
@@ -606,8 +655,18 @@ spec:
   - name: surrogate-site-dag
     dag:
       tasks:
+      - name: verify-manifest-validation
+        template: verify-manifest
+        arguments:
+          parameters:
+          - name: manifest_path
+            value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet.manifest.json
+          - name: expect
+            value: '{"input_path": "surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/staging"}'
       - name: sample-validation
+        depends: verify-manifest-validation
         template: surrogate-sample-validation-dag
+        when: '{{tasks.verify-manifest-validation.outputs.parameters.result}} != true'
         arguments:
           parameters:
           - name: ensemble
@@ -631,9 +690,19 @@ spec:
             value: '{{inputs.parameters.site_id}}'
           - name: out_parquet
             value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/docking_results.parquet
-      - name: sample-round-0
+      - name: verify-manifest-round-0
         depends: dock-validation
+        template: verify-manifest
+        arguments:
+          parameters:
+          - name: manifest_path
+            value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet.manifest.json
+          - name: expect
+            value: '{"input_path": "surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/staging"}'
+      - name: sample-round-0
+        depends: verify-manifest-round-0
         template: surrogate-sample-round-0-dag
+        when: '{{tasks.verify-manifest-round-0.outputs.parameters.result}} != true'
         arguments:
           parameters:
           - name: ensemble
@@ -672,9 +741,19 @@ spec:
             value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/docking_results.parquet
           - name: model_path
             value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/model.joblib
-      - name: sample-round-1
+      - name: verify-manifest-round-1
         depends: train-round-0
+        template: verify-manifest
+        arguments:
+          parameters:
+          - name: manifest_path
+            value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet.manifest.json
+          - name: expect
+            value: '{"input_path": "surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/staging"}'
+      - name: sample-round-1
+        depends: verify-manifest-round-1
         template: surrogate-sample-round-1-dag
+        when: '{{tasks.verify-manifest-round-1.outputs.parameters.result}} != true'
         arguments:
           parameters:
           - name: ensemble
@@ -713,9 +792,19 @@ spec:
             value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/docking_results.parquet
           - name: model_path
             value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/model.joblib
-      - name: sample-round-2
+      - name: verify-manifest-round-2
         depends: train-round-1
+        template: verify-manifest
+        arguments:
+          parameters:
+          - name: manifest_path
+            value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet.manifest.json
+          - name: expect
+            value: '{"input_path": "surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/staging"}'
+      - name: sample-round-2
+        depends: verify-manifest-round-2
         template: surrogate-sample-round-2-dag
+        when: '{{tasks.verify-manifest-round-2.outputs.parameters.result}} != true'
         arguments:
           parameters:
           - name: ensemble

@@ -78,10 +78,13 @@ templates:
     image: *targets_image
 
   ##### Surrogate #####
-  surrogate_sample:
-    resources: *high_cpu
+  verify_manifest:
+    resources: *low_cpu
     image: &surrogate_image
       image: registry.nebula.lan:5000/lynceus/surrogate-model:0.1.0
+  surrogate_sample:
+    resources: *high_cpu
+    image: *surrogate_image
   surrogate_sample_by_prediction:
     resources: *high_cpu
     image: *surrogate_image

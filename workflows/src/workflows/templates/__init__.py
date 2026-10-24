@@ -8,7 +8,11 @@ from .candidates import (
     sample_candidates_template,
     shard_candidates_template,
 )
-from .common import build_clean_prefix_template, merge_shards_template
+from .common import (
+    build_clean_prefix_template,
+    merge_shards_template,
+    verify_manifest_template,
+)
 from .docking import run_docking_template
 from .surrogate import (
     surrogate_sample_by_prediction_template,
@@ -23,6 +27,7 @@ __all__ = [
     # common
     "build_clean_prefix_template",
     "merge_shards_template",
+    "verify_manifest_template",
     # candidates
     "generate_conformers_template",
     "generate_features_template",

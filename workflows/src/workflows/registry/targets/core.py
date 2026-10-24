@@ -3,7 +3,11 @@
 from hera.workflows import DAG, Workflow
 
 from workflows.config import InfraConfig, ScreenConfig
-from workflows.registry.common import ENTRYPOINT_DAG, get_template_factory, new_workflow
+from workflows.registry.common.core import (
+    ENTRYPOINT_DAG,
+    get_template_factory,
+    new_workflow,
+)
 from workflows.registry.targets.detect_binding_sites import (
     build_detect_binding_sites_dag,
 )

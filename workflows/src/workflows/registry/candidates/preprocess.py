@@ -4,7 +4,7 @@ from hera.workflows import DAG, Parameter, Task, Workflow
 
 from workflows.config import InfraConfig, ScreenConfig
 from workflows.config.infrastructure import TemplateName
-from workflows.registry.common import (
+from workflows.registry.common.core import (
     ENTRYPOINT_DAG,
     ITEM_PARAM,
     SOURCE_INPUT_NAME,
