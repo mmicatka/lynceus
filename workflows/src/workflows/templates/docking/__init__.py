@@ -1,4 +1,4 @@
-# workflows/src/workflwows/template/docking/__init__.py
+# workflows/src/workflows/template/docking/__init__.py
 
 
 from .run_docking import run_docking_template

@@ -22,7 +22,6 @@ from workflows.templates import (
     TemplateFactory,
     merge_shards_template,
     run_docking_template,
-    surrogate_prepare_validation_template,
     surrogate_sample_by_prediction_template,
     surrogate_sample_template,
     surrogate_train_template,
@@ -42,23 +41,13 @@ def _docking_arguments(spec: SampleSpec, layout: SiteLayout) -> dict:
     }
 
 
-def _prepare_validation_arguments(
-    layout: SiteLayout, surrogate: SurrogateConfig
-) -> dict:
-    return {
-        "validation_path": layout.docking_results_path(VALIDATION_LABEL),
-        "active_percentile": surrogate.active_percentile,
-    }
-
-
-def _train_arguments(spec: SampleSpec, layout: SiteLayout, threshold: str) -> dict:
+def _train_arguments(spec: SampleSpec, layout: SiteLayout) -> dict:
     return {
         "train_features": layout.features_path(spec.label),
         "train_labels": layout.labels_path(spec.label),
         "validation_features": layout.features_path(VALIDATION_LABEL),
         "validation_labels": layout.docking_results_path(VALIDATION_LABEL),
         "model_path": layout.model_path(spec.label),
-        "threshold": threshold,
     }
 
 
@@ -121,32 +110,11 @@ def _sample_and_dock(
     return sample_task, dock_task
 
 
-def _prepare_validation(
-    layout: SiteLayout,
-    surrogate: SurrogateConfig,
-    validation_dock_task: Task,
-    prepare_validation,
-) -> Task:
-    prepare_task = prepare_validation(
-        name="prepare-validation",
-        arguments=_prepare_validation_arguments(layout, surrogate),
-    )
-    validation_dock_task >> prepare_task  # type: ignore
-    return prepare_task
-
-
-def _train(
-    spec: SampleSpec,
-    layout: SiteLayout,
-    surrogate_train,
-    prepare_task: Task,
-) -> Task:
-    train_task = surrogate_train(
+def _train(spec: SampleSpec, layout: SiteLayout, surrogate_train) -> Task:
+    return surrogate_train(
         name=f"train-{spec.task_suffix}",
-        arguments=_train_arguments(spec, layout, prepare_task.result),
+        arguments=_train_arguments(spec, layout),
     )
-    prepare_task >> train_task  # type: ignore
-    return train_task
 
 
 def build_surrogate_site_dag(
@@ -167,10 +135,6 @@ def build_surrogate_site_dag(
 
     dock = templates.build(TemplateName.RUN_DOCKING, run_docking_template)
     merge_shards = templates.build(TemplateName.MERGE_SHARDS, merge_shards_template)
-    prepare_validation = templates.build(
-        TemplateName.SURROGATE_PREPARE_VALIDATION,
-        surrogate_prepare_validation_template,
-    )
     surrogate_train = templates.build(
         TemplateName.SURROGATE_TRAIN, surrogate_train_template
     )
@@ -198,15 +162,12 @@ def build_surrogate_site_dag(
         _, previous_task = _sample_and_dock(
             validation_spec, layout, sample_dags[validation_spec.label], dock
         )
-        prepare_task = _prepare_validation(
-            layout, surrogate, previous_task, prepare_validation
-        )
 
         for spec in round_specs:
             sample_task, dock_task = _sample_and_dock(
                 spec, layout, sample_dags[spec.label], dock
             )
-            train_task = _train(spec, layout, surrogate_train, prepare_task)
+            train_task = _train(spec, layout, surrogate_train)
 
             previous_task >> sample_task  # type: ignore
             dock_task >> train_task  # type: ignore

@@ -281,14 +281,14 @@ def run_docking(
     start_time = time.perf_counter()
 
     manifest = {
-        "ensemble": ensemble,
+        "ensemble": str(ensemble),
         "member_id": member_id,
         "ligands_path": ligands_path,
         "center": center,
         "size": size,
         "search_mode": search_mode,
         "num_modes": num_modes,
-        "out_dir": out_dir,
+        "out_dir": str(out_dir) if out_dir else None,
     }
 
     identifier = Path(out_parquet).stem

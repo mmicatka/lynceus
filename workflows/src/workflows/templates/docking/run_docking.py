@@ -1,4 +1,4 @@
-# workflows/src/workflwows/template/docking/run_docking.py
+# workflows/src/workflows/template/docking/run_docking.py
 
 
 def run_docking_template(
