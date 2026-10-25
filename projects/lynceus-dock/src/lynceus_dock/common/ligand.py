@@ -1,6 +1,5 @@
 # projects/lynceus-dock/src/lynceus_dock/common/ligand.py
 
-import logging
 import typing
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -9,16 +8,17 @@ from tempfile import TemporaryDirectory
 from typing import Generator
 
 import pyarrow.parquet as pq
+from lynceus_core.logging import get_lynceus_logger
 from meeko import MoleculePreparation, PDBQTWriterLegacy
 from rdkit import Chem
 
 from lynceus_dock.common.types import DockingError, LigandRecord
 
-logger = logging.getLogger(__name__)
-
 _ID_COL = "id"
 _SDF_COL = "conformer"
 _DEFAULT_BATCH_SIZE = 1024
+
+logger = get_lynceus_logger()
 
 
 class LigandPrepError(DockingError):
@@ -120,6 +120,11 @@ def iter_ligand_records(
             yield LigandRecord(ligand_id=ligand_id, mol_bytes=mol.ToBinary())
 
     if n_skipped_empty:
+        logger.warning(
+            "Rows skipped due to empty column",
+            n_skipped=n_skipped_empty,
+            column=sdf_col,
+        )
         logger.warning(
             "%d row(s) skipped due to empty %s.",
             n_skipped_empty,

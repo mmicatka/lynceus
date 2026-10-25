@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-import logging
 import shutil
 import subprocess
 from pathlib import Path
 from typing import Any, Iterator
+
+from lynceus_core.logging import get_lynceus_logger
 
 from lynceus_dock.common.ligand import materialize_ligands
 from lynceus_dock.common.logging import log_progress
@@ -53,13 +54,13 @@ class UnidockGPUProvider(DockingProvider):
         search_mode: str = _DEFAULT_SEARCH_MODE,
         num_modes: int = _DEFAULT_NUM_MODES,
         out_dir: Path | None = None,
-        logger: Any = logging.getLogger(__name__),
+        logger: Any = None,
     ) -> None:
         self.search_mode = search_mode
         self.num_modes = num_modes
         self.out_dir = out_dir or Path.cwd() / "unidock_gpu_out"
         self.quarantine = UnidockCrashQuarantine()
-        self.logger = logger
+        self.logger = logger or get_lynceus_logger()
 
     def validate_environment(self) -> None:
         if shutil.which(_UNIDOCK_BINARY) is None:
@@ -115,31 +116,29 @@ class UnidockGPUProvider(DockingProvider):
                 n_failed_this_chunk = len(chunk) - n_yielded_this_chunk
                 n_ligands_failed += n_failed_this_chunk
                 self.logger.info(
-                    "unidock chunk %d/%d: %d/%d ligands produced results "
-                    "(%d failed, %d quarantined due to crashes)",
-                    chunk_idx,
-                    n_chunks,
-                    n_yielded_this_chunk,
-                    len(chunk),
-                    n_failed_this_chunk,
-                    n_quarantined_this_chunk,
+                    "unidock chunk complete",
+                    chunk_idx=chunk_idx,
+                    n_chunks=n_chunks,
+                    n_produced=n_yielded_this_chunk,
+                    n_chunk=len(chunk),
+                    n_failed=n_failed_this_chunk,
+                    n_quarantined=n_quarantined_this_chunk,
                 )
 
             if n_ligands_failed:
                 self.logger.warning(
-                    "unidock dock_batch complete: %d/%d ligands failed to produce "
-                    "results across %d chunk(s). See preceding WARNING/ERROR log "
-                    "lines for per-ligand detail.",
-                    n_ligands_failed,
-                    n_ligands_seen,
-                    n_chunks,
+                    "unidock dock_batch complete with failed ligands",
+                    n_failed=n_ligands_failed,
+                    n_seen=n_ligands_seen,
+                    n_chunks=n_chunks,
                 )
             if self.quarantine:
                 self.logger.warning(
-                    "unidock dock_batch complete: %d ligand(s) quarantined after "
-                    "repeated subprocess crashes (isolated via bisection). See "
-                    "provider.quarantine.entries for the full list.",
-                    n_ligands_quarantined,
+                    "unidock dock_batch complete with quarantined ligands",
+                    n_quarantined=n_ligands_quarantined,
+                    quarantined_ligand_ids=[
+                        entry["ligand_id"] for entry in self.quarantine.entries
+                    ],
                 )
 
         yield from log_progress(

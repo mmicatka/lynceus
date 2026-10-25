@@ -73,6 +73,7 @@ def _build_provider(search_mode: str, num_modes: int, out_dir: Path | None):
     provider_kwargs: dict[str, Any] = {
         "search_mode": search_mode,
         "num_modes": num_modes,
+        "logger": logger,
     }
     if out_dir:
         provider_kwargs["out_dir"] = out_dir
