@@ -59,7 +59,7 @@ filter:
       - topological_torsion
       - usrcat
       - whim
-    seed: 1010
+    seed: 1000
     validation: 5000
     rounds:
       - top: 0
