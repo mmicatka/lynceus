@@ -1,7 +1,9 @@
 # modules/local/generate_features/src/generate_features/generate_features.py
 
+import datetime
 import json
 import os
+import time
 from concurrent.futures import Future, ProcessPoolExecutor
 
 import click
@@ -33,6 +35,30 @@ rdBase.DisableLog("rdApp.*")
 
 
 _WORKER_GENERATORS: dict[str, FeatureGenerator] | None = None
+
+
+class Manifest:
+    def __init__(self, data: dict, filepath: str):
+        self.data = data
+        self.filepath = filepath
+
+    def exists_superset(self) -> bool:
+        if not os.path.exists(self.filepath):
+            return False
+        try:
+            with open(self.filepath, "r") as f:
+                saved_data = json.load(f)
+            for key, value in self.data.items():
+                if saved_data.get(key) != value:
+                    return False
+            return True
+        except Exception:
+            return False
+
+    def save(self):
+        os.makedirs(os.path.dirname(self.filepath), exist_ok=True)
+        with open(self.filepath, "w") as f:
+            json.dump(self.data, f, indent=2)
 
 
 def _init_worker(generator_names: list[str]) -> None:
@@ -115,37 +141,6 @@ def _expected_schema_fields(
     return field_names
 
 
-def _marker_path(output_path: str, identifier: str) -> str:
-    base_dir = os.path.dirname(output_path)
-    return os.path.join(base_dir, f"_SUCCESS_{identifier}")
-
-
-def _state_is_valid(
-    output_path: str, num_rows: int, expected_fields: set[str], identifier: str
-) -> bool:
-    marker_path = _marker_path(output_path, identifier)
-    if not os.path.exists(marker_path):
-        return False
-    try:
-        with open(marker_path, "r") as f:
-            data = json.load(f)
-            return (
-                data.get("num_rows") == num_rows
-                and set(data.get("expected_fields", [])) == expected_fields
-            )
-    except Exception:
-        return False
-
-
-def _write_success_marker(
-    output_path: str, num_rows: int, expected_fields: set[str], identifier: str
-) -> None:
-    marker_path = _marker_path(output_path, identifier)
-    os.makedirs(os.path.dirname(marker_path), exist_ok=True)
-    with open(marker_path, "w") as f:
-        json.dump({"num_rows": num_rows, "expected_fields": list(expected_fields)}, f)
-
-
 @click.command("generate_features")
 @click.option(
     "--input",
@@ -206,7 +201,7 @@ def generate_features(
 ):
     click.echo(f"Processing {input_path}...")
 
-    identifier = os.path.basename(input_path).replace(".parquet", "")
+    key = os.path.basename(input_path).replace(".parquet", "")
 
     parquet_file = pq.ParquetFile(input_path)
     num_rows = parquet_file.metadata.num_rows
@@ -216,15 +211,29 @@ def generate_features(
         parquet_file.schema_arrow, feature_generators
     )
 
-    if _state_is_valid(output_path, num_rows, expected_fields, identifier):
-        logger.info(
-            "Features already valid, skipping generation",
-            file=identifier,
-            num_rows=num_rows,
-            output_path=output_path,
-        )
-        click.echo("Done!")
-        return
+    manifest_data = {
+        "input_path": input_path,
+        "output_path": output_path,
+        "num_rows": num_rows,
+        "batch_size": batch_size,
+        "chunk_size": chunk_size,
+        "features": sorted(list(features)),
+        "expected_fields": sorted(list(expected_fields)),
+    }
+
+    manifest_path = f"{output_path.rstrip('/')}.manifest.json"
+    manifest = Manifest(data=manifest_data, filepath=manifest_path)
+
+    try:
+        if manifest.exists_superset():
+            logger.info(
+                "Valid manifest found. Features already generated.",
+                manifest=manifest.data,
+            )
+            click.echo("Done!")
+            return
+    except Exception as e:
+        logger.warning("Failed to load existing manifest, re-generating.", error=str(e))
 
     logger.info(
         "Generating features",
@@ -237,6 +246,8 @@ def generate_features(
 
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     writer = None
+
+    start_time = time.perf_counter()
 
     with ProcessPoolExecutor(
         max_workers=num_workers,
@@ -263,12 +274,18 @@ def generate_features(
     if writer is not None:
         writer.close()
 
-    _write_success_marker(output_path, num_rows, expected_fields, identifier)
+    elapsed_time = time.perf_counter() - start_time
+    manifest.data["run_time"] = str(datetime.timedelta(seconds=elapsed_time))
+    manifest.save()
 
     logger.info(
         "Finished generating features",
-        file=identifier,
+        file=key,
         num_rows=num_rows,
         output_path=output_path,
     )
     click.echo("Done!")
+
+
+if __name__ == "__main__":
+    generate_features()

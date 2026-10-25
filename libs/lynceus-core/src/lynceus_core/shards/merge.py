@@ -2,7 +2,6 @@
 
 import datetime
 import glob
-import os
 import time
 from pathlib import Path
 
@@ -14,14 +13,13 @@ from lynceus_core.logging import get_lynceus_logger, wide_log
 from lynceus_core.manifest.common import Manifest
 
 DEFAULT_ROW_GROUP_SIZE = 5_000
-PARQUET_GLOB = "*.parquet"
 STAGED_OUTPUT_TRANSFERS = 1
 
 logger = get_lynceus_logger()
 
 
-def _find_input_files(input_path: str) -> list[str]:
-    return sorted(glob.glob(os.path.join(input_path, PARQUET_GLOB)))
+def _find_input_files(input_glob: str) -> list[str]:
+    return sorted(glob.glob(input_glob))
 
 
 def _connect(memory_limit: str) -> duckdb.DuckDBPyConnection:
@@ -71,10 +69,11 @@ def _merge_via_staged_output(
 @click.command("merge_shards")
 @click.option(
     "--input",
-    "input_path",
+    "input_glob",
     required=True,
     type=str,
-    help="Shard folder (e.g. .../shard_id=3) containing the parquet files to merge.",
+    help="Glob pattern for the parquet files to merge"
+    " (e.g., 'path/to/shards/*.parquet').",
 )
 @click.option(
     "--output",
@@ -105,17 +104,17 @@ def _merge_via_staged_output(
 )
 @wide_log(logger)
 def merge_shards(
-    input_path: str,
+    input_glob: str,
     output_file: str,
     memory_limit: str,
     row_group_size: int,
     scratch_dir: str | None,
 ) -> None:
-    click.echo(f"Processing merge for {input_path}...")
+    click.echo(f"Processing merge for {input_glob}...")
 
-    input_files = _find_input_files(input_path)
+    input_files = _find_input_files(input_glob)
     if not input_files:
-        logger.warning("No parquet files found for shard", input_path=input_path)
+        logger.warning("No files found matching glob", input_glob=input_glob)
         click.echo("Done!")
         return
 
@@ -139,7 +138,7 @@ def merge_shards(
 
     logger.info(
         "Merging shard into single file",
-        input_path=input_path,
+        input_glob=input_glob,
         input_files=len(input_files),
         output_file=output_file,
         memory_limit=memory_limit,
@@ -163,6 +162,6 @@ def merge_shards(
     manifest.save()
 
     logger.info(
-        "Finished merging shard", input_path=input_path, output_file=output_file
+        "Finished merging shard", input_glob=input_glob, output_file=output_file
     )
     click.echo("Done!")

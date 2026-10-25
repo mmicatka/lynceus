@@ -4,7 +4,6 @@ import datetime
 import tempfile
 import time
 from contextlib import contextmanager
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Generator
 
@@ -14,15 +13,7 @@ from lynceus_core.manifest.common import Manifest as LynceusManifest
 from protein_ensemble import Manifest
 from protein_ensemble.accessors.pdbqt import member_to_pdbqt
 
-from lynceus_dock.common.ligand import count_ligand_rows, iter_ligand_records
-from lynceus_dock.common.manifest import (
-    build_entry,
-    build_manifest_path,
-    existing_entry_is_valid,
-    load_manifest,
-    run_key,
-    write_manifest,
-)
+from lynceus_dock.common.ligand import iter_ligand_records
 from lynceus_dock.common.results import write_results
 from lynceus_dock.registry.common import ProviderNotAvailableError
 from lynceus_dock.registry.registry import get_provider
@@ -31,52 +22,19 @@ from .common.types import DockingError, LigandRecord, SearchBox
 
 logger = get_lynceus_logger()
 
-
-@dataclass(frozen=True)
-class RunIdentity:
-    member_id: str
-    site_id: str
-    ligands_path: str
-    ligand_row_count: int
-    out_parquet: str
-
-    @property
-    def key(self) -> str:
-        return run_key(self.member_id, self.site_id)
+MANIFEST_FILENAME = "docking.manifest.json"
 
 
-def _already_docked(manifest: dict[str, Any], identity: RunIdentity) -> bool:
-    existing_entry = manifest["runs"].get(identity.key)
-    if existing_entry is None:
-        return False
-    if not existing_entry_is_valid(
-        existing_entry, identity.ligands_path, identity.ligand_row_count
-    ):
-        return False
-
-    logger.info(
-        "Skipping already docked target",
-        member_id=identity.member_id,
-        site_id=identity.site_id,
-        pose_row_count=existing_entry["pose_row_count"],
-        ligand_row_count=identity.ligand_row_count,
-        out_parquet=existing_entry["out_parquet"],
-    )
-    return True
-
-
-def _ensure_output_parent(out_parquet: str) -> None:
-    Path(out_parquet).parent.mkdir(parents=True, exist_ok=True)
-
-
-def _build_provider(search_mode: str, num_modes: int, out_dir: Path | None):
+def _build_provider(
+    search_mode: str, num_modes: int, output_path: str, keep_docking_output: bool
+):
     provider_kwargs: dict[str, Any] = {
         "search_mode": search_mode,
         "num_modes": num_modes,
         "logger": logger,
+        "output_path": output_path,
+        "keep_docking_output": keep_docking_output,
     }
-    if out_dir:
-        provider_kwargs["out_dir"] = out_dir
 
     provider = get_provider("gpu", **provider_kwargs)
     try:
@@ -125,14 +83,25 @@ def _receptor_file(member_id: str, pdbqt_string: str) -> Generator[Path, None, N
         yield receptor_path
 
 
+def _is_run_complete(manifest: LynceusManifest) -> bool:
+    try:
+        return manifest.exists_superset()
+    except Exception as exc:
+        logger.warning(
+            "Failed to load existing manifest, re-generating.", error=str(exc)
+        )
+        return False
+
+
 def _dock_and_write(
     provider,
     receptor_path: Path,
     ligands: list[LigandRecord],
     box: SearchBox,
-    identity: RunIdentity,
     *,
     member_id: str,
+    site_id: str,
+    output_path: str,
     batch_size: int | None,
     parquet_batch_rows: int,
 ) -> int:
@@ -145,31 +114,14 @@ def _dock_and_write(
     try:
         return write_results(
             results,
-            identity.out_parquet,
+            output_path,
             member_id=member_id,
-            site_id=identity.site_id,
+            site_id=site_id,
             batch_rows=parquet_batch_rows,
             drop_pose_column=True,
         )
     except DockingError as exc:
         raise click.ClickException(str(exc)) from exc
-
-
-def _record_run(
-    manifest: dict[str, Any],
-    manifest_file_path: Path,
-    identity: RunIdentity,
-    pose_row_count: int,
-) -> None:
-    manifest["runs"][identity.key] = build_entry(
-        identity.member_id,
-        identity.site_id,
-        identity.ligands_path,
-        identity.ligand_row_count,
-        identity.out_parquet,
-        pose_row_count,
-    )
-    write_manifest(manifest_file_path, manifest)
 
 
 @click.command(help="Dock candidate conformers against a receptor.")
@@ -228,16 +180,11 @@ def _record_run(
     help="Max ligands per underlying provider invocation.",
 )
 @click.option(
-    "--out-dir",
-    type=click.Path(path_type=Path),
-    default=None,
-    help="Directory for provider output files.",
-)
-@click.option(
-    "--out-parquet",
+    "--output",
+    "output_path",
     type=str,
     required=True,
-    help="Path to write docking results as Parquet.",
+    help="Directory for provider output files.",
 )
 @click.option(
     "--parquet-batch-rows",
@@ -258,6 +205,11 @@ def _record_run(
     is_flag=True,
     help="Drop residues that fail template matching instead of raising.",
 )
+@click.option(
+    "--keep-docking-output",
+    is_flag=False,
+    help="Keep docking output.",
+)
 @wide_log(logger)
 def run_docking(
     ensemble: Path,
@@ -269,11 +221,11 @@ def run_docking(
     search_mode: str,
     num_modes: int,
     batch_size: int | None,
-    out_dir: Path | None,
-    out_parquet: str,
+    output_path: str,
     parquet_batch_rows: int,
     default_altloc: str,
     allow_bad_residues: bool,
+    keep_docking_output: bool,
 ) -> None:
     click.echo(
         f"Running docking for {ensemble}:{member_id} with ligands {ligands_path}..."
@@ -281,56 +233,26 @@ def run_docking(
 
     start_time = time.perf_counter()
 
-    manifest = {
-        "ensemble": str(ensemble),
-        "member_id": member_id,
-        "ligands_path": ligands_path,
-        "center": center,
-        "size": size,
-        "search_mode": search_mode,
-        "num_modes": num_modes,
-        "out_dir": str(out_dir) if out_dir else None,
-    }
-
-    manifest_path = str(Path(out_parquet).with_suffix(".manifest.json"))
-    target_manifest = LynceusManifest(data=manifest, filepath=manifest_path)
-    disk_manifest = LynceusManifest(filepath=manifest_path)
-
-    if disk_manifest.exists():
-        try:
-            disk_manifest.load()
-            if target_manifest <= disk_manifest:
-                logger.info(
-                    "Valid manifest found.",
-                    manifest=disk_manifest,
-                )
-                click.echo("Done!")
-                return
-        except Exception as e:
-            logger.warning(
-                "Failed to load existing manifest, re-generating.", error=str(e)
-            )
-
-    identity = RunIdentity(
-        member_id=member_id,
-        site_id=site_id,
-        ligands_path=ligands_path,
-        ligand_row_count=count_ligand_rows(ligands_path),
-        out_parquet=out_parquet,
-    )
-    logger.info(
-        "Starting docking run",
-        ligand_row_count=identity.ligand_row_count,
-        ligands_path=ligands_path,
+    manifest = LynceusManifest(
+        data={
+            "ensemble": str(ensemble),
+            "member_id": member_id,
+            "ligands_path": ligands_path,
+            "center": center,
+            "size": size,
+            "search_mode": search_mode,
+            "num_modes": num_modes,
+            "output_path": output_path,
+        },
+        filepath=Path(output_path) / MANIFEST_FILENAME,
     )
 
-    manifest_path = build_manifest_path(out_parquet)
-    manifest = load_manifest(manifest_path)
-    if _already_docked(manifest, identity):
+    if _is_run_complete(manifest):
+        logger.info("Valid manifest found.", manifest=manifest.data)
+        click.echo("Done!")
         return
 
-    _ensure_output_parent(out_parquet)
-    provider = _build_provider(search_mode, num_modes, out_dir)
+    provider = _build_provider(search_mode, num_modes, output_path, keep_docking_output)
     pdbqt_string = _prepare_receptor_pdbqt(
         ensemble,
         member_id,
@@ -338,30 +260,31 @@ def run_docking(
         allow_bad_residues=allow_bad_residues,
     )
     ligands = _load_ligands(ligands_path)
-    box = SearchBox(center=center, size=size)
+    logger.info(
+        "Starting docking run",
+        ligand_count=len(ligands),
+        ligands_path=ligands_path,
+    )
 
     with _receptor_file(member_id, pdbqt_string) as receptor_path:
-        pose_row_count = _dock_and_write(
+        manifest.data["num_docked"] = _dock_and_write(
             provider,
             receptor_path,
             ligands,
-            box,
-            identity,
+            SearchBox(center=center, size=size),
             member_id=member_id,
+            site_id=site_id,
+            output_path=output_path,
             batch_size=batch_size,
             parquet_batch_rows=parquet_batch_rows,
         )
 
-    _record_run(manifest, manifest_path, identity, pose_row_count)
-
     elapsed_time = time.perf_counter() - start_time
-    target_manifest.data["run_time"] = str(datetime.timedelta(seconds=elapsed_time))
-    target_manifest.save()
+    manifest.data["run_time"] = str(datetime.timedelta(seconds=elapsed_time))
+    manifest.save()
 
     logger.info(
         "Finished docking run",
-        out_parquet=out_parquet,
-        manifest_file_path=manifest_path,
-        pose_row_count=pose_row_count,
+        manifest=manifest.data,
         elapsed_time=elapsed_time,
     )

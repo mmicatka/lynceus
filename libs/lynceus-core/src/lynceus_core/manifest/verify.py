@@ -26,15 +26,15 @@ def _parse_expected(_ctx: click.Context, _param: click.Parameter, value: str) ->
 
 
 def _manifest_matches(manifest_path: str, expected: dict) -> bool:
-    disk_manifest = Manifest(filepath=manifest_path)
-    if not disk_manifest.exists():
+    manifest = Manifest(filepath=manifest_path)
+    if not manifest.exists():
         return False
     try:
-        disk_manifest.load()
+        manifest.load()
     except Exception as e:
         logger.warning("Failed to load existing manifest", error=str(e))
         return False
-    return Manifest(data=expected) <= disk_manifest
+    return Manifest(data=expected) <= manifest
 
 
 def _write_result(result_file: str, matches: bool) -> None:
@@ -72,7 +72,14 @@ def _write_result(result_file: str, matches: bool) -> None:
 def verify_manifest(manifest_path: str, expected: dict, result_file: str) -> None:
     click.echo(f"Checking manifest {manifest_path}...")
 
-    matches = _manifest_matches(manifest_path, expected)
+    manifest = Manifest(data=expected, filepath=manifest_path)
+    matches = False
+
+    try:
+        matches = manifest.exists_superset()
+    except Exception as e:
+        logger.warning("Failed to load existing manifest, re-generating.", error=str(e))
+
     _write_result(result_file, matches)
 
     logger.info(

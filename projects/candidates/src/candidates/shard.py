@@ -1,7 +1,8 @@
 # projects/candidates/src/candidates/shard.py
 
-import json
+import datetime
 import os
+import time
 from pathlib import Path
 
 import click
@@ -9,60 +10,13 @@ import duckdb
 from lynceus_core.cli import NumWorkers
 from lynceus_core.io import plan_batches, staged_io
 from lynceus_core.logging import get_lynceus_logger, wide_log
+from lynceus_core.manifest import Manifest
 
 logger = get_lynceus_logger()
 
 
-def _read_marker(path: Path) -> dict | None:
-    try:
-        with open(path, "r") as f:
-            return json.load(f)
-    except FileNotFoundError, json.JSONDecodeError:
-        return None
-
-
-def _write_marker(output_path: Path, payload: dict) -> None:
-    with open(output_path, "w") as f:
-        json.dump(payload, f)
-
-
-def _partition_marker_path(output_path: Path, input_folder: str) -> Path:
-    return output_path / f"_SUCCESS_{input_folder}"
-
-
-def _partition_marker_payload(num_shards: int) -> dict:
-    return {"num_shards": num_shards}
-
-
-def _partition_is_valid(output_path: Path, num_shards: int, input_folder: str) -> bool:
-    marker = _read_marker(_partition_marker_path(output_path, input_folder))
-    return marker == _partition_marker_payload(num_shards)
-
-
 def _batch_prefix(input_folder: str, batch_index: int) -> str:
     return f"{input_folder}_b{batch_index}"
-
-
-def _batch_marker_path(output_path: Path, input_folder: str, batch_index: int) -> Path:
-    return output_path / f"_SUCCESS_{_batch_prefix(input_folder, batch_index)}"
-
-
-def _batch_marker_payload(num_shards: int, batch: list[Path]) -> dict:
-    return {
-        "num_shards": num_shards,
-        "files": [{"name": path.name, "size": path.stat().st_size} for path in batch],
-    }
-
-
-def _batch_is_valid(
-    output_path: Path,
-    input_folder: str,
-    batch_index: int,
-    num_shards: int,
-    batch: list[Path],
-) -> bool:
-    marker = _read_marker(_batch_marker_path(output_path, input_folder, batch_index))
-    return marker == _batch_marker_payload(num_shards, batch)
 
 
 def _purge_batch_outputs(output_path: Path, prefix: str) -> None:
@@ -85,17 +39,19 @@ def _configure_connection(
 
 def _shard_batch(
     conn: duckdb.DuckDBPyConnection,
-    local_input: Path,
+    local_input: list[Path],
     local_output: Path,
     id_column: str,
     num_shards: int,
     filename_prefix: str,
 ) -> None:
+    input_files = ", ".join(f"'{p}'" for p in local_input)
+
     conn.sql(
         f"""
         COPY (
             SELECT *, hash({id_column}) % {num_shards} AS shard_id
-            FROM read_parquet('{local_input}/*.parquet')
+            FROM read_parquet([{input_files}])
         )
         TO '{local_output}'
         (FORMAT parquet, COMPRESSION zstd, PARTITION_BY (shard_id),
@@ -124,11 +80,6 @@ def _process_batch(
         local_output,
     ):
         _shard_batch(conn, local_input, local_output, id_column, num_shards, prefix)
-
-    _write_marker(
-        _batch_marker_path(output_path, input_folder, batch_index),
-        _batch_marker_payload(num_shards, batch),
-    )
 
 
 @click.command("shard_candidates")
@@ -219,15 +170,27 @@ def shard_candidates(
             f"folder={input_folder} resolved to zero parquet files at {input_path}"
         )
 
-    if _partition_is_valid(output, num_shards, input_folder):
-        logger.info(
-            "Partition already valid, skipping shard creation",
-            folder=input_folder,
-            num_shards=num_shards,
-            output_path=output_path,
-        )
-        click.echo("Done!")
-        return
+    manifest_data = {
+        "input_path": input_path,
+        "output_path": output_path,
+        "num_shards": num_shards,
+        "id_column": id_column,
+        "max_batch_gib": max_batch_gib,
+    }
+
+    manifest_path = f"{input_path.rstrip('/')}.manifest.json"
+    manifest = Manifest(data=manifest_data, filepath=manifest_path)
+
+    try:
+        if manifest.exists_superset():
+            logger.info(
+                "Valid manifest found.",
+                manifest=manifest.data,
+            )
+            click.echo("Done!")
+            return
+    except Exception as e:
+        logger.warning("Failed to load existing manifest, re-generating.", error=str(e))
 
     conn = duckdb.connect()
     _configure_connection(conn, num_workers, num_shards, memory_limit)
@@ -248,15 +211,9 @@ def shard_candidates(
 
     output.mkdir(parents=True, exist_ok=True)
 
-    for batch_index, batch in enumerate(batches):
-        if _batch_is_valid(output, input_folder, batch_index, num_shards, batch):
-            logger.info(
-                "Batch already valid, skipping",
-                folder=input_folder,
-                batch=batch_index,
-            )
-            continue
+    start_time = time.perf_counter()
 
+    for batch_index, batch in enumerate(batches):
         _process_batch(
             conn,
             batch,
@@ -269,16 +226,15 @@ def shard_candidates(
             scratch_dir,
         )
         logger.info(
-            "Flushed batch",
+            "Processed batch",
             folder=input_folder,
             batch=batch_index,
             files=len(batch),
         )
 
-    _write_marker(
-        _partition_marker_path(output, input_folder),
-        _partition_marker_payload(num_shards),
-    )
+    elapsed_time = time.perf_counter() - start_time
+    manifest.data["run_time"] = str(datetime.timedelta(seconds=elapsed_time))
+    manifest.save()
 
     logger.info(
         "Finished hash-partitioning candidates",
@@ -287,3 +243,7 @@ def shard_candidates(
         output_path=output_path,
     )
     click.echo("Done!")
+
+
+if __name__ == "__main__":
+    shard_candidates()
