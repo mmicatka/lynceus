@@ -1,67 +1,56 @@
 # libs/lynceus-core/src/lynceus_core/io/staged_io.py
 
-import shutil
 import tempfile
-import time
-from collections.abc import Callable, Generator
-from concurrent.futures import ThreadPoolExecutor
+from collections.abc import Generator, Sequence
 from contextlib import contextmanager
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Sequence
 
-import structlog
-
-logger = structlog.get_logger()
+from lynceus_core.io.transfer import DEFAULT_RETRY_POLICY, RetryPolicy, copy_pairs
 
 
-@dataclass(frozen=True)
-class RetryPolicy:
-    attempts: int = 5
-    backoff_seconds: float = 0.5
+def _ensure_unique_names(paths: Sequence[Path]) -> None:
+    names = [path.name for path in paths]
+    duplicates = sorted({name for name in names if names.count(name) > 1})
+    if duplicates:
+        raise ValueError(f"Input files share basenames: {duplicates}")
 
 
-def _retry_on_missing_path(
-    operation: Callable[[], None], description: str, policy: RetryPolicy
-) -> None:
-    for attempt in range(1, policy.attempts + 1):
-        try:
-            operation()
-            return
-        except FileNotFoundError as error:
-            if attempt == policy.attempts:
-                raise RuntimeError(
-                    f"{description} failed after {policy.attempts} attempts"
-                ) from error
-            logger.warning(
-                "Retrying after missing path",
-                description=description,
-                attempt=attempt,
-                error=str(error),
-            )
-            time.sleep(policy.backoff_seconds * attempt)
+def _list_files(root: Path) -> list[Path]:
+    return sorted(path for path in root.rglob("*") if path.is_file())
 
 
-def _copy_file(source: Path, destination: Path, policy: RetryPolicy) -> None:
-    def copy() -> None:
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(source, destination)
-
-    _retry_on_missing_path(copy, f"copy to {destination}", policy)
-
-
-def _copy_pairs(
-    pairs: Sequence[tuple[Path, Path]],
+@contextmanager
+def staged_input(
+    input_files: Sequence[Path],
     transfers: int,
-    policy: RetryPolicy,
-) -> None:
-    with ThreadPoolExecutor(max_workers=transfers) as executor:
-        futures = [
-            executor.submit(_copy_file, source, destination, policy)
-            for source, destination in pairs
-        ]
-        for future in futures:
-            future.result()
+    scratch_dir: str | None = None,
+    retry_policy: RetryPolicy = DEFAULT_RETRY_POLICY,
+) -> Generator[list[Path]]:
+    _ensure_unique_names(input_files)
+    with tempfile.TemporaryDirectory(dir=scratch_dir) as scratch:
+        local_files = [Path(scratch) / path.name for path in input_files]
+        copy_pairs(list(zip(input_files, local_files)), transfers, retry_policy)
+        yield local_files
+
+
+@contextmanager
+def staged_output(
+    output_path: Path,
+    transfers: int,
+    scratch_dir: str | None = None,
+    retry_policy: RetryPolicy = DEFAULT_RETRY_POLICY,
+) -> Generator[Path]:
+    with tempfile.TemporaryDirectory(dir=scratch_dir) as scratch:
+        local_output = Path(scratch)
+        yield local_output
+        copy_pairs(
+            [
+                (path, output_path / path.relative_to(local_output))
+                for path in _list_files(local_output)
+            ],
+            transfers,
+            retry_policy,
+        )
 
 
 @contextmanager
@@ -70,25 +59,12 @@ def staged_io(
     output_path: Path,
     transfers: int,
     scratch_dir: str | None = None,
-    retry_policy: RetryPolicy = RetryPolicy(),
-) -> Generator[tuple[Path, Path]]:
-    with tempfile.TemporaryDirectory(dir=scratch_dir) as scratch:
-        local_input = Path(scratch) / "input"
-        local_output = Path(scratch) / "output"
-        local_input.mkdir()
-        local_output.mkdir()
-        _copy_pairs(
-            [(path, local_input / path.name) for path in input_files],
-            transfers,
-            retry_policy,
-        )
-        yield local_input, local_output
-        _copy_pairs(
-            [
-                (path, output_path / path.relative_to(local_output))
-                for path in sorted(local_output.rglob("*"))
-                if path.is_file()
-            ],
-            transfers,
-            retry_policy,
-        )
+    retry_policy: RetryPolicy = DEFAULT_RETRY_POLICY,
+) -> Generator[tuple[list[Path], Path]]:
+    with (
+        staged_input(input_files, transfers, scratch_dir, retry_policy) as local_inputs,
+        staged_output(
+            output_path, transfers, scratch_dir, retry_policy
+        ) as local_output,
+    ):
+        yield local_inputs, local_output

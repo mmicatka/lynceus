@@ -7,7 +7,11 @@ from workflows.registry.candidates.load import build_load_candidates_dag
 from workflows.registry.candidates.preprocess import (
     build_preprocess_candidates_dag,
 )
-from workflows.registry.common import ENTRYPOINT_DAG, get_template_factory, new_workflow
+from workflows.registry.common.core import (
+    ENTRYPOINT_DAG,
+    get_template_factory,
+    new_workflow,
+)
 
 
 def build_candidates_workflow(

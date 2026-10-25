@@ -29,11 +29,8 @@ def load_manifest(manifest_path: Path) -> dict:
 
 
 def write_manifest(output_path: Path, manifest: dict) -> None:
-    tmp_path = f"{output_path}.tmp"
-
-    with open(tmp_path, "w") as f:
+    with open(output_path, "w") as f:
         json.dump(manifest, f, indent=2, sort_keys=True)
-    os.replace(tmp_path, output_path)
 
 
 def run_key(member_id: str, site_id: str) -> str:

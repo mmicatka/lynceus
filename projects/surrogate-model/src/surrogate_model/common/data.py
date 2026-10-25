@@ -5,6 +5,8 @@ from typing import Optional
 import numpy as np
 import polars as pl
 
+AFFINITY_COLUMN_NAME = "affinity_kcal_mol"
+
 
 def load_and_clean_data(
     features: pl.DataFrame, labels: Optional[pl.DataFrame] = None
@@ -13,7 +15,7 @@ def load_and_clean_data(
 
     if labels is not None:
         df = df.join(labels, on="id")
-        df = df.filter(pl.col("affinity_kcal_mol") < 0)
+        df = df.filter(pl.col(AFFINITY_COLUMN_NAME) < 0)
 
     return df
 
@@ -35,19 +37,10 @@ def flatten_features(df: pl.DataFrame, feature_cols=None) -> np.ndarray:
     return np.hstack(feature_arrays)
 
 
-def label(
-    raw: pl.Series | np.ndarray,
-    threshold: Optional[float] = None,
-    percentile: Optional[float] = None,
-) -> tuple[np.ndarray, float]:
+def compute_labels(raw: pl.Series | np.ndarray, threshold: float) -> np.ndarray:
     if isinstance(raw, pl.Series):
         raw = raw.to_numpy()
 
-    if threshold is None:
-        if percentile is None:
-            raise ValueError("Either 'threshold' or 'percentile' must be provided.")
-        threshold = float(np.percentile(raw, percentile))
-
     labels = (raw <= threshold).astype(int)
 
-    return labels, threshold
+    return labels

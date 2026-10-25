@@ -3,7 +3,7 @@
 REGISTRY ?= registry.nebula.lan:5000
 IMAGE_PREFIX := $(REGISTRY)/lynceus
 
-SCREEN_CONFIG ?= conf/screen/10m-poc.yaml
+SCREEN_CONFIG ?= conf/screen/5m-poc.yaml
 INFRA_CONFIG ?= conf/infra/dev.yaml
 
 NAMESPACE ?= workflows

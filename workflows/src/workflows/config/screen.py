@@ -19,12 +19,12 @@ class CandidatesConfig(StrictModel):
 
 
 class RoundConfig(StrictModel):
-    active: int = Field(ge=0)
-    uniform: PositiveInt
+    top: int = Field(ge=0)
+    random: PositiveInt
 
     @property
     def total(self) -> int:
-        return self.active + self.uniform
+        return self.top + self.random
 
 
 class HyperparametersConfig(StrictModel):
@@ -38,13 +38,14 @@ class SurrogateConfig(StrictModel):
     validation: PositiveInt
     rounds: list[RoundConfig] = Field(min_length=1)
     seed: int
+    active_percentile: float
     hyperparameters: HyperparametersConfig = Field(
         default_factory=HyperparametersConfig
     )
 
     @model_validator(mode="after")
-    def _first_round_is_uniform_only(self) -> "SurrogateConfig":
-        if self.rounds[0].active != 0:
+    def _first_round_is_random_only(self) -> "SurrogateConfig":
+        if self.rounds[0].top != 0:
             raise ValueError(
                 "rounds[0].active must be 0: no model exists before round 0"
             )

@@ -20,6 +20,7 @@ candidates:
   num_shards: 8
 
 templates:
+  ##### Candidates #####
   load_candidates:
     resources: &med_cpu
       requests: &med_cpu_res
@@ -56,6 +57,8 @@ templates:
   generate_features:
     resources: *med_cpu
     image: *candidates_image
+
+  ##### Targets #####
   download_pdbs:
     resources: &low_cpu
       requests: &low_cpu_res
@@ -73,10 +76,21 @@ templates:
   resolve_binding_sites:
     resources: *low_cpu
     image: *targets_image
-  surrogate_sample:
-    resources: *high_cpu
+
+  ##### Surrogate #####
+  verify_manifest:
+    resources: *low_cpu
     image: &surrogate_image
       image: registry.nebula.lan:5000/lynceus/surrogate-model:0.1.0
+  surrogate_sample:
+    resources: *high_cpu
+    image: *surrogate_image
+  surrogate_sample_by_prediction:
+    resources: *high_cpu
+    image: *surrogate_image
+  surrogate_train:
+    resources: *high_cpu
+    image: *surrogate_image
   run_docking:
     image:
       image: registry.nebula.lan:5000/lynceus/lynceus-dock:0.1.0

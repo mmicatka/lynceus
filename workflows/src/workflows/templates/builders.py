@@ -106,7 +106,7 @@ class TemplateFactory:
             volumes.append(_to_hera_scratch_volume(template.scratch))
         return volumes
 
-    def build(self, name: TemplateName, func: Callable) -> Callable:
+    def build(self, name: TemplateName, func: Callable, **kwargs) -> Callable:
         template = self.templates[name]
         return script(
             name=_to_template_name(name),
@@ -119,4 +119,5 @@ class TemplateFactory:
             node_selector=template.node_selector or None,
             tolerations=_to_hera_tolerations(template.tolerations),
             pod_spec_patch=_to_pod_spec_patch(template.runtime_class_name),
+            **kwargs,
         )(func)

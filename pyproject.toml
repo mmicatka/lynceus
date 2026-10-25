@@ -51,6 +51,7 @@ dev = [
     "ruff>=0.15.21",
     "yamllint>=1.38.0",
     "pre-commit>=4.6.0",
+    "pytest>=9.1.1",
 ]
 
 [tool.ruff.lint]

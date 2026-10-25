@@ -4,7 +4,11 @@ from hera.workflows import DAG, Workflow
 
 from workflows.config import InfraConfig, ScreenConfig
 from workflows.config.infrastructure import TemplateName
-from workflows.registry.common import ENTRYPOINT_DAG, get_template_factory, new_workflow
+from workflows.registry.common.core import (
+    ENTRYPOINT_DAG,
+    get_template_factory,
+    new_workflow,
+)
 from workflows.registry.surrogate.sample_site import build_surrogate_site_dag
 from workflows.templates.targets.resolve_binding_sites import (
     resolve_binding_sites_template,

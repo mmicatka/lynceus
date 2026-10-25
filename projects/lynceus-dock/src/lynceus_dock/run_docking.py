@@ -1,6 +1,8 @@
 # projects/lynceus-dock/src/lynceus_dock/run_docking.py
 
+import datetime
 import tempfile
+import time
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
@@ -8,8 +10,9 @@ from typing import Any, Generator
 
 import click
 from lynceus_core.logging import get_lynceus_logger, wide_log
+from lynceus_core.manifest.common import Manifest as LynceusManifest
+from protein_ensemble import Manifest
 from protein_ensemble.accessors.pdbqt import member_to_pdbqt
-from protein_ensemble.manifest import Manifest
 
 from lynceus_dock.common.ligand import count_ligand_rows, iter_ligand_records
 from lynceus_dock.common.manifest import (
@@ -70,6 +73,7 @@ def _build_provider(search_mode: str, num_modes: int, out_dir: Path | None):
     provider_kwargs: dict[str, Any] = {
         "search_mode": search_mode,
         "num_modes": num_modes,
+        "logger": logger,
     }
     if out_dir:
         provider_kwargs["out_dir"] = out_dir
@@ -271,6 +275,42 @@ def run_docking(
     default_altloc: str,
     allow_bad_residues: bool,
 ) -> None:
+    click.echo(
+        f"Running docking for {ensemble}:{member_id} with ligands {ligands_path}..."
+    )
+
+    start_time = time.perf_counter()
+
+    manifest = {
+        "ensemble": str(ensemble),
+        "member_id": member_id,
+        "ligands_path": ligands_path,
+        "center": center,
+        "size": size,
+        "search_mode": search_mode,
+        "num_modes": num_modes,
+        "out_dir": str(out_dir) if out_dir else None,
+    }
+
+    manifest_path = str(Path(out_parquet).with_suffix(".manifest.json"))
+    target_manifest = LynceusManifest(data=manifest, filepath=manifest_path)
+    disk_manifest = LynceusManifest(filepath=manifest_path)
+
+    if disk_manifest.exists():
+        try:
+            disk_manifest.load()
+            if target_manifest <= disk_manifest:
+                logger.info(
+                    "Valid manifest found.",
+                    manifest=disk_manifest,
+                )
+                click.echo("Done!")
+                return
+        except Exception as e:
+            logger.warning(
+                "Failed to load existing manifest, re-generating.", error=str(e)
+            )
+
     identity = RunIdentity(
         member_id=member_id,
         site_id=site_id,
@@ -313,9 +353,15 @@ def run_docking(
         )
 
     _record_run(manifest, manifest_path, identity, pose_row_count)
+
+    elapsed_time = time.perf_counter() - start_time
+    target_manifest.data["run_time"] = str(datetime.timedelta(seconds=elapsed_time))
+    target_manifest.save()
+
     logger.info(
         "Finished docking run",
         out_parquet=out_parquet,
         manifest_file_path=manifest_path,
         pose_row_count=pose_row_count,
+        elapsed_time=elapsed_time,
     )

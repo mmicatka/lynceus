@@ -9,15 +9,22 @@ authors = [{ name = "Mike Micatka", email = "mike.micatka@gmail.com" }]
 requires-python = ">=3.14"
 dependencies = [
     "click>=8.5.0",
+    "joblib>=1.6.0",
+    "lightgbm>=4.7.0",
     "lynceus-core",
     "numpy>=2.5.4",
     "polars>=2.0.0",
     "pyarrow>=26.0.0",
+    "pydantic>=2.14.1",
+    "scikit-learn>=1.9.1",
+    "scipy>=1.18.1",
     "structlog>=26.1.0",
 ]
 
 [project.scripts]
-surrogate-sample = "surrogate_model:sample_candidates"
+surrogate-sample = "surrogate_model:sample_surrogate_candidates"
+surrogate-train = "surrogate_model:train_model"
+surrogate-sample-by-prediction = "surrogate_model:sample_candidates_by_prediction"
 
 [build-system]
 requires = ["uv_build>=0.12.23,<0.13.0"]

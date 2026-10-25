@@ -30,8 +30,11 @@ class TemplateName(StrEnum):
     GENERATE_MANIFEST = "generate_manifest"
     DETECT_BINDING_SITES = "detect_binding_sites"
     RESOLVE_BINDING_SITES = "resolve_binding_sites"
-    SURROGATE_SAMPLE = "surrogate_sample"
     RUN_DOCKING = "run_docking"
+    SURROGATE_SAMPLE = "surrogate_sample"
+    SURROGATE_SAMPLE_BY_PREDICTION = "surrogate_sample_by_prediction"
+    SURROGATE_TRAIN = "surrogate_train"
+    VERIFY_MANIFEST = "verify_manifest"
 
 
 class CandidatePrefixes(StrictModel):
