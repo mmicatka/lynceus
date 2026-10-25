@@ -490,7 +490,7 @@ spec:
           - name: num_samples
             value: '1250'
           - name: seed
-            value: '1000'
+            value: '1010'
       - name: merge-samples
         depends: sample-shards
         template: merge-shards
@@ -536,7 +536,7 @@ spec:
           - name: num_samples
             value: '1250'
           - name: seed
-            value: '1001'
+            value: '1011'
       - name: merge-samples
         depends: sample-shards
         template: merge-shards
@@ -586,7 +586,7 @@ spec:
           - name: num_random
             value: '625'
           - name: seed
-            value: '1002'
+            value: '1012'
       - name: merge-samples
         depends: sample-shards
         template: merge-shards
@@ -636,7 +636,7 @@ spec:
           - name: num_random
             value: '625'
           - name: seed
-            value: '1003'
+            value: '1013'
       - name: merge-samples
         depends: sample-shards
         template: merge-shards

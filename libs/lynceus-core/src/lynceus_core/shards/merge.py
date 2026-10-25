@@ -11,7 +11,7 @@ import duckdb
 
 from lynceus_core.io.staged_io import staged_output
 from lynceus_core.logging import get_lynceus_logger, wide_log
-from lynceus_core.manifest.common import MANIFEST_SUFFIX, Manifest
+from lynceus_core.manifest.common import Manifest
 
 DEFAULT_ROW_GROUP_SIZE = 5_000
 PARQUET_GLOB = "*.parquet"
@@ -119,7 +119,7 @@ def merge_shards(
         click.echo("Done!")
         return
 
-    manifest_path = f"{output_file}.{MANIFEST_SUFFIX}"
+    manifest_path = str(Path(output_file).with_suffix(".manifest.json"))
     manifest_data = {
         "input_files": input_files,
     }

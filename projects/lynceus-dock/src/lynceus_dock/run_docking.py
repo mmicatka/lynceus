@@ -291,9 +291,7 @@ def run_docking(
         "out_dir": str(out_dir) if out_dir else None,
     }
 
-    identifier = Path(out_parquet).stem
-
-    manifest_path = f"{identifier}.manifest.json"
+    manifest_path = str(Path(out_parquet).with_suffix(".manifest.json"))
     target_manifest = LynceusManifest(data=manifest, filepath=manifest_path)
     disk_manifest = LynceusManifest(filepath=manifest_path)
 

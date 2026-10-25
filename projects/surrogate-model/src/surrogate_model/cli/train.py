@@ -142,6 +142,8 @@ def train_model(
 
     threshold = get_validation_threshold(validation_labels_path)
 
+    logger.info("threshold", threshold=threshold)
+
     manifest_data = _build_manifest(
         train_features_path=train_features_path,
         train_labels_path=train_labels_path,
@@ -151,7 +153,7 @@ def train_model(
         threshold=threshold,
     )
 
-    manifest_path = f"{Path(model_path).stem}.manifest.json"
+    manifest_path = str(Path(model_path).with_suffix(".manifest.json"))
 
     manifest = Manifest(data=manifest_data, filepath=manifest_path)
 

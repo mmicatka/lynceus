@@ -183,7 +183,7 @@ def sample_candidates_by_prediction(
         "seed": seed,
     }
 
-    manifest_path = f"{identifier}.manifest.json"
+    manifest_path = str(Path(output_path).with_suffix(".manifest.json"))
     manifest = Manifest(data=manifest_data, filepath=manifest_path)
 
     try:
