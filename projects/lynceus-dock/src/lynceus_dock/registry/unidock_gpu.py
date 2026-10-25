@@ -6,7 +6,7 @@ import logging
 import shutil
 import subprocess
 from pathlib import Path
-from typing import Iterator
+from typing import Any, Iterator
 
 from lynceus_dock.common.ligand import materialize_ligands
 from lynceus_dock.common.logging import log_progress
@@ -18,8 +18,6 @@ from lynceus_dock.common.types import (
 )
 
 from .common import DockingProvider, ProviderNotAvailableError, parse_vina_output_pdbqt
-
-logger = logging.getLogger(__name__)
 
 _DEFAULT_BATCH_SIZE = 1000
 _DEFAULT_SEARCH_MODE = "balance"
@@ -55,11 +53,13 @@ class UnidockGPUProvider(DockingProvider):
         search_mode: str = _DEFAULT_SEARCH_MODE,
         num_modes: int = _DEFAULT_NUM_MODES,
         out_dir: Path | None = None,
+        logger: Any = logging.getLogger(__name__),
     ) -> None:
         self.search_mode = search_mode
         self.num_modes = num_modes
         self.out_dir = out_dir or Path.cwd() / "unidock_gpu_out"
         self.quarantine = UnidockCrashQuarantine()
+        self.logger = logger
 
     def validate_environment(self) -> None:
         if shutil.which(_UNIDOCK_BINARY) is None:
@@ -114,7 +114,7 @@ class UnidockGPUProvider(DockingProvider):
                 n_ligands_quarantined += n_quarantined_this_chunk
                 n_failed_this_chunk = len(chunk) - n_yielded_this_chunk
                 n_ligands_failed += n_failed_this_chunk
-                logger.info(
+                self.logger.info(
                     "unidock chunk %d/%d: %d/%d ligands produced results "
                     "(%d failed, %d quarantined due to crashes)",
                     chunk_idx,
@@ -126,7 +126,7 @@ class UnidockGPUProvider(DockingProvider):
                 )
 
             if n_ligands_failed:
-                logger.warning(
+                self.logger.warning(
                     "unidock dock_batch complete: %d/%d ligands failed to produce "
                     "results across %d chunk(s). See preceding WARNING/ERROR log "
                     "lines for per-ligand detail.",
@@ -135,7 +135,7 @@ class UnidockGPUProvider(DockingProvider):
                     n_chunks,
                 )
             if self.quarantine:
-                logger.warning(
+                self.logger.warning(
                     "unidock dock_batch complete: %d ligand(s) quarantined after "
                     "repeated subprocess crashes (isolated via bisection). See "
                     "provider.quarantine.entries for the full list.",
@@ -146,7 +146,7 @@ class UnidockGPUProvider(DockingProvider):
             _generate(),
             total=len(ligands),
             every=chunk_size,
-            logger=logger,
+            logger=self.logger,
         )
 
     def _run_gpu_batch_contained(
@@ -184,7 +184,7 @@ class UnidockGPUProvider(DockingProvider):
             proc = exc.proc
 
         if crashed:
-            logger.error(
+            self.logger.error(
                 "unidock subprocess crashed (returncode=%d) on a batch of "
                 "%d ligand(s) in %s: %s",
                 proc.returncode,
@@ -205,7 +205,7 @@ class UnidockGPUProvider(DockingProvider):
                 return
 
             if retries_used < _MAX_CRASH_RETRIES_PER_BATCH:
-                logger.warning(
+                self.logger.warning(
                     "Retrying crashed sub-batch of %d ligand(s) once "
                     "(retry %d/%d) before bisecting.",
                     len(unresolved),
@@ -223,7 +223,7 @@ class UnidockGPUProvider(DockingProvider):
 
             if len(unresolved) <= _MIN_BISECT_SIZE:
                 ligand_ids = list(unresolved.keys())
-                logger.error(
+                self.logger.error(
                     "Quarantining %d ligand(s) after repeated unidock "
                     "crashes at minimum bisection size: %s",
                     len(unresolved),
@@ -242,7 +242,7 @@ class UnidockGPUProvider(DockingProvider):
             items = list(unresolved.items())
             midpoint = len(items) // 2
             left, right = dict(items[:midpoint]), dict(items[midpoint:])
-            logger.warning(
+            self.logger.warning(
                 "Bisecting crashed sub-batch of %d ligand(s) into halves "
                 "of %d and %d to isolate the failure.",
                 len(unresolved),
@@ -321,7 +321,7 @@ class UnidockGPUProvider(DockingProvider):
             candidates = list(chunk_out_dir.glob(f"{ligand_id}_out.pdbqt"))
 
             if not candidates:
-                logger.warning(
+                self.logger.warning(
                     "unidock produced no output file for ligand '%s' "
                     "(expected %s) -- skipping. This ligand will be "
                     "absent from results.",
@@ -331,7 +331,7 @@ class UnidockGPUProvider(DockingProvider):
                 continue
 
             if len(candidates) > 1:
-                logger.error(
+                self.logger.error(
                     "Ambiguous output for ligand '%s' in %s: found %d "
                     "matching files (%s) -- skipping rather than "
                     "guessing which is correct.",
@@ -345,7 +345,7 @@ class UnidockGPUProvider(DockingProvider):
             try:
                 results = parse_vina_output_pdbqt(candidates[0], ligand_id=ligand_id)
             except DockingError as exc:
-                logger.warning(
+                self.logger.warning(
                     "Failed to parse unidock output for ligand '%s' "
                     "(%s) -- skipping: %s",
                     ligand_id,
@@ -357,7 +357,7 @@ class UnidockGPUProvider(DockingProvider):
             if results:
                 yield ligand_id, results
             else:
-                logger.warning(
+                self.logger.warning(
                     "unidock output for ligand '%s' (%s) parsed to zero "
                     "poses -- skipping.",
                     ligand_id,

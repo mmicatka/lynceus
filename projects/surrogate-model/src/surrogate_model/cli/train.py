@@ -179,6 +179,8 @@ def train_model(
         threshold=threshold,
     )
 
+    logger.info("dataset", label_bins=np.bincount(y_initial_label))
+
     x_initial_train, x_initial_test, y_initial_train, y_initial_test = train_test_split(
         x_initial, y_initial_label, train_size=0.8, random_state=RANDOM_SEED
     )
