@@ -14,6 +14,8 @@ DEFAULT_STREAM_BATCH_ROWS = 10_000
 PARQUET_COMPRESSION = "zstd"
 POSE_COLUMN = "pose_pdbqt"
 
+RESULTS_FILENAME = "docking.results.parquet"
+
 DOCKING_RESULTS_SCHEMA = pa.schema(
     [
         pa.field("id", pa.string(), nullable=False),
@@ -108,18 +110,22 @@ def docking_results_to_table(
     return pa.Table.from_batches(batches, schema=DOCKING_RESULTS_SCHEMA)
 
 
+def _resolve_results_file(output_path: str) -> Path:
+    path = Path(output_path)
+    if path.suffix != ".parquet":
+        path = path / RESULTS_FILENAME
+    return path
+
+
 def _write_result_batches(
     batches: Iterable[pa.RecordBatch],
-    output_path: Path,
+    results_file: Path,
     schema: pa.Schema,
 ) -> int:
     row_count = 0
 
-    if output_path.suffix != ".parquet":
-        output_path = output_path / "docking.results.parquet"
-
     with pq.ParquetWriter(
-        output_path, schema, compression=PARQUET_COMPRESSION
+        results_file, schema, compression=PARQUET_COMPRESSION
     ) as writer:
         for batch in batches:
             writer.write_batch(batch.select(schema.names))
@@ -137,8 +143,8 @@ def write_results(
     batch_rows: int = DEFAULT_STREAM_BATCH_ROWS,
     drop_pose_column: bool = False,
 ) -> int:
-    local_path = Path(output_path)
-    local_path.parent.mkdir(parents=True, exist_ok=True)
+    results_file = _resolve_results_file(output_path)
+    results_file.parent.mkdir(parents=True, exist_ok=True)
 
     batches = iter_docking_result_batches(
         results_iter,
@@ -147,8 +153,6 @@ def write_results(
         batch_rows=batch_rows,
     )
 
-    row_count = _write_result_batches(
-        batches, local_path, _output_schema(drop_pose_column)
+    return _write_result_batches(
+        batches, results_file, _output_schema(drop_pose_column)
     )
-
-    return row_count

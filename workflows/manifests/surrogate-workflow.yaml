@@ -121,7 +121,7 @@ spec:
       - name: ligands_path
       - name: center
       - name: site_id
-      - name: out_parquet
+      - name: output_path
       - name: size
         default: 'null'
       - name: search_mode
@@ -172,8 +172,8 @@ spec:
         except: num_modes = r'''{{inputs.parameters.num_modes}}'''
         try: out_dir = json.loads(r'''{{inputs.parameters.out_dir}}''')
         except: out_dir = r'''{{inputs.parameters.out_dir}}'''
-        try: out_parquet = json.loads(r'''{{inputs.parameters.out_parquet}}''')
-        except: out_parquet = r'''{{inputs.parameters.out_parquet}}'''
+        try: output_path = json.loads(r'''{{inputs.parameters.output_path}}''')
+        except: output_path = r'''{{inputs.parameters.output_path}}'''
         try: parquet_batch_rows = json.loads(r'''{{inputs.parameters.parquet_batch_rows}}''')
         except: parquet_batch_rows = r'''{{inputs.parameters.parquet_batch_rows}}'''
         try: search_mode = json.loads(r'''{{inputs.parameters.search_mode}}''')
@@ -184,7 +184,7 @@ spec:
         except: size = r'''{{inputs.parameters.size}}'''
 
         import subprocess
-        cmd = ['run-docking', '--ensemble', str(ensemble), '--member-id', str(member_id), '--ligands-path', str(ligands_path), '--center', str(center[0]), str(center[1]), str(center[2]), '--site-id', str(site_id), '--out-parquet', str(out_parquet), '--search-mode', str(search_mode), '--num-modes', str(num_modes), '--parquet-batch-rows', str(parquet_batch_rows), '--default-altloc', str(default_altloc)]
+        cmd = ['run-docking', '--ensemble', str(ensemble), '--member-id', str(member_id), '--ligands-path', str(ligands_path), '--center', str(center[0]), str(center[1]), str(center[2]), '--site-id', str(site_id), '--output', str(output_path), '--search-mode', str(search_mode), '--num-modes', str(num_modes), '--parquet-batch-rows', str(parquet_batch_rows), '--default-altloc', str(default_altloc)]
         if size is not None:
             cmd.extend(['--size', str(size[0]), str(size[1]), str(size[2])])
         if batch_size is not None:
@@ -888,8 +888,8 @@ spec:
             value: '{{inputs.parameters.center}}'
           - name: site_id
             value: '{{inputs.parameters.site_id}}'
-          - name: out_parquet
-            value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/docking_results.parquet
+          - name: output_path
+            value: surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation
       - name: verify-manifest-round-0
         depends: dock-validation
         template: verify-manifest
@@ -924,8 +924,8 @@ spec:
             value: '{{inputs.parameters.center}}'
           - name: site_id
             value: '{{inputs.parameters.site_id}}'
-          - name: out_parquet
-            value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/docking_results.parquet
+          - name: output_path
+            value: surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0
       - name: train-round-0
         depends: dock-round-0
         template: surrogate-train
@@ -975,8 +975,8 @@ spec:
             value: '{{inputs.parameters.center}}'
           - name: site_id
             value: '{{inputs.parameters.site_id}}'
-          - name: out_parquet
-            value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/docking_results.parquet
+          - name: output_path
+            value: surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1
       - name: train-round-1
         depends: dock-round-1
         template: surrogate-train
@@ -1026,8 +1026,8 @@ spec:
             value: '{{inputs.parameters.center}}'
           - name: site_id
             value: '{{inputs.parameters.site_id}}'
-          - name: out_parquet
-            value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/docking_results.parquet
+          - name: output_path
+            value: surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2
       - name: train-round-2
         depends: dock-round-2
         template: surrogate-train
@@ -1077,8 +1077,8 @@ spec:
             value: '{{inputs.parameters.center}}'
           - name: site_id
             value: '{{inputs.parameters.site_id}}'
-          - name: out_parquet
-            value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/docking_results.parquet
+          - name: output_path
+            value: surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3
       - name: train-round-3
         depends: dock-round-3
         template: surrogate-train
@@ -1128,8 +1128,8 @@ spec:
             value: '{{inputs.parameters.center}}'
           - name: site_id
             value: '{{inputs.parameters.site_id}}'
-          - name: out_parquet
-            value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/docking_results.parquet
+          - name: output_path
+            value: surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4
       - name: train-round-4
         depends: dock-round-4
         template: surrogate-train
@@ -1179,8 +1179,8 @@ spec:
             value: '{{inputs.parameters.center}}'
           - name: site_id
             value: '{{inputs.parameters.site_id}}'
-          - name: out_parquet
-            value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_5/docking_results.parquet
+          - name: output_path
+            value: surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_5
       - name: train-round-5
         depends: dock-round-5
         template: surrogate-train
@@ -1230,8 +1230,8 @@ spec:
             value: '{{inputs.parameters.center}}'
           - name: site_id
             value: '{{inputs.parameters.site_id}}'
-          - name: out_parquet
-            value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_6/docking_results.parquet
+          - name: output_path
+            value: surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_6
       - name: train-round-6
         depends: dock-round-6
         template: surrogate-train
