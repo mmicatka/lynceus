@@ -1,8 +1,9 @@
 # projects/candidates/src/candidates/processing/conformer.py
 
-
+import datetime
 import json
 import os
+import time
 from concurrent.futures import ProcessPoolExecutor
 
 import click
@@ -28,6 +29,30 @@ EMBED_PARAMS.maxIterations = 50
 EMBED_PARAMS.numThreads = 1
 
 OPTIMIZE_MAX_ITERS = 50
+
+
+class Manifest:
+    def __init__(self, data: dict, filepath: str):
+        self.data = data
+        self.filepath = filepath
+
+    def exists_superset(self) -> bool:
+        if not os.path.exists(self.filepath):
+            return False
+        try:
+            with open(self.filepath, "r") as f:
+                saved_data = json.load(f)
+            for key, value in self.data.items():
+                if saved_data.get(key) != value:
+                    return False
+            return True
+        except Exception:
+            return False
+
+    def save(self):
+        os.makedirs(os.path.dirname(self.filepath), exist_ok=True)
+        with open(self.filepath, "w") as f:
+            json.dump(self.data, f, indent=2)
 
 
 def _process_chunk(
@@ -69,30 +94,6 @@ def _process_chunk(
 def _chunk_list(input_list, size):
     for i in range(0, len(input_list), size):
         yield input_list[i : i + size]
-
-
-def _marker_path(output_path: str, identifier: str) -> str:
-    base_dir = os.path.dirname(output_path)
-    return os.path.join(base_dir, f"_SUCCESS_{identifier}")
-
-
-def _state_is_valid(output_path: str, num_rows: int, identifier: str) -> bool:
-    marker_path = _marker_path(output_path, identifier)
-    if not os.path.exists(marker_path):
-        return False
-    try:
-        with open(marker_path, "r") as f:
-            data = json.load(f)
-            return data.get("num_rows") == num_rows
-    except Exception:
-        return False
-
-
-def _write_success_marker(output_path: str, num_rows: int, identifier: str) -> None:
-    marker_path = _marker_path(output_path, identifier)
-    os.makedirs(os.path.dirname(marker_path), exist_ok=True)
-    with open(marker_path, "w") as f:
-        json.dump({"num_rows": num_rows}, f)
 
 
 @click.command("generate_conformers")
@@ -152,15 +153,27 @@ def generate_conformers(
     parquet_file = pq.ParquetFile(input_path)
     num_rows = parquet_file.metadata.num_rows
 
-    if _state_is_valid(output_path, num_rows, identifier):
-        logger.info(
-            "Conformers already valid, skipping generation",
-            file=identifier,
-            num_rows=num_rows,
-            output_path=output_path,
-        )
-        click.echo("Done!")
-        return
+    manifest_data = {
+        "input_path": input_path,
+        "output_path": output_path,
+        "num_rows": num_rows,
+        "batch_size": batch_size,
+        "chunk_size": chunk_size,
+    }
+
+    manifest_path = f"{output_path.rstrip('/')}.manifest.json"
+    manifest = Manifest(data=manifest_data, filepath=manifest_path)
+
+    try:
+        if manifest.exists_superset():
+            logger.info(
+                "Valid manifest found.",
+                manifest=manifest.data,
+            )
+            click.echo("Done!")
+            return
+    except Exception as e:
+        logger.warning("Failed to load existing manifest, re-generating.", error=str(e))
 
     logger.info(
         "Generating conformers",
@@ -172,6 +185,8 @@ def generate_conformers(
 
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     writer = None
+
+    start_time = time.perf_counter()
 
     with ProcessPoolExecutor(max_workers=num_workers) as executor:
         for i, batch in enumerate(parquet_file.iter_batches(batch_size=batch_size)):
@@ -208,7 +223,9 @@ def generate_conformers(
     if writer is not None:
         writer.close()
 
-    _write_success_marker(output_path, num_rows, identifier)
+    elapsed_time = time.perf_counter() - start_time
+    manifest.data["run_time"] = str(datetime.timedelta(seconds=elapsed_time))
+    manifest.save()
 
     logger.info(
         "Finished generating conformers",

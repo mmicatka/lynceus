@@ -51,14 +51,17 @@ class UnidockCrashQuarantine:
 class UnidockGPUProvider(DockingProvider):
     def __init__(
         self,
+        output_path: str,
+        keep_docking_output: bool = False,
         search_mode: str = _DEFAULT_SEARCH_MODE,
         num_modes: int = _DEFAULT_NUM_MODES,
-        out_dir: Path | None = None,
         logger: Any = None,
     ) -> None:
         self.search_mode = search_mode
         self.num_modes = num_modes
-        self.out_dir = out_dir or Path.cwd() / "unidock_gpu_out"
+        self.output_path = (
+            Path(output_path) if keep_docking_output else Path.cwd() / "unidock_gpu_out"
+        )
         self.quarantine = UnidockCrashQuarantine()
         self.logger = logger or get_lynceus_logger()
 
@@ -344,7 +347,7 @@ class UnidockGPUProvider(DockingProvider):
             try:
                 results = parse_vina_output_pdbqt(candidates[0], ligand_id=ligand_id)
             except DockingError as exc:
-                self.logger.warning(
+                self.logger.debug(
                     "Failed to parse unidock output for ligand '%s' "
                     "(%s) -- skipping: %s",
                     ligand_id,
@@ -356,7 +359,7 @@ class UnidockGPUProvider(DockingProvider):
             if results:
                 yield ligand_id, results
             else:
-                self.logger.warning(
+                self.logger.debug(
                     "unidock output for ligand '%s' (%s) parsed to zero "
                     "poses -- skipping.",
                     ligand_id,
@@ -367,10 +370,10 @@ class UnidockGPUProvider(DockingProvider):
         self, paths_by_id: dict[str, Path], *, retries_used: int = 0
     ) -> Path:
         if not paths_by_id:
-            return self.out_dir / "chunk_empty"
+            return self.output_path / "chunk_empty"
         ids = list(paths_by_id.keys())
         suffix = f"_r{retries_used}" if retries_used else ""
-        return self.out_dir / f"chunk_{ids[0]}_{ids[-1]}_{len(ids)}{suffix}"
+        return self.output_path / f"chunk_{ids[0]}_{ids[-1]}_{len(ids)}{suffix}"
 
 
 class _UnidockCrash(Exception):

@@ -8,7 +8,7 @@ import click
 import duckdb
 from lynceus_core.cli import NumWorkers
 from lynceus_core.logging import get_lynceus_logger, wide_log
-from lynceus_core.manifest.common import Manifest
+from lynceus_core.manifest.common import MANIFEST_SUFFIX, Manifest
 
 logger = get_lynceus_logger()
 
@@ -75,28 +75,19 @@ def sample_candidates(
         "input_path": os.path.abspath(input_path),
     }
 
-    manifest_path = f"{output_path}.manifest"
-    disk_manifest = Manifest(filepath=manifest_path)
+    manifest_path = f"{output_path}.{MANIFEST_SUFFIX}"
+    manifest = Manifest(filepath=manifest_path, data=expected_state)
 
-    target_manifest = Manifest(data=expected_state)
-
-    if disk_manifest.exists():
-        try:
-            disk_manifest.load()
-            if target_manifest <= disk_manifest:
-                logger.info(
-                    "Sample already valid, skipping generation",
-                    source=input_path,
-                    num_samples=num_samples,
-                    seed=seed,
-                    output_path=output_path,
-                )
-                click.echo("Done!")
-                return
-        except Exception as e:
-            logger.warning(
-                "Failed to load existing manifest, re-generating.", error=str(e)
+    try:
+        if manifest.exists_superset():
+            logger.info(
+                "Valid manifest found.",
+                manifest=manifest.data,
             )
+            click.echo("Done!")
+            return
+    except Exception as e:
+        logger.warning("Failed to load existing manifest, re-generating.", error=str(e))
 
     start_time = time.perf_counter()
 
@@ -126,17 +117,13 @@ def sample_candidates(
         """
     )
 
-    target_manifest.data = expected_state
     elapsed_time = time.perf_counter() - start_time
-    target_manifest.data["run_time"] = str(datetime.timedelta(seconds=elapsed_time))
-    target_manifest.save()
+    manifest.data["run_time"] = str(datetime.timedelta(seconds=elapsed_time))
+    manifest.save()
 
     logger.info(
         "Finished reservoir sampling",
-        source=input_path,
-        num_samples=num_samples,
-        seed=seed,
-        output_path=output_path,
+        manifest=manifest.data,
     )
 
     click.echo("Done!")

@@ -110,27 +110,34 @@ def docking_results_to_table(
 
 def _write_result_batches(
     batches: Iterable[pa.RecordBatch],
-    dest_path: Path,
+    output_path: Path,
     schema: pa.Schema,
 ) -> int:
     row_count = 0
-    with pq.ParquetWriter(dest_path, schema, compression=PARQUET_COMPRESSION) as writer:
+
+    if output_path.suffix != ".parquet":
+        output_path = output_path / "docking.results.parquet"
+
+    with pq.ParquetWriter(
+        output_path, schema, compression=PARQUET_COMPRESSION
+    ) as writer:
         for batch in batches:
             writer.write_batch(batch.select(schema.names))
             row_count += batch.num_rows
+
     return row_count
 
 
 def write_results(
     results_iter: Iterable[tuple[str, list[DockingResult]]],
-    out_path: Path | str,
+    output_path: str,
     *,
     member_id: str,
     site_id: str,
     batch_rows: int = DEFAULT_STREAM_BATCH_ROWS,
     drop_pose_column: bool = False,
 ) -> int:
-    local_path = Path(out_path)
+    local_path = Path(output_path)
     local_path.parent.mkdir(parents=True, exist_ok=True)
 
     batches = iter_docking_result_batches(
