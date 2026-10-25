@@ -72,8 +72,8 @@ def _merge_via_staged_output(
     "input_glob",
     required=True,
     type=str,
-    help="Glob pattern for the parquet files to merge (e.g., "
-    "'path/to/shards/*.parquet').",
+    help="Glob pattern for the parquet files to merge"
+    " (e.g., 'path/to/shards/*.parquet').",
 )
 @click.option(
     "--output",
