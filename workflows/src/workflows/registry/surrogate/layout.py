@@ -2,6 +2,7 @@
 
 import os
 from dataclasses import dataclass
+from typing import Callable, Sequence
 
 from lynceus_core.manifest.common import MANIFEST_SUFFIX
 
@@ -12,6 +13,7 @@ VALIDATION_LABEL = "validation"
 SITE_PARAMETERS = ("ensemble", "site_id", "member_id", "center")
 SURROGATE_ENSEMBLES_DIRNAME = "ensembles"
 MODEL_FILENAME = "model.joblib"
+PATH_SEPARATOR = ","
 
 
 def ref(name: str) -> str:
@@ -76,3 +78,14 @@ class SiteLayout:
 
     def manifest_path(self, label: str) -> str:
         return os.path.join(self.base_path, self.manifest_file(label))
+
+    def _joined(
+        self, path_for_label: Callable[[str], str], labels: Sequence[str]
+    ) -> str:
+        return PATH_SEPARATOR.join(path_for_label(label) for label in labels)
+
+    def features_paths(self, labels: Sequence[str]) -> str:
+        return self._joined(self.features_path, labels)
+
+    def labels_paths(self, labels: Sequence[str]) -> str:
+        return self._joined(self.labels_path, labels)

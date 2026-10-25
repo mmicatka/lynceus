@@ -488,7 +488,7 @@ spec:
           - name: output_prefix
             value: surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/staging
           - name: num_samples
-            value: '2500'
+            value: '625'
           - name: seed
             value: '1010'
       - name: merge-samples
@@ -534,7 +534,7 @@ spec:
           - name: output_prefix
             value: surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/staging
           - name: num_samples
-            value: '2500'
+            value: '625'
           - name: seed
             value: '1011'
       - name: merge-samples
@@ -582,9 +582,9 @@ spec:
           - name: model_path
             value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/model.joblib
           - name: num_top
-            value: '1250'
+            value: '312'
           - name: num_random
-            value: '1250'
+            value: '312'
           - name: seed
             value: '1012'
       - name: merge-samples
@@ -632,9 +632,9 @@ spec:
           - name: model_path
             value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/model.joblib
           - name: num_top
-            value: '1250'
+            value: '312'
           - name: num_random
-            value: '1250'
+            value: '312'
           - name: seed
             value: '1013'
       - name: merge-samples
@@ -682,9 +682,9 @@ spec:
           - name: model_path
             value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/model.joblib
           - name: num_top
-            value: '1250'
+            value: '312'
           - name: num_random
-            value: '1250'
+            value: '312'
           - name: seed
             value: '1014'
       - name: merge-samples
@@ -732,9 +732,9 @@ spec:
           - name: model_path
             value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/model.joblib
           - name: num_top
-            value: '1250'
+            value: '312'
           - name: num_random
-            value: '1250'
+            value: '312'
           - name: seed
             value: '1015'
       - name: merge-samples
@@ -748,6 +748,106 @@ spec:
             value: surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/staging
           - name: output_path
             value: surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/features.parquet
+    inputs:
+      parameters:
+      - name: ensemble
+      - name: site_id
+  - name: surrogate-sample-round-5-dag
+    parallelism: 3
+    dag:
+      tasks:
+      - name: sample-shards
+        template: surrogate-sample-by-prediction
+        withItems:
+        - 0
+        - 1
+        - 2
+        - 3
+        - 4
+        - 5
+        - 6
+        - 7
+        arguments:
+          parameters:
+          - name: base_path
+            value: /mnt/lynceus
+          - name: source
+            value: shard_{{item}}.parquet
+          - name: features_input_prefix
+            value: candidates/features
+          - name: conformers_input_prefix
+            value: candidates/conformers
+          - name: output_prefix
+            value: surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_5/staging
+          - name: model_path
+            value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/model.joblib
+          - name: num_top
+            value: '312'
+          - name: num_random
+            value: '312'
+          - name: seed
+            value: '1016'
+      - name: merge-samples
+        depends: sample-shards
+        template: merge-shards
+        arguments:
+          parameters:
+          - name: base_path
+            value: /mnt/lynceus
+          - name: input_path
+            value: surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_5/staging
+          - name: output_path
+            value: surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_5/features.parquet
+    inputs:
+      parameters:
+      - name: ensemble
+      - name: site_id
+  - name: surrogate-sample-round-6-dag
+    parallelism: 3
+    dag:
+      tasks:
+      - name: sample-shards
+        template: surrogate-sample-by-prediction
+        withItems:
+        - 0
+        - 1
+        - 2
+        - 3
+        - 4
+        - 5
+        - 6
+        - 7
+        arguments:
+          parameters:
+          - name: base_path
+            value: /mnt/lynceus
+          - name: source
+            value: shard_{{item}}.parquet
+          - name: features_input_prefix
+            value: candidates/features
+          - name: conformers_input_prefix
+            value: candidates/conformers
+          - name: output_prefix
+            value: surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_6/staging
+          - name: model_path
+            value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_5/model.joblib
+          - name: num_top
+            value: '312'
+          - name: num_random
+            value: '312'
+          - name: seed
+            value: '1017'
+      - name: merge-samples
+        depends: sample-shards
+        template: merge-shards
+        arguments:
+          parameters:
+          - name: base_path
+            value: /mnt/lynceus
+          - name: input_path
+            value: surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_6/staging
+          - name: output_path
+            value: surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_6/features.parquet
     inputs:
       parameters:
       - name: ensemble
@@ -883,9 +983,9 @@ spec:
         arguments:
           parameters:
           - name: train_features
-            value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet
+            value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet,/mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet
           - name: train_labels
-            value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/docking_results.parquet
+            value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/docking_results.parquet,/mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/docking_results.parquet
           - name: validation_features
             value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet
           - name: validation_labels
@@ -934,9 +1034,9 @@ spec:
         arguments:
           parameters:
           - name: train_features
-            value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet
+            value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet,/mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet,/mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet
           - name: train_labels
-            value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/docking_results.parquet
+            value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/docking_results.parquet,/mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/docking_results.parquet,/mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/docking_results.parquet
           - name: validation_features
             value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet
           - name: validation_labels
@@ -985,9 +1085,9 @@ spec:
         arguments:
           parameters:
           - name: train_features
-            value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/features.parquet
+            value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet,/mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet,/mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet,/mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/features.parquet
           - name: train_labels
-            value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/docking_results.parquet
+            value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/docking_results.parquet,/mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/docking_results.parquet,/mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/docking_results.parquet,/mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/docking_results.parquet
           - name: validation_features
             value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet
           - name: validation_labels
@@ -1036,15 +1136,117 @@ spec:
         arguments:
           parameters:
           - name: train_features
-            value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/features.parquet
+            value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet,/mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet,/mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet,/mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/features.parquet,/mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/features.parquet
           - name: train_labels
-            value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/docking_results.parquet
+            value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/docking_results.parquet,/mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/docking_results.parquet,/mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/docking_results.parquet,/mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/docking_results.parquet,/mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/docking_results.parquet
           - name: validation_features
             value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet
           - name: validation_labels
             value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/docking_results.parquet
           - name: model_path
             value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/model.joblib
+      - name: verify-manifest-round-5
+        depends: train-round-4
+        template: verify-manifest
+        arguments:
+          parameters:
+          - name: manifest_path
+            value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_5/features.parquet.manifest.json
+          - name: expect
+            value: '{"input_path": "surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_5/staging"}'
+      - name: sample-round-5
+        depends: verify-manifest-round-5
+        template: surrogate-sample-round-5-dag
+        when: '{{tasks.verify-manifest-round-5.outputs.parameters.result}} != true'
+        arguments:
+          parameters:
+          - name: ensemble
+            value: '{{inputs.parameters.ensemble}}'
+          - name: site_id
+            value: '{{inputs.parameters.site_id}}'
+      - name: dock-round-5
+        depends: sample-round-5
+        template: run-docking
+        arguments:
+          parameters:
+          - name: ensemble
+            value: /mnt/lynceus/target/ensembles/{{inputs.parameters.ensemble}}
+          - name: member_id
+            value: '{{inputs.parameters.member_id}}'
+          - name: ligands_path
+            value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_5/features.parquet
+          - name: center
+            value: '{{inputs.parameters.center}}'
+          - name: site_id
+            value: '{{inputs.parameters.site_id}}'
+          - name: out_parquet
+            value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_5/docking_results.parquet
+      - name: train-round-5
+        depends: dock-round-5
+        template: surrogate-train
+        arguments:
+          parameters:
+          - name: train_features
+            value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet,/mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet,/mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet,/mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/features.parquet,/mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/features.parquet,/mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_5/features.parquet
+          - name: train_labels
+            value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/docking_results.parquet,/mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/docking_results.parquet,/mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/docking_results.parquet,/mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/docking_results.parquet,/mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/docking_results.parquet,/mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_5/docking_results.parquet
+          - name: validation_features
+            value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet
+          - name: validation_labels
+            value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/docking_results.parquet
+          - name: model_path
+            value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_5/model.joblib
+      - name: verify-manifest-round-6
+        depends: train-round-5
+        template: verify-manifest
+        arguments:
+          parameters:
+          - name: manifest_path
+            value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_6/features.parquet.manifest.json
+          - name: expect
+            value: '{"input_path": "surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_6/staging"}'
+      - name: sample-round-6
+        depends: verify-manifest-round-6
+        template: surrogate-sample-round-6-dag
+        when: '{{tasks.verify-manifest-round-6.outputs.parameters.result}} != true'
+        arguments:
+          parameters:
+          - name: ensemble
+            value: '{{inputs.parameters.ensemble}}'
+          - name: site_id
+            value: '{{inputs.parameters.site_id}}'
+      - name: dock-round-6
+        depends: sample-round-6
+        template: run-docking
+        arguments:
+          parameters:
+          - name: ensemble
+            value: /mnt/lynceus/target/ensembles/{{inputs.parameters.ensemble}}
+          - name: member_id
+            value: '{{inputs.parameters.member_id}}'
+          - name: ligands_path
+            value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_6/features.parquet
+          - name: center
+            value: '{{inputs.parameters.center}}'
+          - name: site_id
+            value: '{{inputs.parameters.site_id}}'
+          - name: out_parquet
+            value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_6/docking_results.parquet
+      - name: train-round-6
+        depends: dock-round-6
+        template: surrogate-train
+        arguments:
+          parameters:
+          - name: train_features
+            value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet,/mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet,/mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet,/mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/features.parquet,/mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/features.parquet,/mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_5/features.parquet,/mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_6/features.parquet
+          - name: train_labels
+            value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/docking_results.parquet,/mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/docking_results.parquet,/mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/docking_results.parquet,/mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/docking_results.parquet,/mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/docking_results.parquet,/mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_5/docking_results.parquet,/mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_6/docking_results.parquet
+          - name: validation_features
+            value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet
+          - name: validation_labels
+            value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/docking_results.parquet
+          - name: model_path
+            value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_6/model.joblib
     inputs:
       parameters:
       - name: ensemble
