@@ -7,7 +7,7 @@ from typing import Callable, Sequence
 from lynceus_core.manifest.common import MANIFEST_SUFFIX
 
 FEATURES_FILENAME = "features.parquet"
-DOCKING_RESULTS_FILENAME = "docking_results.parquet"
+DOCKING_RESULTS_FILENAME = "docking.results.parquet"
 STAGING_DIRNAME = "staging"
 VALIDATION_LABEL = "validation"
 SITE_PARAMETERS = ("ensemble", "site_id", "member_id", "center")
