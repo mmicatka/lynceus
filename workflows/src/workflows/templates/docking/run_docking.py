@@ -12,7 +12,6 @@ def run_docking_template(
     search_mode: str = "balance",
     num_modes: int = 1,
     batch_size: int | None = None,
-    out_dir: str | None = None,
     parquet_batch_rows: int = 10000,
     default_altloc: str = "A",
     allow_bad_residues: bool = True,
@@ -50,9 +49,6 @@ def run_docking_template(
 
     if batch_size is not None:
         cmd.extend(["--batch-size", str(batch_size)])
-
-    if out_dir is not None:
-        cmd.extend(["--out-dir", str(out_dir)])
 
     if allow_bad_residues:
         cmd.append("--allow-bad-residues")

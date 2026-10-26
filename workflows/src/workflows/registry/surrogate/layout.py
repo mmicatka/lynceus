@@ -27,9 +27,12 @@ class SiteLayout:
     target_prefix: str
     screen_name: str
 
+    def _absolute(self, relative: str) -> str:
+        return os.path.join(self.base_path, relative)
+
     @property
     def ensemble_path(self) -> str:
-        return os.path.join(self.base_path, self.target_prefix, ref("ensemble"))
+        return self._absolute(os.path.join(self.target_prefix, ref("ensemble")))
 
     @property
     def surrogate_root(self) -> str:
@@ -44,16 +47,21 @@ class SiteLayout:
     def label_prefix(self, label: str) -> str:
         return f"{self.site_prefix}/{label}"
 
+    def label_dir(self, label: str) -> str:
+        return self._absolute(self.label_prefix(label))
+
     def staging_prefix(self, label: str) -> str:
         return f"{self.label_prefix(label)}/{STAGING_DIRNAME}"
+
+    def staging_dir(self, label: str) -> str:
+        return self._absolute(self.staging_prefix(label))
 
     def features_file(self, label: str) -> str:
         return f"{self.label_prefix(label)}/{FEATURES_FILENAME}"
 
     def features_path(self, label: str) -> str:
-        return os.path.join(self.base_path, self.features_file(label))
+        return self._absolute(self.features_file(label))
 
-    # This is the same as the features
     def docking_input_path(self, label: str) -> str:
         return self.features_path(label)
 
@@ -61,9 +69,8 @@ class SiteLayout:
         return f"{self.label_prefix(label)}/{DOCKING_RESULTS_FILENAME}"
 
     def docking_results_path(self, label: str) -> str:
-        return os.path.join(self.base_path, self.docking_results_file(label))
+        return self._absolute(self.docking_results_file(label))
 
-    # This is the same as the docking results
     def labels_path(self, label: str) -> str:
         return self.docking_results_path(label)
 
@@ -71,13 +78,13 @@ class SiteLayout:
         return f"{self.label_prefix(label)}/{MODEL_FILENAME}"
 
     def model_path(self, label: str) -> str:
-        return os.path.join(self.base_path, self.model_file(label))
+        return self._absolute(self.model_file(label))
 
     def manifest_file(self, label: str) -> str:
         return f"{self.features_file(label)}.{MANIFEST_SUFFIX}"
 
     def manifest_path(self, label: str) -> str:
-        return os.path.join(self.base_path, self.manifest_file(label))
+        return self._absolute(self.manifest_file(label))
 
     def _joined(
         self, path_for_label: Callable[[str], str], labels: Sequence[str]
