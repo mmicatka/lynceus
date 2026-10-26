@@ -10,6 +10,7 @@ import joblib
 import lightgbm as lgb
 import numpy as np
 import polars as pl
+from lynceus_core.cli import PATH_SEPARATOR, split_paths
 from lynceus_core.logging import get_lynceus_logger, wide_log
 from lynceus_core.manifest.common import Manifest
 from sklearn.model_selection import train_test_split
@@ -30,13 +31,13 @@ RANDOM_SEED = 1000
 logger = get_lynceus_logger()
 
 
-def _count_rows(path: str) -> int:
-    return pl.scan_parquet(path).select(pl.len()).collect().item()
+def _count_rows(paths: list[str]) -> int:
+    return pl.scan_parquet(paths).select(pl.len()).collect().item()
 
 
 def _build_manifest(
-    train_features_path: str,
-    train_labels_path: str,
+    train_features_paths: list[str],
+    train_labels_paths: list[str],
     validation_features_path: str,
     validation_labels_path: str,
     features: list[str],
@@ -44,8 +45,8 @@ def _build_manifest(
 ) -> dict:
     return {
         "train_files": {
-            "features": train_features_path,
-            "labels": train_labels_path,
+            "features": train_features_paths,
+            "labels": train_labels_paths,
         },
         "validation_files": {
             "features": validation_features_path,
@@ -53,17 +54,20 @@ def _build_manifest(
         },
         "features": list(features),
         "threshold": threshold,
-        "num_samples": _count_rows(train_features_path),
-        "num_validation_samples": _count_rows(validation_features_path),
+        "num_samples": _count_rows(train_features_paths),
+        "num_validation_samples": _count_rows([validation_features_path]),
         "seed": RANDOM_SEED,
     }
 
 
 def _prepare_dataset(
-    features_path: str, labels_path: str, features: list[str], threshold: float
+    features_paths: list[str],
+    labels_paths: list[str],
+    features: list[str],
+    threshold: float,
 ) -> tuple[np.ndarray, np.ndarray]:
-    raw_features = pl.read_parquet(features_path)
-    raw_labels = pl.read_parquet(labels_path)
+    raw_features = pl.read_parquet(features_paths)
+    raw_labels = pl.read_parquet(labels_paths)
 
     df_cleaned = load_and_clean_data(raw_features, raw_labels)
 
@@ -95,17 +99,19 @@ def _save_model(model, path: str):
 @click.command()
 @click.option(
     "--train-features",
-    "train_features_path",
+    "train_features_paths",
     type=str,
     required=True,
-    help="Path to the input features file.",
+    callback=split_paths,
+    help=f"{PATH_SEPARATOR}-separated paths to the input features files.",
 )
 @click.option(
     "--train-labels",
-    "train_labels_path",
+    "train_labels_paths",
     type=str,
     required=True,
-    help="Path to the input label file.",
+    callback=split_paths,
+    help=f"{PATH_SEPARATOR}-separated paths to the input label files.",
 )
 @click.option(
     "--validation-features",
@@ -131,22 +137,24 @@ def _save_model(model, path: str):
 @features_option
 @wide_log(logger)
 def train_model(
-    train_features_path: str,
-    train_labels_path: str,
+    train_features_paths: list[str],
+    train_labels_paths: list[str],
     validation_features_path: str,
     validation_labels_path: str,
     features: list[str],
     model_path: str,
 ):
-    click.echo(f"Training surrogate model using features from {train_features_path}...")
+    click.echo(
+        f"Training surrogate model using {len(train_features_paths)} feature files..."
+    )
 
     threshold = get_validation_threshold(validation_labels_path)
 
     logger.info("threshold", threshold=threshold)
 
     manifest_data = _build_manifest(
-        train_features_path=train_features_path,
-        train_labels_path=train_labels_path,
+        train_features_paths=train_features_paths,
+        train_labels_paths=train_labels_paths,
         validation_features_path=validation_features_path,
         validation_labels_path=validation_labels_path,
         features=features,
@@ -173,8 +181,8 @@ def train_model(
     )
 
     x_initial, y_initial_label = _prepare_dataset(
-        train_features_path,
-        train_labels_path,
+        train_features_paths,
+        train_labels_paths,
         features,
         threshold=threshold,
     )
@@ -210,8 +218,8 @@ def train_model(
     )
 
     x_validation, y_validation_label = _prepare_dataset(
-        validation_features_path,
-        validation_labels_path,
+        [validation_features_path],
+        [validation_labels_path],
         features,
         threshold=threshold,
     )

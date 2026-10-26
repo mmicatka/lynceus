@@ -60,8 +60,8 @@ class UnidockGPUProvider(DockingProvider):
         self.search_mode = search_mode
         self.num_modes = num_modes
         self.output_path = (
-            Path(output_path) if keep_docking_output else Path.cwd() / "unidock_gpu_out"
-        )
+            Path(output_path) if keep_docking_output else Path.cwd()
+        ) / "unidock_gpu_out"
         self.quarantine = UnidockCrashQuarantine()
         self.logger = logger or get_lynceus_logger()
 

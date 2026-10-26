@@ -207,7 +207,7 @@ def _dock_and_write(
 )
 @click.option(
     "--keep-docking-output",
-    is_flag=False,
+    is_flag=True,
     help="Keep docking output.",
 )
 @wide_log(logger)

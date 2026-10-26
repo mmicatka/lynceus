@@ -45,3 +45,10 @@ class NumWorkers(click.ParamType):
             self.fail(
                 f"'{value}' is not 'auto' or a valid positive integer", param, ctx
             )
+
+
+PATH_SEPARATOR = ","
+
+
+def split_paths(ctx: click.Context, param: click.Parameter, value: str) -> list[str]:
+    return [path for path in value.split(PATH_SEPARATOR) if path]
