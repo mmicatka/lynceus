@@ -883,7 +883,7 @@ spec:
           - name: site_id
             value: '{{inputs.parameters.site_id}}'
           - name: output_path
-            value: surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation
+            value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation
       - name: verify-manifest-round-0
         depends: dock-validation
         template: verify-manifest
@@ -919,7 +919,7 @@ spec:
           - name: site_id
             value: '{{inputs.parameters.site_id}}'
           - name: output_path
-            value: surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0
+            value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0
       - name: train-round-0
         depends: dock-round-0
         template: surrogate-train
@@ -970,7 +970,7 @@ spec:
           - name: site_id
             value: '{{inputs.parameters.site_id}}'
           - name: output_path
-            value: surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1
+            value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1
       - name: train-round-1
         depends: dock-round-1
         template: surrogate-train
@@ -1021,7 +1021,7 @@ spec:
           - name: site_id
             value: '{{inputs.parameters.site_id}}'
           - name: output_path
-            value: surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2
+            value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2
       - name: train-round-2
         depends: dock-round-2
         template: surrogate-train
@@ -1072,7 +1072,7 @@ spec:
           - name: site_id
             value: '{{inputs.parameters.site_id}}'
           - name: output_path
-            value: surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3
+            value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3
       - name: train-round-3
         depends: dock-round-3
         template: surrogate-train
@@ -1123,7 +1123,7 @@ spec:
           - name: site_id
             value: '{{inputs.parameters.site_id}}'
           - name: output_path
-            value: surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4
+            value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4
       - name: train-round-4
         depends: dock-round-4
         template: surrogate-train
@@ -1174,7 +1174,7 @@ spec:
           - name: site_id
             value: '{{inputs.parameters.site_id}}'
           - name: output_path
-            value: surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_5
+            value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_5
       - name: train-round-5
         depends: dock-round-5
         template: surrogate-train
@@ -1225,7 +1225,7 @@ spec:
           - name: site_id
             value: '{{inputs.parameters.site_id}}'
           - name: output_path
-            value: surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_6
+            value: /mnt/lynceus/surrogate/5m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_6
       - name: train-round-6
         depends: dock-round-6
         template: surrogate-train

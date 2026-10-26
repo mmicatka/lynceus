@@ -46,7 +46,7 @@ def _docking_arguments(spec: SampleSpec, layout: SiteLayout) -> dict:
         "ligands_path": layout.docking_input_path(spec.label),
         "center": ref("center"),
         "site_id": ref("site_id"),
-        "output_path": layout.label_prefix(spec.label),
+        "output_path": layout.label_dir(spec.label),
     }
 
 
