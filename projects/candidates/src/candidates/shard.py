@@ -178,7 +178,7 @@ def shard_candidates(
         "max_batch_gib": max_batch_gib,
     }
 
-    manifest_path = f"{input_path.rstrip('/')}.manifest.json"
+    manifest_path = f"{output_path.rstrip('/')}.{Path(input_path).name}.manifest.json"
     manifest = Manifest(data=manifest_data, filepath=manifest_path)
 
     try:

@@ -8,7 +8,7 @@ from pydantic import BaseModel, ConfigDict
 
 
 class StrictModel(BaseModel):
-    model_config = ConfigDict(extra="forbid", frozen=True)
+    model_config = ConfigDict(frozen=True)
 
 
 ModelT = TypeVar("ModelT", bound=BaseModel)

@@ -76,6 +76,16 @@ def _prepare_dataset(
 
     y_label = compute_labels(y_raw, threshold=threshold)
 
+    logger.info(
+        "_prepare_dataset",
+        features_paths=features_paths,
+        raw_features=len(raw_features),
+        raw_labels=len(raw_labels),
+        df_cleaned=df_cleaned.shape,
+        x=len(x),
+        y_label=len(y_label),
+    )
+
     return x, y_label
 
 

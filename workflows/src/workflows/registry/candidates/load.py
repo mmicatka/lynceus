@@ -11,13 +11,13 @@ from workflows.registry.common.core import (
     SOURCE_PARAM,
     get_template_factory,
     new_workflow,
+    shard_filename,
     shard_ids,
 )
 from workflows.templates import (
     build_clean_prefix_template,
     load_candidates_template,
     merge_shards_template,
-    sample_candidates_template,
     shard_candidates_template,
 )
 from workflows.templates.builders import TemplateFactory
@@ -26,10 +26,6 @@ LOAD_CANDIDATES_DAG = "load-candidates-dag"
 PROCESS_SOURCE_DAG = "process-source-dag"
 SOURCE_INPUT_NAME = "source"
 MAX_PARALLEL_SOURCES = 3
-
-
-def _shard_filename(shard: str) -> str:
-    return f"shard_{shard}.parquet"
 
 
 def _build_process_source_dag(
@@ -92,7 +88,7 @@ def _merge_shards_task(
             "base_path": infra_config.volume.mount_path,
             "input_path": f"{prefixes.shards_staging}/"
             f"{SHARD_FOLDER_PREFIX}{ITEM_PARAM}",
-            "output_path": f"{prefixes.shards}/{_shard_filename(ITEM_PARAM)}",
+            "output_path": f"{prefixes.shards}/{shard_filename(ITEM_PARAM)}",
         },
     )
 
@@ -108,55 +104,24 @@ def _cleanup_staging_task(infra_config: InfraConfig) -> Task:
     )
 
 
-def _subsample_task(
-    templates: TemplateFactory,
-    infra_config: InfraConfig,
-    sub_sample: int,
-) -> Task:
-    prefixes = infra_config.storage.prefixes.candidates
-    num_shards = infra_config.candidates.num_shards
-    subsample_candidates = templates.build(
-        TemplateName.SUBSAMPLE_CANDIDATES, sample_candidates_template
-    )
-
-    return subsample_candidates(
-        name="subsample-candidates",
-        with_items=shard_ids(num_shards),
-        arguments={
-            "base_path": infra_config.volume.mount_path,
-            "source": _shard_filename(ITEM_PARAM),
-            "source_prefix": prefixes.shards,
-            "parquet_prefix": f"{prefixes.shards_sample}/",
-            "num_samples": sub_sample // num_shards,
-        },
-    )
-
-
 def build_load_candidates_dag(
     templates: TemplateFactory,
     infra_config: InfraConfig,
     screen_config: ScreenConfig,
 ) -> DAG:
-    candidates_config = screen_config.candidates
     process_source_dag = _build_process_source_dag(templates, infra_config)
 
     with DAG(name=LOAD_CANDIDATES_DAG, parallelism=MAX_PARALLEL_SOURCES) as dag:
         process_task = Task(
             name="process-sources",
             template=process_source_dag,
-            with_items=candidates_config.sources,
+            with_items=screen_config.candidates.sources,
             arguments={SOURCE_INPUT_NAME: ITEM_PARAM},
         )
         merge_task = _merge_shards_task(templates, infra_config)
         cleanup_task = _cleanup_staging_task(infra_config)
 
         process_task >> merge_task >> cleanup_task  # type: ignore
-
-        if candidates_config.sub_sample:
-            sample_task = _subsample_task(
-                templates, infra_config, candidates_config.sub_sample
-            )
-            cleanup_task >> sample_task  # type: ignore
 
     return dag
 

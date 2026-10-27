@@ -17,62 +17,80 @@ storage:
 
 candidates:
   max_batch_gib: 20
-  num_shards: 8
+  num_shards: 256
 
-templates:
-  ##### Candidates #####
-  load_candidates:
-    resources: &med_cpu
+x-defs:
+  images:
+    candidates: &candidates_image
+      image: registry.nebula.lan:5000/lynceus/candidates:0.1.0
+    targets: &targets_image
+      image: registry.nebula.lan:5000/lynceus/targets:0.1.0
+    surrogate: &surrogate_image
+      image: registry.nebula.lan:5000/lynceus/surrogate-model:0.1.0
+  resources:
+    low_cpu: &low_cpu
+      requests: &low_cpu_res
+        cpu: "2"
+        memory: 1Gi
+      limits: *low_cpu_res
+    med_cpu: &med_cpu
       requests: &med_cpu_res
         cpu: "4"
         memory: 3Gi
       limits: *med_cpu_res
-    image: &candidates_image
-      image: registry.nebula.lan:5000/lynceus/candidates:0.1.0
-  shard_candidates:
-    resources:
-      requests:
-        cpu: "2"
-        memory: 4Gi
-      limits:
-        cpu: "2"
-        memory: 4Gi
-    image: *candidates_image
-    scratch: &scratch
-      mount_path: /scratch
-      size_limit: 50Gi
-  merge_shards:
-    resources: &high_cpu
+    high_cpu: &high_cpu
       requests: &high_cpu_res
         cpu: "8"
         memory: 8Gi
       limits: *high_cpu_res
+    high_cpu_high_ram: &high_cpu_high_ram
+      requests: &high_cpu_high_ram_res
+        cpu: "8"
+        memory: 16Gi
+      limits: *high_cpu_high_ram_res
+
+templates:
+  ##### Candidates #####
+  load_candidates:
+    resources: *high_cpu_high_ram
+    image: *candidates_image
+
+  shard_candidates:
+    resources: *high_cpu_high_ram
+    image: *candidates_image
+    scratch: &scratch
+      mount_path: /scratch
+      size_limit: 50Gi
+
+  merge_shards:
+    resources: *high_cpu
     image: *candidates_image # TODO: move this into a dedicated image
+
   subsample_candidates:
     resources: *high_cpu
     image: *candidates_image
+
   generate_conformers:
     resources: *med_cpu
     image: *candidates_image
+
   generate_features:
     resources: *med_cpu
     image: *candidates_image
 
   ##### Targets #####
   download_pdbs:
-    resources: &low_cpu
-      requests: &low_cpu_res
-        cpu: "2"
-        memory: 1Gi
-      limits: *low_cpu_res
-    image: &targets_image
-      image: registry.nebula.lan:5000/lynceus/targets:0.1.0
+    resources: *low_cpu
+    image: *targets_image
+
   generate_manifest:
     resources: *low_cpu
     image: *targets_image
+
   detect_binding_sites:
     resources: *low_cpu
     image: *targets_image
+
   resolve_binding_sites:
     resources: *low_cpu
     image: *targets_image
@@ -80,17 +98,20 @@ templates:
   ##### Surrogate #####
   verify_manifest:
     resources: *low_cpu
-    image: &surrogate_image
-      image: registry.nebula.lan:5000/lynceus/surrogate-model:0.1.0
+    image: *surrogate_image
+
   surrogate_sample:
     resources: *high_cpu
     image: *surrogate_image
+
   surrogate_sample_by_prediction:
     resources: *high_cpu
     image: *surrogate_image
+
   surrogate_train:
     resources: *high_cpu
     image: *surrogate_image
+
   run_docking:
     image:
       image: registry.nebula.lan:5000/lynceus/lynceus-dock:0.1.0
@@ -112,6 +133,7 @@ templates:
         operator: Exists
         effect: NoSchedule
     runtime_class_name: nvidia
+
 volume:
   name: lynceus
   claim_name: lynceus-pvc
