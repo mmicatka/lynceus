@@ -6,6 +6,55 @@ spec:
   entrypoint: main-dag
   serviceAccountName: argo-workflow
   templates:
+  - name: verify-manifest
+    volumes:
+    - name: lynceus
+      persistentVolumeClaim:
+        claimName: lynceus-pvc
+    inputs:
+      parameters:
+      - name: manifest_path
+      - name: expect
+        default: 'null'
+    outputs:
+      parameters:
+      - name: result
+        valueFrom:
+          path: /tmp/manifest_matches.txt
+    retryStrategy:
+      limit: 5
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 10m
+    script:
+      image: registry.nebula.lan:5000/lynceus/surrogate-model:0.1.0
+      imagePullPolicy: Always
+      source: |-
+        import os
+        import sys
+        sys.path.append(os.getcwd())
+        import json
+        try: expect = json.loads(r'''{{inputs.parameters.expect}}''')
+        except: expect = r'''{{inputs.parameters.expect}}'''
+        try: manifest_path = json.loads(r'''{{inputs.parameters.manifest_path}}''')
+        except: manifest_path = r'''{{inputs.parameters.manifest_path}}'''
+
+        import json
+        import subprocess
+        subprocess.run(['verify-manifest', '--manifest', manifest_path, '--expect', json.dumps(expect or {}), '--result-file', '/tmp/manifest_matches.txt'], check=True)
+      command:
+      - python
+      volumeMounts:
+      - name: lynceus
+        mountPath: /mnt/lynceus
+      resources:
+        limits:
+          cpu: '2'
+          memory: 1Gi
+        requests:
+          cpu: '2'
+          memory: 1Gi
   - name: load-candidates
     volumes:
     - name: lynceus
@@ -50,11 +99,11 @@ spec:
         mountPath: /mnt/lynceus
       resources:
         limits:
-          cpu: '8'
-          memory: 16Gi
+          cpu: '4'
+          memory: 8Gi
         requests:
-          cpu: '8'
-          memory: 16Gi
+          cpu: '4'
+          memory: 8Gi
   - name: shard-candidates
     volumes:
     - name: lynceus
@@ -77,6 +126,8 @@ spec:
         default: id
       - name: num_workers
         default: auto
+      - name: memory_limit
+        default: ''
     retryStrategy:
       limit: 5
       backoff:
@@ -99,6 +150,8 @@ spec:
         except: input_prefix = r'''{{inputs.parameters.input_prefix}}'''
         try: max_batch_gib = json.loads(r'''{{inputs.parameters.max_batch_gib}}''')
         except: max_batch_gib = r'''{{inputs.parameters.max_batch_gib}}'''
+        try: memory_limit = json.loads(r'''{{inputs.parameters.memory_limit}}''')
+        except: memory_limit = r'''{{inputs.parameters.memory_limit}}'''
         try: num_shards = json.loads(r'''{{inputs.parameters.num_shards}}''')
         except: num_shards = r'''{{inputs.parameters.num_shards}}'''
         try: num_workers = json.loads(r'''{{inputs.parameters.num_workers}}''')
@@ -112,7 +165,10 @@ spec:
 
         import os
         import subprocess
-        subprocess.run(['shard-candidates', '--input', os.path.join(base_path, input_prefix), '--output', os.path.join(base_path, output_prefix), '--scratch-dir', scratch_path, '--num-shards', str(num_shards), '--max-batch-gib', str(max_batch_gib), '--transfers', str(transfers), '--id-column', id_column, '--num-workers', str(num_workers)], check=True)
+        cmd = ['shard-candidates', '--input', os.path.join(base_path, input_prefix), '--output', os.path.join(base_path, output_prefix), '--scratch-dir', scratch_path, '--num-shards', str(num_shards), '--max-batch-gib', str(max_batch_gib), '--transfers', str(transfers), '--id-column', id_column, '--num-workers', str(num_workers)]
+        if memory_limit:
+            cmd.extend(['--memory-limit', memory_limit])
+        subprocess.run(cmd, check=True)
       command:
       - python
       volumeMounts:
@@ -122,16 +178,28 @@ spec:
         mountPath: /scratch
       resources:
         limits:
-          cpu: '8'
-          memory: 16Gi
+          cpu: '4'
+          memory: 8Gi
         requests:
-          cpu: '8'
-          memory: 16Gi
+          cpu: '4'
+          memory: 8Gi
   - name: process-source-dag
     dag:
       tasks:
+      - name: verify-manifest
+        template: verify-manifest
+        arguments:
+          parameters:
+          - name: manifest_path
+            value: /mnt/lynceus/candidates/shards_staging.{{inputs.parameters.source}}.manifest.json
+          - name: expect
+            value: '{"input_path": "/mnt/lynceus/candidates/raw/parquet/{{inputs.parameters.source}}",
+              "output_path": "/mnt/lynceus/candidates/shards_staging", "num_shards":
+              256, "max_batch_gib": 20}'
       - name: load-candidates
+        depends: verify-manifest
         template: load-candidates
+        when: '{{tasks.verify-manifest.outputs.parameters.result}} != true'
         arguments:
           parameters:
           - name: base_path
@@ -145,6 +213,7 @@ spec:
       - name: shard-candidates
         depends: load-candidates
         template: shard-candidates
+        when: '{{tasks.verify-manifest.outputs.parameters.result}} != true'
         arguments:
           parameters:
           - name: base_path
@@ -159,6 +228,8 @@ spec:
             value: /scratch
           - name: max_batch_gib
             value: '20'
+          - name: memory_limit
+            value: 8Gi
     inputs:
       parameters:
       - name: source
@@ -191,9 +262,6 @@ spec:
         - H23
         - H24
         - H25
-        - H26
-        - H27
-        - H28
         arguments:
           parameters:
           - name: source
@@ -466,6 +534,8 @@ spec:
             value: candidates/shards_staging/shard_id={{item}}
           - name: output_path
             value: candidates/shards/shard_{{item}}.parquet
+          - name: memory_limit
+            value: 8Gi
       - name: cleanup-staging
         depends: merge-shards
         template: clean-prefix

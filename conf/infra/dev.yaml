@@ -38,25 +38,25 @@ x-defs:
         cpu: "4"
         memory: 3Gi
       limits: *med_cpu_res
+    med_cpu_high_ram: &med_cpu_high_ram
+      requests: &med_cpu_high_ram_res
+        cpu: "4"
+        memory: 8Gi
+      limits: *med_cpu_high_ram_res
     high_cpu: &high_cpu
       requests: &high_cpu_res
         cpu: "8"
         memory: 8Gi
       limits: *high_cpu_res
-    high_cpu_high_ram: &high_cpu_high_ram
-      requests: &high_cpu_high_ram_res
-        cpu: "8"
-        memory: 16Gi
-      limits: *high_cpu_high_ram_res
 
 templates:
   ##### Candidates #####
   load_candidates:
-    resources: *high_cpu_high_ram
+    resources: *med_cpu_high_ram
     image: *candidates_image
 
   shard_candidates:
-    resources: *high_cpu_high_ram
+    resources: *med_cpu_high_ram
     image: *candidates_image
     scratch: &scratch
       mount_path: /scratch

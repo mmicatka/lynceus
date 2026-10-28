@@ -1,6 +1,7 @@
 # workflows/src/workflows/registry/candidates/load.py
 
 from hera.workflows import DAG, Parameter, Task, Workflow
+from hera.workflows.models import ValueFrom
 
 from workflows.config import InfraConfig, ScreenConfig
 from workflows.config.infrastructure import TemplateName
@@ -19,6 +20,7 @@ from workflows.templates import (
     load_candidates_template,
     merge_shards_template,
     shard_candidates_template,
+    verify_manifest_template,
 )
 from workflows.templates.builders import TemplateFactory
 
@@ -26,6 +28,11 @@ LOAD_CANDIDATES_DAG = "load-candidates-dag"
 PROCESS_SOURCE_DAG = "process-source-dag"
 SOURCE_INPUT_NAME = "source"
 MAX_PARALLEL_SOURCES = 3
+VERIFY_RESULT_OUTPUT = "result"
+
+
+def _run_unless_verified(verify_task: Task) -> str:
+    return f"{verify_task.get_parameter(VERIFY_RESULT_OUTPUT)} != true"
 
 
 def _build_process_source_dag(
@@ -36,6 +43,16 @@ def _build_process_source_dag(
     base_path = infra_config.volume.mount_path
     source_parquet_prefix = f"{prefixes.raw_parquet}/{SOURCE_PARAM}"
 
+    verify_manifest = templates.build(
+        TemplateName.VERIFY_MANIFEST,
+        verify_manifest_template,
+        outputs=[
+            Parameter(
+                name=VERIFY_RESULT_OUTPUT,
+                value_from=ValueFrom(path="/tmp/manifest_matches.txt"),
+            )
+        ],
+    )
     load_candidates = templates.build(
         TemplateName.LOAD_CANDIDATES, load_candidates_template
     )
@@ -43,9 +60,25 @@ def _build_process_source_dag(
         TemplateName.SHARD_CANDIDATES, shard_candidates_template
     )
 
+    shard_template_config = infra_config.templates[TemplateName.SHARD_CANDIDATES]
+
     with DAG(
         name=PROCESS_SOURCE_DAG, inputs=[Parameter(name=SOURCE_INPUT_NAME)]
     ) as dag:
+        verify_task = verify_manifest(
+            name="verify-manifest",
+            arguments={
+                "manifest_path": f"{base_path}/{prefixes.shards_staging}."
+                f"{SOURCE_PARAM}.manifest.json",
+                "expect": {
+                    "input_path": f"{base_path}/{source_parquet_prefix}",
+                    "output_path": f"{base_path}/{prefixes.shards_staging}",
+                    "num_shards": infra_config.candidates.num_shards,
+                    "max_batch_gib": infra_config.candidates.max_batch_gib,
+                },
+            },
+        )
+
         load_task = load_candidates(
             name="load-candidates",
             arguments={
@@ -54,6 +87,7 @@ def _build_process_source_dag(
                 "source_prefix": prefixes.raw_smiles,
                 "parquet_prefix": source_parquet_prefix,
             },
+            when=_run_unless_verified(verify_task),
         )
 
         shard_task = shard_candidates(
@@ -63,13 +97,14 @@ def _build_process_source_dag(
                 "input_prefix": source_parquet_prefix,
                 "output_prefix": prefixes.shards_staging,
                 "num_shards": infra_config.candidates.num_shards,
-                "scratch_path": infra_config.templates[
-                    TemplateName.SHARD_CANDIDATES
-                ].scratch_path,
+                "scratch_path": shard_template_config.scratch_path,
                 "max_batch_gib": infra_config.candidates.max_batch_gib,
+                "memory_limit": str(shard_template_config.resources.limits.memory),
             },
+            when=_run_unless_verified(verify_task),
         )
-        load_task >> shard_task  # type: ignore
+
+        verify_task >> load_task >> shard_task  # type: ignore
 
     return dag
 
@@ -81,6 +116,8 @@ def _merge_shards_task(
     prefixes = infra_config.storage.prefixes.candidates
     merge_shards = templates.build(TemplateName.MERGE_SHARDS, merge_shards_template)
 
+    template_config = infra_config.templates[TemplateName.MERGE_SHARDS]
+
     return merge_shards(
         name="merge-shards",
         with_items=shard_ids(infra_config.candidates.num_shards),
@@ -89,6 +126,7 @@ def _merge_shards_task(
             "input_path": f"{prefixes.shards_staging}/"
             f"{SHARD_FOLDER_PREFIX}{ITEM_PARAM}",
             "output_path": f"{prefixes.shards}/{shard_filename(ITEM_PARAM)}",
+            "memory_limit": str(template_config.resources.limits.memory),
         },
     )
 
