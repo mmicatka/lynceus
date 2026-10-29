@@ -17,7 +17,7 @@ def merge_shards_template(
             "--output",
             os.path.join(base_path, output_path),
             "--memory-limit",
-            "4GB",
+            "6GB",
         ],
         check=True,
     )

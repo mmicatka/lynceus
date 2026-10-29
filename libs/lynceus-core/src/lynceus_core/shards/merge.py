@@ -8,6 +8,7 @@ from pathlib import Path
 import click
 import duckdb
 
+from lynceus_core.cli import MemoryLimit
 from lynceus_core.io.staged_io import staged_output
 from lynceus_core.logging import get_lynceus_logger, wide_log
 from lynceus_core.manifest.common import Manifest
@@ -84,9 +85,10 @@ def _merge_via_staged_output(
 )
 @click.option(
     "--memory-limit",
-    type=str,
-    default="4GB",
-    help="DuckDB memory limit (e.g. 4GB).",
+    "memory_limit",
+    default=None,
+    type=MemoryLimit(),
+    help="DuckDB memory limit, e.g. '48Gi' or '48GB'.",
 )
 @click.option(
     "--row-group-size",

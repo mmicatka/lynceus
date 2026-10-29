@@ -162,7 +162,6 @@ def train_model(
     )
 
     manifest_path = str(Path(model_path).with_suffix(".manifest.json"))
-
     manifest = Manifest(data=manifest_data, filepath=manifest_path)
 
     try:

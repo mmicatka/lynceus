@@ -1,6 +1,5 @@
 # projects/surrogate-model/src/surrogate_model/common/data.py
 
-from typing import Optional
 
 import numpy as np
 import polars as pl
@@ -8,16 +7,16 @@ import polars as pl
 AFFINITY_COLUMN_NAME = "affinity_kcal_mol"
 
 
-def load_and_clean_data(
-    features: pl.DataFrame, labels: Optional[pl.DataFrame] = None
-) -> pl.DataFrame:
+def load_and_clean_data(features: pl.DataFrame, labels: pl.DataFrame) -> pl.DataFrame:
     df = features.filter(pl.all_horizontal(pl.col("^.*_valid$")))
+    df = df.unique(subset=["id"], keep="first")
 
-    if labels is not None:
-        df = df.join(labels, on="id")
-        df = df.filter(pl.col(AFFINITY_COLUMN_NAME) < 0)
+    labels = labels.filter(pl.col(AFFINITY_COLUMN_NAME) < 0)
+    labels = labels.unique(subset=["id"], keep="first")
 
-    return df
+    df_clean = df.join(labels, on="id", how="inner")
+
+    return df_clean
 
 
 def flatten_features(df: pl.DataFrame, feature_cols=None) -> np.ndarray:

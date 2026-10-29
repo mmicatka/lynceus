@@ -21,6 +21,14 @@ candidates:
     - H18
     - H19
     - H20
+    - H21
+    - H22
+    - H23
+    - H24
+    - H25
+    - H26
+    - H27
+    - H28
 
 targets:
   ensembles:
@@ -60,19 +68,19 @@ filter:
       - usrcat
       - whim
     seed: 1000
-    validation: 5000
+    validation: 20000
     rounds:
       - top: 0
-        random: 5000
-      - top: 2500
-        random: 2500
-      - top: 2500
-        random: 2500
-      - top: 2500
-        random: 2500
-      - top: 2500
-        random: 2500
-      - top: 2500
-        random: 2500
-      - top: 2500
-        random: 2500
+        random: 20000
+      - top: 10000
+        random: 10000
+      - top: 10000
+        random: 10000
+      - top: 10000
+        random: 10000
+      - top: 10000
+        random: 10000
+      - top: 10000
+        random: 10000
+      - top: 10000
+        random: 10000

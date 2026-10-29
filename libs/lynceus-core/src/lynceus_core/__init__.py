@@ -1,6 +1,6 @@
 # libs/lynceus-core/src/lynceus_core/__init__.py
 
-from .cli import NumWorkers
+from .cli import MemoryLimit, NumWorkers
 from .features import FEATURE_COLS
 from .io import plan_batches, staged_input, staged_io, staged_output
 from .logging import get_lynceus_logger, wide_log
@@ -13,6 +13,7 @@ __all__ = [
     "get_lynceus_logger",
     "wide_log",
     # cli
+    "MemoryLimit",
     "NumWorkers",
     # io
     "plan_batches",

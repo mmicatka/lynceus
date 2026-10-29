@@ -11,29 +11,32 @@ def shard_candidates_template(
     transfers: int = 4,
     id_column: str = "id",
     num_workers: str = "auto",
+    memory_limit: str = "4GB",
 ):
     import os
     import subprocess
 
-    subprocess.run(
-        [
-            "shard-candidates",
-            "--input",
-            os.path.join(base_path, input_prefix),
-            "--output",
-            os.path.join(base_path, output_prefix),
-            "--scratch-dir",
-            scratch_path,
-            "--num-shards",
-            str(num_shards),
-            "--max-batch-gib",
-            str(max_batch_gib),
-            "--transfers",
-            str(transfers),
-            "--id-column",
-            id_column,
-            "--num-workers",
-            str(num_workers),
-        ],
-        check=True,
-    )
+    cmd = [
+        "shard-candidates",
+        "--input",
+        os.path.join(base_path, input_prefix),
+        "--output",
+        os.path.join(base_path, output_prefix),
+        "--scratch-dir",
+        scratch_path,
+        "--num-shards",
+        str(num_shards),
+        "--max-batch-gib",
+        str(max_batch_gib),
+        "--transfers",
+        str(transfers),
+        "--id-column",
+        id_column,
+        "--num-workers",
+        str(num_workers),
+    ]
+
+    if memory_limit:
+        cmd.extend(["--memory-limit", memory_limit])
+
+    subprocess.run(cmd, check=True)

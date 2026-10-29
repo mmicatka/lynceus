@@ -54,7 +54,7 @@ def _ensure_parent_dir(path: str) -> None:
 @click.option(
     "--seed",
     "seed",
-    default=42,
+    default=1000,
     type=int,
     show_default=True,
     help="Random seed for repeatable reservoir sampling.",
