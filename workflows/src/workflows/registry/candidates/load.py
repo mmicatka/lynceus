@@ -27,7 +27,7 @@ from workflows.templates.builders import TemplateFactory
 LOAD_CANDIDATES_DAG = "load-candidates-dag"
 PROCESS_SOURCE_DAG = "process-source-dag"
 SOURCE_INPUT_NAME = "source"
-MAX_PARALLEL_SOURCES = 3
+MAX_PARALLEL_SOURCES = 1
 VERIFY_RESULT_OUTPUT = "result"
 
 

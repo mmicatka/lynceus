@@ -6,6 +6,26 @@ import os
 import click
 
 
+class MemoryLimit(click.ParamType):
+    name = "memory_limit"
+
+    def convert(self, value, param, ctx):
+        if not value:
+            return None
+
+        val_str = str(value).strip()
+
+        # Convert K8s 'Gi'/'Mi'/'Ki' to DuckDB 'GiB'/'MiB'/'KiB'
+        if val_str.endswith("i"):
+            return f"{val_str}B"
+
+        # Convert K8s 'G'/'M'/'K' to DuckDB 'GB'/'MB'/'KB'
+        if not val_str.endswith("B") and val_str[-1].isalpha():
+            return f"{val_str}B"
+
+        return val_str
+
+
 def _get_container_cpu_limit():
     if os.path.exists("/sys/fs/cgroup/cpu.max"):
         with open("/sys/fs/cgroup/cpu.max") as f:

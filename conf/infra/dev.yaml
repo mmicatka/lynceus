@@ -63,7 +63,7 @@ templates:
       size_limit: 50Gi
 
   merge_shards:
-    resources: *high_cpu
+    resources: *med_cpu_high_ram
     image: *candidates_image # TODO: move this into a dedicated image
 
   subsample_candidates:

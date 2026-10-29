@@ -127,7 +127,7 @@ spec:
       - name: num_workers
         default: auto
       - name: memory_limit
-        default: ''
+        default: 4GB
     retryStrategy:
       limit: 5
       backoff:
@@ -234,7 +234,7 @@ spec:
       parameters:
       - name: source
   - name: load-candidates-dag
-    parallelism: 3
+    parallelism: 1
     dag:
       tasks:
       - name: process-sources
@@ -262,6 +262,9 @@ spec:
         - H23
         - H24
         - H25
+        - H26
+        - H27
+        - H28
         arguments:
           parameters:
           - name: source
@@ -578,7 +581,7 @@ spec:
 
         import os
         import subprocess
-        subprocess.run(['merge-shards', '--input', os.path.join(base_path, input_path), '--output', os.path.join(base_path, output_path), '--memory-limit', '4GB'], check=True)
+        subprocess.run(['merge-shards', '--input', os.path.join(base_path, input_path), '--output', os.path.join(base_path, output_path), '--memory-limit', '6GB'], check=True)
       command:
       - python
       volumeMounts:
@@ -586,10 +589,10 @@ spec:
         mountPath: /mnt/lynceus
       resources:
         limits:
-          cpu: '8'
+          cpu: '4'
           memory: 8Gi
         requests:
-          cpu: '8'
+          cpu: '4'
           memory: 8Gi
   - name: clean-prefix
     volumes:

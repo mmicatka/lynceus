@@ -11,7 +11,7 @@ def shard_candidates_template(
     transfers: int = 4,
     id_column: str = "id",
     num_workers: str = "auto",
-    memory_limit: str = "",
+    memory_limit: str = "4GB",
 ):
     import os
     import subprocess

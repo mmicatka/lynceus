@@ -7,7 +7,7 @@ from pathlib import Path
 
 import click
 import duckdb
-from lynceus_core.cli import NumWorkers
+from lynceus_core.cli import MemoryLimit, NumWorkers
 from lynceus_core.io import plan_batches, staged_io
 from lynceus_core.logging import get_lynceus_logger, wide_log
 from lynceus_core.manifest import Manifest
@@ -143,9 +143,9 @@ def _process_batch(
 @click.option(
     "--memory-limit",
     "memory_limit",
-    default=None,
-    type=str,
-    help="DuckDB memory limit, e.g. '48GB'. Defaults to DuckDB's own default.",
+    default="6GB",
+    type=MemoryLimit(),
+    help="DuckDB memory limit, e.g. '48Gi' or '48GB'.",
 )
 @wide_log(logger)
 def shard_candidates(
@@ -160,6 +160,9 @@ def shard_candidates(
     memory_limit: str | None,
 ) -> None:
     click.echo(f"Processing {input_path}...")
+
+    memory_limit = "6GB"
+    num_workers = 1
 
     output = Path(output_path)
     input_folder = os.path.basename(input_path.rstrip("/"))
