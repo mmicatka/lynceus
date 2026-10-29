@@ -4,6 +4,7 @@ import datetime
 import json
 import os
 import time
+from collections import deque
 from concurrent.futures import ProcessPoolExecutor
 
 import click
@@ -21,14 +22,15 @@ logger = get_lynceus_logger()
 # we handle/report parse failures ourselves, so silence RDKit's own logger.
 rdBase.DisableLog("rdApp.*")
 
-MAX_PROTONATION_VARIANTS = 4
+MAX_PROTONATION_VARIANTS = 1
 
 EMBED_PARAMS = AllChem.ETKDGv3()
 EMBED_PARAMS.randomSeed = 1000
-EMBED_PARAMS.maxIterations = 50
+EMBED_PARAMS.useRandomCoords = False
+EMBED_PARAMS.maxIterations = 10
 EMBED_PARAMS.numThreads = 1
-
-OPTIMIZE_MAX_ITERS = 50
+EMBED_PARAMS.clearConfs = True
+EMBED_PARAMS.enforceChirality = True
 
 
 class Manifest:
@@ -56,13 +58,14 @@ class Manifest:
 
 
 def _process_chunk(
-    smiles_chunk: list[tuple[str, str]], max_variants: int = MAX_PROTONATION_VARIANTS
+    smiles_chunk: list[tuple[str, str]],
+    max_variants: int = MAX_PROTONATION_VARIANTS,
 ) -> list[str]:
     res = []
 
     for id, smiles in smiles_chunk:
         variants = dimorphite_dl.protonate_smiles(
-            smiles, validate_output=True, max_variants=max_variants
+            smiles, validate_output=False, max_variants=max_variants
         )
         target_smiles = variants[0] if variants else smiles
 
@@ -79,14 +82,11 @@ def _process_chunk(
             continue
 
         if AllChem.EmbedMolecule(_mol, EMBED_PARAMS) != -1:
-            if AllChem.MMFFOptimizeMolecule(_mol, maxIters=OPTIMIZE_MAX_ITERS) != -1:
-                _mol.SetIntProp("conf_id", 0)
-                _mol.SetProp("_Name", str(id))
-
-                res.append(MolToMolBlock(_mol))
-                continue
-
-        res.append("")
+            _mol.SetIntProp("conf_id", 0)
+            _mol.SetProp("_Name", str(id))
+            res.append(MolToMolBlock(_mol))
+        else:
+            res.append("")
 
     return res
 
@@ -122,7 +122,7 @@ def _chunk_list(input_list, size):
 @click.option(
     "--chunk-size",
     "chunk_size",
-    default=25,
+    default=100,  # OPTIMIZATION: Increased from 25 to reduce IPC overhead
     type=click.IntRange(min=1),
     show_default=True,
     help="Worker chunk size for the conformer process pool.",
@@ -188,6 +188,33 @@ def generate_conformers(
 
     start_time = time.perf_counter()
 
+    pending_batches = deque()
+    MAX_IN_FLIGHT = 3
+
+    def flush_oldest_batch(current_writer):
+        old_batch, old_futures, batch_idx = pending_batches.popleft()
+
+        conformers = []
+        for future in old_futures:
+            conformers.extend(future.result())
+
+        new_batch = old_batch.append_column(
+            "conformer", pa.array(conformers, type=pa.string())
+        )
+
+        if current_writer is None:
+            current_writer = pq.ParquetWriter(output_path, new_batch.schema)
+
+        current_writer.write_batch(new_batch)
+
+        logger.info(
+            "Processed batch",
+            batch_index=batch_idx + 1,
+            processed=min((batch_idx + 1) * batch_size, num_rows),
+            total_rows=num_rows,
+        )
+        return current_writer
+
     with ProcessPoolExecutor(max_workers=num_workers) as executor:
         for i, batch in enumerate(parquet_file.iter_batches(batch_size=batch_size)):
             id_list = batch["id"].to_pylist()
@@ -196,29 +223,17 @@ def generate_conformers(
             id_smiles_list = list(zip(id_list, smiles_list))
 
             futures = [
-                executor.submit(_process_chunk, chunk)
+                executor.submit(_process_chunk, chunk, MAX_PROTONATION_VARIANTS)
                 for chunk in _chunk_list(id_smiles_list, chunk_size)
             ]
 
-            conformers = []
-            for future in futures:
-                conformers.extend(future.result())
+            pending_batches.append((batch, futures, i))
 
-            new_batch = batch.append_column(
-                "conformer", pa.array(conformers, type=pa.string())
-            )
+            if len(pending_batches) >= MAX_IN_FLIGHT:
+                writer = flush_oldest_batch(writer)
 
-            if writer is None:
-                writer = pq.ParquetWriter(output_path, new_batch.schema)
-
-            writer.write_batch(new_batch)
-
-            logger.info(
-                "Processed batch",
-                batch_index=i + 1,
-                processed=(i + 1) * batch_size,
-                total_rows=num_rows,
-            )
+        while pending_batches:
+            writer = flush_oldest_batch(writer)
 
     if writer is not None:
         writer.close()
@@ -232,6 +247,7 @@ def generate_conformers(
         file=identifier,
         num_rows=num_rows,
         output_path=output_path,
+        run_time=str(datetime.timedelta(seconds=elapsed_time)),
     )
     click.echo("Done!")
 
