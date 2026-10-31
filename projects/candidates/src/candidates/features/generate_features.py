@@ -86,28 +86,27 @@ def _parse_conformers(conformers: list[str]) -> list[Mol | None]:
     ]
 
 
-def _generate_feature_chunk(
-    generator_name: str, conformer_chunk: list[str]
-) -> FeatureChunk:
+def _generate_all_features_chunk(conformer_chunk: list[str]) -> dict[str, FeatureChunk]:
+    """Worker function: parses molecules ONCE and runs all generators."""
     if _WORKER_GENERATORS is None:
         raise RuntimeError("worker not initialized: _WORKER_GENERATORS is None")
-    return _WORKER_GENERATORS[generator_name].generate_feature_chunk(
-        _parse_conformers(conformer_chunk)
-    )
+
+    # 1. Parse the chunk exactly once
+    mols = _parse_conformers(conformer_chunk)
+
+    # 2. Run all generators on the parsed molecules
+    return {
+        name: generator.generate_feature_chunk(mols)
+        for name, generator in _WORKER_GENERATORS.items()
+    }
 
 
 def _submit_chunks(
     executor: ProcessPoolExecutor,
-    feature_generators: list[FeatureGenerator],
     chunks: list[list[str]],
-) -> dict[str, list[Future[FeatureChunk]]]:
-    return {
-        generator.name: [
-            executor.submit(_generate_feature_chunk, generator.name, chunk)
-            for chunk in chunks
-        ]
-        for generator in feature_generators
-    }
+) -> list[Future]:
+    """Submit each chunk of strings to the executor exactly once."""
+    return [executor.submit(_generate_all_features_chunk, chunk) for chunk in chunks]
 
 
 def _process_batch(
@@ -117,15 +116,26 @@ def _process_batch(
     executor: ProcessPoolExecutor,
 ) -> pa.RecordBatch:
     chunks = list(_chunk_list(batch["conformer"].to_pylist(), chunk_size))
-    pending = _submit_chunks(executor, feature_generators, chunks)
+
+    # Submit chunks to the process pool
+    pending_futures = _submit_chunks(executor, chunks)
 
     base = batch.drop_columns(["conformer", "smiles"])
     arrays = list(base.columns)
     names = list(base.schema.names)
 
+    # Pre-allocate containers for the results of each generator
+    gathered_results = {gen.name: [] for gen in feature_generators}
+
+    # Gather results from all futures
+    for future in pending_futures:
+        chunk_result = future.result()
+        for gen_name in gathered_results:
+            gathered_results[gen_name].append(chunk_result[gen_name])
+
+    # Convert the gathered feature chunks into PyArrow columns
     for generator in feature_generators:
-        results = [future.result() for future in pending.pop(generator.name)]
-        for field_name, array in generator.to_columns(results):
+        for field_name, array in generator.to_columns(gathered_results[generator.name]):
             arrays.append(array)
             names.append(field_name)
 
