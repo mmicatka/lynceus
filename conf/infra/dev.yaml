@@ -17,7 +17,7 @@ storage:
 
 candidates:
   max_batch_gib: 20
-  num_shards: 256
+  num_shards: 512
 
 x-defs:
   images:
