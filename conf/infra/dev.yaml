@@ -1,24 +1,4 @@
 ---
-storage:
-  prefixes:
-    candidates:
-      raw_smiles: candidates/raw/smiles
-      raw_parquet: candidates/raw/parquet
-      shards_staging: candidates/shards_staging
-      shards: candidates/shards
-      shards_sample: candidates/shards_sample
-      conformers: candidates/conformers
-      features: candidates/features
-    target:
-      pdbs: target/pdbs
-      ensembles: target/ensembles
-    surrogate:
-      root: surrogate
-
-candidates:
-  max_batch_gib: 20
-  num_shards: 512
-
 x-defs:
   images:
     candidates: &candidates_image
@@ -48,6 +28,26 @@ x-defs:
         cpu: "8"
         memory: 8Gi
       limits: *high_cpu_res
+
+storage:
+  prefixes:
+    candidates:
+      raw_smiles: candidates/raw/smiles
+      raw_parquet: candidates/raw/parquet
+      shards_staging: candidates/shards/staging
+      shards: candidates/shards/merged
+      shards_sample: candidates/5m/shards
+      conformers: candidates/5m/conformers
+      features: candidates/5m/features
+    target:
+      pdbs: target/pdbs
+      ensembles: target/ensembles
+    surrogate:
+      root: surrogate
+
+candidates:
+  max_batch_gib: 20
+  num_shards: 512
 
 templates:
   ##### Candidates #####
