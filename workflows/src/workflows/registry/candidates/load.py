@@ -1,5 +1,7 @@
 # workflows/src/workflows/registry/candidates/load.py
 
+from typing import Callable
+
 from hera.workflows import DAG, Parameter, Task, Workflow
 from hera.workflows.models import ValueFrom
 
@@ -29,10 +31,31 @@ PROCESS_SOURCE_DAG = "process-source-dag"
 SOURCE_INPUT_NAME = "source"
 MAX_PARALLEL_SOURCES = 1
 VERIFY_RESULT_OUTPUT = "result"
+SOURCE_SMILES_GLOB = "*.smi.gz"
+SOURCE_PARQUET_GLOB = "*.parquet"
 
 
 def _run_unless_verified(verify_task: Task) -> str:
     return f"{verify_task.get_parameter(VERIFY_RESULT_OUTPUT)} != true"
+
+
+def _verify_task(
+    verify_manifest: Callable[..., Task],
+    name: str,
+    manifest_path: str,
+    expect: dict,
+    source_root: str,
+    source_glob: str,
+) -> Task:
+    return verify_manifest(
+        name=name,
+        arguments={
+            "manifest_path": manifest_path,
+            "expect": expect,
+            "source_root": source_root,
+            "source_glob": source_glob,
+        },
+    )
 
 
 def _build_process_source_dag(
@@ -41,6 +64,7 @@ def _build_process_source_dag(
 ) -> DAG:
     prefixes = infra_config.storage.prefixes.candidates
     base_path = infra_config.volume.mount_path
+    source_smiles_prefix = f"{prefixes.raw_smiles}/{SOURCE_PARAM}"
     source_parquet_prefix = f"{prefixes.raw_parquet}/{SOURCE_PARAM}"
 
     verify_manifest = templates.build(
@@ -65,18 +89,13 @@ def _build_process_source_dag(
     with DAG(
         name=PROCESS_SOURCE_DAG, inputs=[Parameter(name=SOURCE_INPUT_NAME)]
     ) as dag:
-        verify_task = verify_manifest(
-            name="verify-manifest",
-            arguments={
-                "manifest_path": f"{base_path}/{prefixes.shards_staging}."
-                f"{SOURCE_PARAM}.manifest.json",
-                "expect": {
-                    "input_path": f"{base_path}/{source_parquet_prefix}",
-                    "output_path": f"{base_path}/{prefixes.shards_staging}",
-                    "num_shards": infra_config.candidates.num_shards,
-                    "max_batch_gib": infra_config.candidates.max_batch_gib,
-                },
-            },
+        verify_load_task = _verify_task(
+            verify_manifest,
+            name="verify-load-manifest",
+            manifest_path=f"{base_path}/{source_parquet_prefix}.manifest.json",
+            expect={},
+            source_root=f"{base_path}/{source_smiles_prefix}",
+            source_glob=SOURCE_SMILES_GLOB,
         )
 
         load_task = load_candidates(
@@ -87,7 +106,20 @@ def _build_process_source_dag(
                 "source_prefix": prefixes.raw_smiles,
                 "parquet_prefix": source_parquet_prefix,
             },
-            when=_run_unless_verified(verify_task),
+            when=_run_unless_verified(verify_load_task),
+        )
+
+        verify_shard_task = _verify_task(
+            verify_manifest,
+            name="verify-shard-manifest",
+            manifest_path=f"{base_path}/{prefixes.shards_staging}."
+            f"{SOURCE_PARAM}.manifest.json",
+            expect={
+                "num_shards": infra_config.candidates.num_shards,
+                "max_batch_gib": infra_config.candidates.max_batch_gib,
+            },
+            source_root=f"{base_path}/{source_parquet_prefix}",
+            source_glob=SOURCE_PARQUET_GLOB,
         )
 
         shard_task = shard_candidates(
@@ -101,10 +133,12 @@ def _build_process_source_dag(
                 "max_batch_gib": infra_config.candidates.max_batch_gib,
                 "memory_limit": str(shard_template_config.resources.limits.memory),
             },
-            when=_run_unless_verified(verify_task),
+            when=_run_unless_verified(verify_shard_task),
         )
 
-        verify_task >> load_task >> shard_task  # type: ignore
+        (
+            verify_load_task >> load_task >> verify_shard_task >> shard_task  # type: ignore
+        )
 
     return dag
 

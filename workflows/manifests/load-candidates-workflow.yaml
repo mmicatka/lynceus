@@ -186,20 +186,22 @@ spec:
   - name: process-source-dag
     dag:
       tasks:
-      - name: verify-manifest
+      - name: verify-load-manifest
         template: verify-manifest
         arguments:
           parameters:
           - name: manifest_path
-            value: /mnt/lynceus/candidates/shards/staging.{{inputs.parameters.source}}.manifest.json
+            value: /mnt/lynceus/candidates/raw/parquets/{{inputs.parameters.source}}.manifest.json
           - name: expect
-            value: '{"input_path": "/mnt/lynceus/candidates/raw/parquets/{{inputs.parameters.source}}",
-              "output_path": "/mnt/lynceus/candidates/shards/staging", "num_shards":
-              512, "max_batch_gib": 20}'
+            value: '{}'
+          - name: source_root
+            value: /mnt/lynceus/candidates/raw/smiles/{{inputs.parameters.source}}
+          - name: source_glob
+            value: '*.smi.gz'
       - name: load-candidates
-        depends: verify-manifest
+        depends: verify-load-manifest
         template: load-candidates
-        when: '{{tasks.verify-manifest.outputs.parameters.result}} != true'
+        when: '{{tasks.verify-load-manifest.outputs.parameters.result}} != true'
         arguments:
           parameters:
           - name: base_path
@@ -210,10 +212,23 @@ spec:
             value: candidates/raw/smiles
           - name: parquet_prefix
             value: candidates/raw/parquets/{{inputs.parameters.source}}
-      - name: shard-candidates
+      - name: verify-shard-manifest
         depends: load-candidates
+        template: verify-manifest
+        arguments:
+          parameters:
+          - name: manifest_path
+            value: /mnt/lynceus/candidates/shards/staging.{{inputs.parameters.source}}.manifest.json
+          - name: expect
+            value: '{"num_shards": 512, "max_batch_gib": 20}'
+          - name: source_root
+            value: /mnt/lynceus/candidates/raw/parquets/{{inputs.parameters.source}}
+          - name: source_glob
+            value: '*.parquet'
+      - name: shard-candidates
+        depends: verify-shard-manifest
         template: shard-candidates
-        when: '{{tasks.verify-manifest.outputs.parameters.result}} != true'
+        when: '{{tasks.verify-shard-manifest.outputs.parameters.result}} != true'
         arguments:
           parameters:
           - name: base_path

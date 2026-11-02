@@ -87,7 +87,14 @@ class Manifest:
         with open(self.filepath, "w", encoding="utf-8") as f:
             json.dump(self.data, f, indent=4)
 
-    # _is_subset_of, exists_superset, __le__, __eq__ unchanged
+    def source_files_match(
+        self,
+        root: Union[str, Path],
+        pattern: str,
+        key: str = SOURCE_FILES_KEY,
+    ) -> bool:
+        current = self.describe_files(Path(root).glob(pattern), root)
+        return self.data.get(key) == current
 
     def _is_subset_of(self, other: Union[Dict[str, Any], "Manifest"]) -> bool:
         other_data = other.data if isinstance(other, Manifest) else other
