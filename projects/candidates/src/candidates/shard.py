@@ -174,22 +174,19 @@ def shard_candidates(
         )
 
     manifest_data = {
-        "input_path": input_path,
-        "output_path": output_path,
         "num_shards": num_shards,
         "id_column": id_column,
         "max_batch_gib": max_batch_gib,
     }
 
     manifest_path = f"{output_path.rstrip('/')}.{Path(input_path).name}.manifest.json"
+
     manifest = Manifest(data=manifest_data, filepath=manifest_path)
+    manifest.set_source_files(input_files, root=input_path)
 
     try:
         if manifest.exists_superset():
-            logger.info(
-                "Valid manifest found.",
-                manifest=manifest.data,
-            )
+            logger.info("Valid manifest found.")
             click.echo("Done!")
             return
     except Exception as e:

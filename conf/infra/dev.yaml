@@ -33,7 +33,7 @@ storage:
   prefixes:
     candidates:
       raw_smiles: candidates/raw/smiles
-      raw_parquet: candidates/raw/parquet
+      raw_parquet: candidates/raw/parquets
       shards_staging: candidates/shards/staging
       shards: candidates/shards/merged
       shards_sample: candidates/5m/shards

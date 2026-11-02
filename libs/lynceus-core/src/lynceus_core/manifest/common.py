@@ -1,11 +1,16 @@
 # libs/lynceus-core/src/lynceus_core/manifest/common.py
 
-
 import json
+import os
 from pathlib import Path
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Iterable, List, Optional, Union
+
+from lynceus_core.manifest.hashing import hash_file
 
 MANIFEST_SUFFIX = "manifest.json"
+SOURCE_FILES_KEY = "source_files"
+PATH_FIELD = "path"
+HASH_FIELD = "blake3"
 
 
 class Manifest:
@@ -16,6 +21,48 @@ class Manifest:
     ):
         self.data: Dict[str, Any] = data if data is not None else {}
         self.filepath = Path(filepath) if filepath else None
+
+    @staticmethod
+    def describe_files(
+        paths: Iterable[Union[str, Path]],
+        root: Union[str, Path],
+    ) -> List[Dict[str, str]]:
+        entries = [
+            {
+                PATH_FIELD: os.path.relpath(path, root),
+                HASH_FIELD: hash_file(path),
+            }
+            for path in paths
+        ]
+        return sorted(entries, key=lambda entry: entry[PATH_FIELD])
+
+    def set_source_files(
+        self,
+        paths: Iterable[Union[str, Path]],
+        root: Union[str, Path],
+        key: str = SOURCE_FILES_KEY,
+    ) -> "Manifest":
+        self.data[key] = self.describe_files(paths, root)
+        return self
+
+    def resolve_source_files(
+        self,
+        root: Union[str, Path],
+        key: str = SOURCE_FILES_KEY,
+    ) -> List[Path]:
+        return [Path(root) / entry[PATH_FIELD] for entry in self.data.get(key, [])]
+
+    def verify_source_files(
+        self,
+        root: Union[str, Path],
+        key: str = SOURCE_FILES_KEY,
+    ) -> List[str]:
+        mismatched = []
+        for entry in self.data.get(key, []):
+            path = Path(root) / entry[PATH_FIELD]
+            if not path.is_file() or hash_file(path) != entry[HASH_FIELD]:
+                mismatched.append(entry[PATH_FIELD])
+        return mismatched
 
     def exists(self) -> bool:
         if not self.filepath:
@@ -39,6 +86,8 @@ class Manifest:
         self.filepath.parent.mkdir(parents=True, exist_ok=True)
         with open(self.filepath, "w", encoding="utf-8") as f:
             json.dump(self.data, f, indent=4)
+
+    # _is_subset_of, exists_superset, __le__, __eq__ unchanged
 
     def _is_subset_of(self, other: Union[Dict[str, Any], "Manifest"]) -> bool:
         other_data = other.data if isinstance(other, Manifest) else other

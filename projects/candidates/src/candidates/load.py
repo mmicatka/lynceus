@@ -148,22 +148,18 @@ def load_candidates(
         )
 
     manifest_data = {
-        "input_path": input_path,
-        "output_path": output_path,
-        "source_files": source_paths,
         "chunk_size": chunk_size,
         "batch_rows": batch_rows,
     }
 
     manifest_path = str(Path(output_path).with_suffix(".manifest.json"))
+
     manifest = Manifest(data=manifest_data, filepath=manifest_path)
+    manifest.set_source_files(source_paths, root=input_path)
 
     try:
         if manifest.exists_superset():
-            logger.info(
-                "Valid manifest found.",
-                manifest=manifest.data,
-            )
+            logger.info("Valid manifest found.")
             click.echo("Done!")
             return
     except Exception as e:
@@ -178,7 +174,6 @@ def load_candidates(
 
     start_time = time.perf_counter()
 
-    # Process serially on a single thread
     for path in source_paths:
         processed_path = _write_parquet(
             path,

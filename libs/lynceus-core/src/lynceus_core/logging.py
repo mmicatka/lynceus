@@ -113,15 +113,15 @@ def wide_log(
 
 def _configure_logging():
     if sys.stdout.isatty():
-        processor = structlog.dev.ConsoleRenderer(colors=True)
+        renderer = structlog.processors.JSONRenderer(indent=2)
     else:
-        processor = structlog.processors.JSONRenderer()
+        renderer = structlog.processors.JSONRenderer()
 
     structlog.configure(
         processors=[
             structlog.processors.TimeStamper(fmt="iso"),
             structlog.processors.add_log_level,
-            processor,
+            renderer,
         ]
     )
 
