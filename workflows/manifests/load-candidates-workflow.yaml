@@ -60,12 +60,21 @@ spec:
     - name: lynceus
       persistentVolumeClaim:
         claimName: lynceus-pvc
+    - name: scratch
+      emptyDir:
+        sizeLimit: 50Gi
     inputs:
       parameters:
       - name: base_path
       - name: source
       - name: source_prefix
       - name: parquet_prefix
+      - name: scratch_dir
+        default: ''
+      - name: files_per_stage
+        default: ''
+      - name: transfers
+        default: ''
     retryStrategy:
       limit: 5
       backoff:
@@ -82,21 +91,31 @@ spec:
         import json
         try: base_path = json.loads(r'''{{inputs.parameters.base_path}}''')
         except: base_path = r'''{{inputs.parameters.base_path}}'''
+        try: files_per_stage = json.loads(r'''{{inputs.parameters.files_per_stage}}''')
+        except: files_per_stage = r'''{{inputs.parameters.files_per_stage}}'''
         try: parquet_prefix = json.loads(r'''{{inputs.parameters.parquet_prefix}}''')
         except: parquet_prefix = r'''{{inputs.parameters.parquet_prefix}}'''
+        try: scratch_dir = json.loads(r'''{{inputs.parameters.scratch_dir}}''')
+        except: scratch_dir = r'''{{inputs.parameters.scratch_dir}}'''
         try: source = json.loads(r'''{{inputs.parameters.source}}''')
         except: source = r'''{{inputs.parameters.source}}'''
         try: source_prefix = json.loads(r'''{{inputs.parameters.source_prefix}}''')
         except: source_prefix = r'''{{inputs.parameters.source_prefix}}'''
+        try: transfers = json.loads(r'''{{inputs.parameters.transfers}}''')
+        except: transfers = r'''{{inputs.parameters.transfers}}'''
 
         import os
         import subprocess
-        subprocess.run(['load-candidates', '--input', os.path.join(base_path, source_prefix, source), '--output', os.path.join(base_path, parquet_prefix)], check=True)
+        optional_flags = {'--scratch-dir': scratch_dir, '--files-per-stage': files_per_stage, '--transfers': transfers}
+        extra_args = [arg for flag, value in optional_flags.items() if value for arg in (flag, value)]
+        subprocess.run(['load-candidates', '--input', os.path.join(base_path, source_prefix, source), '--output', os.path.join(base_path, parquet_prefix), *extra_args], check=True)
       command:
       - python
       volumeMounts:
       - name: lynceus
         mountPath: /mnt/lynceus
+      - name: scratch
+        mountPath: /scratch
       resources:
         limits:
           cpu: '4'
@@ -184,6 +203,7 @@ spec:
           cpu: '4'
           memory: 8Gi
   - name: process-source-dag
+    parallelism: 1
     dag:
       tasks:
       - name: verify-load-manifest
@@ -212,6 +232,8 @@ spec:
             value: candidates/raw/smiles
           - name: parquet_prefix
             value: candidates/raw/parquets/{{inputs.parameters.source}}
+          - name: scratch_dir
+            value: /scratch
       - name: verify-shard-manifest
         depends: load-candidates
         template: verify-manifest

@@ -29,6 +29,10 @@ x-defs:
         memory: 8Gi
       limits: *high_cpu_res
 
+    scratch: &scratch
+      mount_path: /scratch
+      size_limit: 50Gi
+
 storage:
   prefixes:
     candidates:
@@ -54,13 +58,12 @@ templates:
   load_candidates:
     resources: *med_cpu_high_ram
     image: *candidates_image
+    scratch: *scratch
 
   shard_candidates:
     resources: *med_cpu_high_ram
     image: *candidates_image
-    scratch: &scratch
-      mount_path: /scratch
-      size_limit: 50Gi
+    scratch: *scratch
 
   merge_shards:
     resources: *med_cpu_high_ram

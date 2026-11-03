@@ -77,6 +77,8 @@ def _build_process_source_dag(
             )
         ],
     )
+
+    load_template_config = infra_config.templates[TemplateName.LOAD_CANDIDATES]
     load_candidates = templates.build(
         TemplateName.LOAD_CANDIDATES, load_candidates_template
     )
@@ -87,7 +89,9 @@ def _build_process_source_dag(
     shard_template_config = infra_config.templates[TemplateName.SHARD_CANDIDATES]
 
     with DAG(
-        name=PROCESS_SOURCE_DAG, inputs=[Parameter(name=SOURCE_INPUT_NAME)]
+        name=PROCESS_SOURCE_DAG,
+        inputs=[Parameter(name=SOURCE_INPUT_NAME)],
+        parallelism=MAX_PARALLEL_SOURCES,
     ) as dag:
         verify_load_task = _verify_task(
             verify_manifest,
@@ -105,6 +109,7 @@ def _build_process_source_dag(
                 "source": SOURCE_PARAM,
                 "source_prefix": prefixes.raw_smiles,
                 "parquet_prefix": source_parquet_prefix,
+                "scratch_dir": load_template_config.scratch_path,
             },
             when=_run_unless_verified(verify_load_task),
         )
