@@ -50,7 +50,7 @@ storage:
       root: surrogate
 
 candidates:
-  max_batch_gib: 20
+  max_batch_gib: 10
   num_shards: 512
 
 templates:

@@ -16,9 +16,9 @@ dependencies = [
 ]
 
 [project.scripts]
-load-candidates = "candidates:load_candidates"
-sample-candidates = "candidates:sample_candidates"
+plan-load-candidates = "candidates:plan_load_candidates"
 shard-candidates = "candidates:shard_candidates"
+sample-candidates = "candidates:sample_candidates"
 generate-conformers = "candidates:generate_conformers"
 generate-features = "candidates:generate_features"
 

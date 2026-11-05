@@ -71,7 +71,7 @@ spec:
       - name: parquet_prefix
       - name: scratch_dir
         default: ''
-      - name: files_per_stage
+      - name: max_batch_gib
         default: ''
       - name: transfers
         default: ''
@@ -91,8 +91,8 @@ spec:
         import json
         try: base_path = json.loads(r'''{{inputs.parameters.base_path}}''')
         except: base_path = r'''{{inputs.parameters.base_path}}'''
-        try: files_per_stage = json.loads(r'''{{inputs.parameters.files_per_stage}}''')
-        except: files_per_stage = r'''{{inputs.parameters.files_per_stage}}'''
+        try: max_batch_gib = json.loads(r'''{{inputs.parameters.max_batch_gib}}''')
+        except: max_batch_gib = r'''{{inputs.parameters.max_batch_gib}}'''
         try: parquet_prefix = json.loads(r'''{{inputs.parameters.parquet_prefix}}''')
         except: parquet_prefix = r'''{{inputs.parameters.parquet_prefix}}'''
         try: scratch_dir = json.loads(r'''{{inputs.parameters.scratch_dir}}''')
@@ -106,7 +106,7 @@ spec:
 
         import os
         import subprocess
-        optional_flags = {'--scratch-dir': scratch_dir, '--files-per-stage': files_per_stage, '--transfers': transfers}
+        optional_flags = {'--scratch-dir': scratch_dir, '--max-batch-gib': max_batch_gib, '--transfers': transfers}
         extra_args = [arg for flag, value in optional_flags.items() if value for arg in (flag, value)]
         subprocess.run(['load-candidates', '--input', os.path.join(base_path, source_prefix, source), '--output', os.path.join(base_path, parquet_prefix), *extra_args], check=True)
       command:
@@ -234,6 +234,8 @@ spec:
             value: candidates/raw/parquets/{{inputs.parameters.source}}
           - name: scratch_dir
             value: /scratch
+          - name: max_batch_gib
+            value: '10'
       - name: verify-shard-manifest
         depends: load-candidates
         template: verify-manifest
@@ -242,7 +244,7 @@ spec:
           - name: manifest_path
             value: /mnt/lynceus/candidates/shards/staging.{{inputs.parameters.source}}.manifest.json
           - name: expect
-            value: '{"num_shards": 512, "max_batch_gib": 20}'
+            value: '{"num_shards": 512, "max_batch_gib": 10}'
           - name: source_root
             value: /mnt/lynceus/candidates/raw/parquets/{{inputs.parameters.source}}
           - name: source_glob
@@ -264,7 +266,7 @@ spec:
           - name: scratch_path
             value: /scratch
           - name: max_batch_gib
-            value: '20'
+            value: '10'
           - name: memory_limit
             value: 8Gi
     inputs:
@@ -299,9 +301,6 @@ spec:
         - H23
         - H24
         - H25
-        - H26
-        - H27
-        - H28
         arguments:
           parameters:
           - name: source

@@ -7,7 +7,7 @@ def load_candidates_template(
     source_prefix: str,
     parquet_prefix: str,
     scratch_dir: str = "",
-    files_per_stage: str = "",
+    max_batch_gib: str = "",
     transfers: str = "",
 ):
     import os
@@ -15,7 +15,7 @@ def load_candidates_template(
 
     optional_flags = {
         "--scratch-dir": scratch_dir,
-        "--files-per-stage": files_per_stage,
+        "--max-batch-gib": max_batch_gib,
         "--transfers": transfers,
     }
     extra_args = [

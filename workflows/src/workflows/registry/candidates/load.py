@@ -110,6 +110,7 @@ def _build_process_source_dag(
                 "source_prefix": prefixes.raw_smiles,
                 "parquet_prefix": source_parquet_prefix,
                 "scratch_dir": load_template_config.scratch_path,
+                "max_batch_gib": infra_config.candidates.max_batch_gib,
             },
             when=_run_unless_verified(verify_load_task),
         )
