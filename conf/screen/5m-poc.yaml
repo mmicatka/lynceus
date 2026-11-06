@@ -26,9 +26,9 @@ candidates:
     - H23
     - H24
     - H25
-    # - H26
-    # - H27
-    # - H28
+    - H26
+    - H27
+    - H28
 
 targets:
   ensembles:

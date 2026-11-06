@@ -30,7 +30,7 @@ SHARD_RETRY = RetryStrategy(limit=2, retry_policy="OnFailure")
 
 
 def _batches_expression(plan_task: Task) -> str:
-    manifest = f"tasks.{plan_task.name}.outputs.parameters.{MANIFEST_OUTPUT}"
+    manifest = f"tasks['{plan_task.name}'].outputs.parameters.{MANIFEST_OUTPUT}"
     return f"{{{{=toJson(fromJSON({manifest}).batches)}}}}"
 
 

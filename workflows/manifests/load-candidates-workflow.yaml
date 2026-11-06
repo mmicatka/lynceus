@@ -33,7 +33,7 @@ spec:
       - name: shard-candidates
         depends: plan-shard
         template: shard-candidates
-        withParam: '{{=toJson(fromJSON(tasks.plan-shard.outputs.parameters.manifest).batches)}}'
+        withParam: '{{=toJson(fromJSON(tasks[''plan-shard''].outputs.parameters.manifest).batches)}}'
         arguments:
           parameters:
           - name: base_path
