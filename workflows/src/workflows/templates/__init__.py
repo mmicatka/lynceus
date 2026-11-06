@@ -1,10 +1,11 @@
 # workflows/src/workflows/templates/__init__.py
 
+
 from .builders import TemplateFactory
 from .candidates import (
     generate_conformers_template,
     generate_features_template,
-    load_candidates_template,
+    plan_shard_candidates_template,
     sample_candidates_template,
     shard_candidates_template,
 )
@@ -31,9 +32,9 @@ __all__ = [
     # candidates
     "generate_conformers_template",
     "generate_features_template",
-    "load_candidates_template",
-    "sample_candidates_template",
+    "plan_shard_candidates_template",
     "shard_candidates_template",
+    "sample_candidates_template",
     # docking
     "run_docking_template",
     # target

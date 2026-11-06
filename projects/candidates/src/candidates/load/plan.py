@@ -1,73 +1,84 @@
 # projects/candidates/src/candidates/load/plan.py
 
 
+import json
 from pathlib import Path
 
 import click
-from lynceus_core.logging import get_lynceus_logger, wide_log
-from lynceus_core.manifest.common import Manifest
 
-logger = get_lynceus_logger()
+BYTES_PER_GIB = 1024**3
+FileEntry = tuple[str, int]
 
 
-@click.command("plan_candidates")
+def scan_files(source_root: Path, source_glob: str) -> list[FileEntry]:
+    return sorted(
+        (str(path.relative_to(source_root)), path.stat().st_size)
+        for path in source_root.glob(source_glob)
+        if path.is_file()
+    )
+
+
+def _pack_batches(files: list[FileEntry], max_batch_bytes: float) -> list[list[str]]:
+    batches: list[list[str]] = []
+    current: list[str] = []
+    current_bytes = 0
+
+    for path, size in files:
+        if current and current_bytes + size > max_batch_bytes:
+            batches.append(current)
+            current, current_bytes = [], 0
+        current.append(path)
+        current_bytes += size
+
+    if current:
+        batches.append(current)
+    return batches
+
+
+def _write_plan(batches: list[list[str]], output_file: Path) -> None:
+    output_file.parent.mkdir(parents=True, exist_ok=True)
+    output_file.write_text(json.dumps({"batches": batches}, separators=(",", ":")))
+
+
+@click.command()
 @click.option(
     "--source-root",
     required=True,
-    type=str,
+    type=click.Path(file_okay=False, path_type=Path),
     help="Directory to scan for files.",
 )
 @click.option(
     "--source-glob",
     default="**/*",
     show_default=True,
-    type=str,
     help="Glob, relative to --source-root, selecting the files.",
 )
 @click.option(
     "--output-file",
     default="/tmp/manifest.json",
     show_default=True,
-    type=str,
-    help="File the manifest JSON is written to (read as an Argo output parameter).",
+    type=click.Path(dir_okay=False, path_type=Path),
+    help="File the plan JSON is written to (read as an Argo output parameter).",
 )
-@wide_log(logger)
+@click.option(
+    "--max-batch-gib",
+    default=10.0,
+    show_default=True,
+    type=click.FloatRange(min=0, min_open=True),
+    help="Maximum total input size per batch. A larger single file gets its own batch.",
+)
 def plan_load_candidates(
-    source_root: str,
+    source_root: Path,
     source_glob: str,
-    output_file: str,
+    output_file: Path,
+    max_batch_gib: float,
 ) -> None:
-    click.echo(
-        f"Generating file manifest for {source_root} matching '{source_glob}'..."
-    )
-
-    root_path = Path(source_root)
-    if not root_path.exists() or not root_path.is_dir():
+    files = scan_files(source_root, source_glob)
+    if not files:
         raise click.ClickException(
-            f"Source root does not exist or is not a directory: {source_root}"
+            f"No files matched {source_glob!r} under {source_root}"
         )
 
-    paths = [p for p in root_path.glob(source_glob) if p.is_file()]
-
-    try:
-        manifest = Manifest(filepath=output_file)
-
-        manifest.set_source_files(paths=paths, root=source_root)
-        manifest.save()
-
-    except Exception as e:
-        logger.error("Failed to generate and save manifest.", error=str(e))
-        raise click.ClickException(f"Failed to generate manifest: {e}")
-
-    logger.info(
-        "Generated file manifest",
-        source_root=source_root,
-        source_glob=source_glob,
-        output_file=output_file,
-        file_count=len(paths),
-    )
-    click.echo(f"Done! Manifest for {len(paths)} files written to {output_file}")
-
-
-if __name__ == "__main__":
-    plan_load_candidates()
+    batches = _pack_batches(files, max_batch_gib * BYTES_PER_GIB)
+    _write_plan(batches, output_file)
+    click.echo(f"Planned {len(files)} files into {len(batches)} batches")

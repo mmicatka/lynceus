@@ -41,7 +41,7 @@ def build_load_targets_dag(
 
     download_pdbs = templates.build(TemplateName.DOWNLOAD_PDBS, download_pdbs_template)
     generate_manifest = templates.build(
-        TemplateName.GENERATE_MANIFEST, generate_manifest_template
+        TemplateName.GENERATE_PROTEIN_ENSEMBLE_MANIFEST, generate_manifest_template
     )
 
     with DAG(name=LOAD_TARGETS_DAG) as load_targets_dag:

@@ -55,10 +55,9 @@ candidates:
 
 templates:
   ##### Candidates #####
-  load_candidates:
-    resources: *med_cpu_high_ram
+  plan_shard_candidates:
+    resources: *low_cpu
     image: *candidates_image
-    scratch: *scratch
 
   shard_candidates:
     resources: *med_cpu_high_ram
@@ -86,7 +85,7 @@ templates:
     resources: *low_cpu
     image: *targets_image
 
-  generate_manifest:
+  generate_protein_ensemble_manifest:
     resources: *low_cpu
     image: *targets_image
 

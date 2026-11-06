@@ -20,20 +20,24 @@ MountPath = Annotated[str, StringConstraints(pattern=r"^/[^/\s]+(/[^/\s]+)*$")]
 
 
 class TemplateName(StrEnum):
-    LOAD_CANDIDATES = "load_candidates"
+    # Candidates
+    PLAN_SHARD_CANDIDATES = "plan_shard_candidates"
     SHARD_CANDIDATES = "shard_candidates"
     MERGE_SHARDS = "merge_shards"
     SUBSAMPLE_CANDIDATES = "subsample_candidates"
     GENERATE_CONFORMERS = "generate_conformers"
     GENERATE_FEATURES = "generate_features"
+    # Targets
     DOWNLOAD_PDBS = "download_pdbs"
-    GENERATE_MANIFEST = "generate_manifest"
+    GENERATE_PROTEIN_ENSEMBLE_MANIFEST = "generate_protein_ensemble_manifest"
     DETECT_BINDING_SITES = "detect_binding_sites"
     RESOLVE_BINDING_SITES = "resolve_binding_sites"
+    # Surrogate
     RUN_DOCKING = "run_docking"
     SURROGATE_SAMPLE = "surrogate_sample"
     SURROGATE_SAMPLE_BY_PREDICTION = "surrogate_sample_by_prediction"
     SURROGATE_TRAIN = "surrogate_train"
+    # Utils
     VERIFY_MANIFEST = "verify_manifest"
 
 

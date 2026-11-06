@@ -7,9 +7,9 @@ from workflows.resources.volumes import LYNCEUS_VOLUME
 CLEAN_SCRIPT = 'test -n "$1" && rm -rf "$0/$1"'
 
 
-def build_clean_prefix_template() -> Container:
+def build_clean_prefix_template(name: str) -> Container:
     return Container(
-        name="clean-prefix",
+        name=name,
         image="alpine:3.20",
         command=["sh", "-c"],
         args=[

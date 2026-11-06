@@ -1,8 +1,6 @@
 # workflows/src/workflows/registry/candidates/load.py
 
-from typing import Callable
-
-from hera.workflows import DAG, Parameter, Task, Workflow
+from hera.workflows import DAG, Parameter, RetryStrategy, Task, Workflow
 from hera.workflows.models import ValueFrom
 
 from workflows.config import InfraConfig, ScreenConfig
@@ -11,7 +9,6 @@ from workflows.registry.common.core import (
     ENTRYPOINT_DAG,
     ITEM_PARAM,
     SHARD_FOLDER_PREFIX,
-    SOURCE_PARAM,
     get_template_factory,
     new_workflow,
     shard_filename,
@@ -19,134 +16,83 @@ from workflows.registry.common.core import (
 )
 from workflows.templates import (
     build_clean_prefix_template,
-    load_candidates_template,
     merge_shards_template,
+    plan_shard_candidates_template,
     shard_candidates_template,
-    verify_manifest_template,
 )
 from workflows.templates.builders import TemplateFactory
 
 LOAD_CANDIDATES_DAG = "load-candidates-dag"
-PROCESS_SOURCE_DAG = "process-source-dag"
-SOURCE_INPUT_NAME = "source"
-MAX_PARALLEL_SOURCES = 1
-VERIFY_RESULT_OUTPUT = "result"
-SOURCE_SMILES_GLOB = "*.smi.gz"
-SOURCE_PARQUET_GLOB = "*.parquet"
+MANIFEST_OUTPUT = "manifest"
+MANIFEST_PATH = "/tmp/manifest.json"
+SOURCE_FILE_GLOB = "**/*.smi.gz"
+SHARD_RETRY = RetryStrategy(limit=2, retry_policy="OnFailure")
 
 
-def _run_unless_verified(verify_task: Task) -> str:
-    return f"{verify_task.get_parameter(VERIFY_RESULT_OUTPUT)} != true"
+def _batches_expression(plan_task: Task) -> str:
+    manifest = f"tasks.{plan_task.name}.outputs.parameters.{MANIFEST_OUTPUT}"
+    return f"{{{{=toJson(fromJSON({manifest}).batches)}}}}"
 
 
-def _verify_task(
-    verify_manifest: Callable[..., Task],
-    name: str,
-    manifest_path: str,
-    expect: dict,
-    source_root: str,
-    source_glob: str,
-) -> Task:
-    return verify_manifest(
+def _clean_staging_task(name: str, infra_config: InfraConfig) -> Task:
+    return Task(
         name=name,
+        template=build_clean_prefix_template(name),
         arguments={
-            "manifest_path": manifest_path,
-            "expect": expect,
-            "source_root": source_root,
-            "source_glob": source_glob,
+            "base_path": infra_config.volume.mount_path,
+            "prefix": infra_config.storage.prefixes.candidates.shards_staging,
         },
     )
 
 
-def _build_process_source_dag(
-    templates: TemplateFactory,
-    infra_config: InfraConfig,
-) -> DAG:
+def _plan_shard_task(templates: TemplateFactory, infra_config: InfraConfig) -> Task:
     prefixes = infra_config.storage.prefixes.candidates
-    base_path = infra_config.volume.mount_path
-    source_smiles_prefix = f"{prefixes.raw_smiles}/{SOURCE_PARAM}"
-    source_parquet_prefix = f"{prefixes.raw_parquet}/{SOURCE_PARAM}"
-
-    verify_manifest = templates.build(
-        TemplateName.VERIFY_MANIFEST,
-        verify_manifest_template,
+    plan = templates.build(
+        TemplateName.PLAN_SHARD_CANDIDATES,
+        plan_shard_candidates_template,
         outputs=[
             Parameter(
-                name=VERIFY_RESULT_OUTPUT,
-                value_from=ValueFrom(path="/tmp/manifest_matches.txt"),
+                name=MANIFEST_OUTPUT,
+                value_from=ValueFrom(path=MANIFEST_PATH),
             )
         ],
     )
 
-    load_template_config = infra_config.templates[TemplateName.LOAD_CANDIDATES]
-    load_candidates = templates.build(
-        TemplateName.LOAD_CANDIDATES, load_candidates_template
+    return plan(
+        name="plan-shard",
+        arguments={
+            "source_root": infra_config.volume.mount_path,
+            "source_glob": f"{prefixes.raw_smiles}/{SOURCE_FILE_GLOB}",
+            "output_file": MANIFEST_PATH,
+            "max_batch_gib": str(infra_config.candidates.max_batch_gib),
+        },
     )
-    shard_candidates = templates.build(
-        TemplateName.SHARD_CANDIDATES, shard_candidates_template
+
+
+def _shard_task(
+    templates: TemplateFactory,
+    infra_config: InfraConfig,
+    plan_task: Task,
+) -> Task:
+    prefixes = infra_config.storage.prefixes.candidates
+    template_config = infra_config.templates[TemplateName.SHARD_CANDIDATES]
+    shard = templates.build(
+        TemplateName.SHARD_CANDIDATES,
+        shard_candidates_template,
+        retry_strategy=SHARD_RETRY,
     )
 
-    shard_template_config = infra_config.templates[TemplateName.SHARD_CANDIDATES]
-
-    with DAG(
-        name=PROCESS_SOURCE_DAG,
-        inputs=[Parameter(name=SOURCE_INPUT_NAME)],
-        parallelism=MAX_PARALLEL_SOURCES,
-    ) as dag:
-        verify_load_task = _verify_task(
-            verify_manifest,
-            name="verify-load-manifest",
-            manifest_path=f"{base_path}/{source_parquet_prefix}.manifest.json",
-            expect={},
-            source_root=f"{base_path}/{source_smiles_prefix}",
-            source_glob=SOURCE_SMILES_GLOB,
-        )
-
-        load_task = load_candidates(
-            name="load-candidates",
-            arguments={
-                "base_path": base_path,
-                "source": SOURCE_PARAM,
-                "source_prefix": prefixes.raw_smiles,
-                "parquet_prefix": source_parquet_prefix,
-                "scratch_dir": load_template_config.scratch_path,
-                "max_batch_gib": infra_config.candidates.max_batch_gib,
-            },
-            when=_run_unless_verified(verify_load_task),
-        )
-
-        verify_shard_task = _verify_task(
-            verify_manifest,
-            name="verify-shard-manifest",
-            manifest_path=f"{base_path}/{prefixes.shards_staging}."
-            f"{SOURCE_PARAM}.manifest.json",
-            expect={
-                "num_shards": infra_config.candidates.num_shards,
-                "max_batch_gib": infra_config.candidates.max_batch_gib,
-            },
-            source_root=f"{base_path}/{source_parquet_prefix}",
-            source_glob=SOURCE_PARQUET_GLOB,
-        )
-
-        shard_task = shard_candidates(
-            name="shard-candidates",
-            arguments={
-                "base_path": base_path,
-                "input_prefix": source_parquet_prefix,
-                "output_prefix": prefixes.shards_staging,
-                "num_shards": infra_config.candidates.num_shards,
-                "scratch_path": shard_template_config.scratch_path,
-                "max_batch_gib": infra_config.candidates.max_batch_gib,
-                "memory_limit": str(shard_template_config.resources.limits.memory),
-            },
-            when=_run_unless_verified(verify_shard_task),
-        )
-
-        (
-            verify_load_task >> load_task >> verify_shard_task >> shard_task  # type: ignore
-        )
-
-    return dag
+    return shard(
+        name="shard-candidates",
+        with_param=_batches_expression(plan_task),
+        arguments={
+            "base_path": infra_config.volume.mount_path,
+            "batch": ITEM_PARAM,
+            "output_prefix": prefixes.shards_staging,
+            "num_shards": infra_config.candidates.num_shards,
+            "scratch_dir": template_config.scratch_path,
+        },
+    )
 
 
 def _merge_shards_task(
@@ -155,7 +101,6 @@ def _merge_shards_task(
 ) -> Task:
     prefixes = infra_config.storage.prefixes.candidates
     merge_shards = templates.build(TemplateName.MERGE_SHARDS, merge_shards_template)
-
     template_config = infra_config.templates[TemplateName.MERGE_SHARDS]
 
     return merge_shards(
@@ -171,35 +116,23 @@ def _merge_shards_task(
     )
 
 
-def _cleanup_staging_task(infra_config: InfraConfig) -> Task:
-    return Task(
-        name="cleanup-staging",
-        template=build_clean_prefix_template(),
-        arguments={
-            "base_path": infra_config.volume.mount_path,
-            "prefix": infra_config.storage.prefixes.candidates.shards_staging,
-        },
-    )
-
-
 def build_load_candidates_dag(
-    templates: TemplateFactory,
-    infra_config: InfraConfig,
-    screen_config: ScreenConfig,
+    templates: TemplateFactory, infra_config: InfraConfig, screen_config: ScreenConfig
 ) -> DAG:
-    process_source_dag = _build_process_source_dag(templates, infra_config)
-
-    with DAG(name=LOAD_CANDIDATES_DAG, parallelism=MAX_PARALLEL_SOURCES) as dag:
-        process_task = Task(
-            name="process-sources",
-            template=process_source_dag,
-            with_items=screen_config.candidates.sources,
-            arguments={SOURCE_INPUT_NAME: ITEM_PARAM},
-        )
+    with DAG(name=LOAD_CANDIDATES_DAG) as dag:
+        clean_start_task = _clean_staging_task("clean-staging-start", infra_config)
+        plan_task = _plan_shard_task(templates, infra_config)
+        shard_task = _shard_task(templates, infra_config, plan_task)
         merge_task = _merge_shards_task(templates, infra_config)
-        cleanup_task = _cleanup_staging_task(infra_config)
+        clean_end_task = _clean_staging_task("clean-staging-end", infra_config)
 
-        process_task >> merge_task >> cleanup_task  # type: ignore
+        (
+            clean_start_task  # type: ignore
+            >> plan_task
+            >> shard_task
+            >> merge_task
+            >> clean_end_task
+        )
 
     return dag
 

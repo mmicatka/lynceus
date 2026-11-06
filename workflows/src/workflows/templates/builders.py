@@ -106,15 +106,27 @@ class TemplateFactory:
             volumes.append(_to_hera_scratch_volume(template.scratch))
         return volumes
 
-    def build(self, name: TemplateName, func: Callable, **kwargs) -> Callable:
+    def build(
+        self,
+        name: TemplateName,
+        func: Callable,
+        *,
+        retry_strategy: RetryStrategy | None = None,
+        **kwargs,
+    ) -> Callable:
         template = self.templates[name]
+
+        retry_strategy = (
+            retry_strategy if retry_strategy is not None else self.retry_strategy
+        )
+
         return script(
             name=_to_template_name(name),
             image=template.image.image,
             image_pull_policy=template.image.image_pull_policy,
             resources=_to_hera_resources(template.resources),
             volumes=self._volumes_for(template),
-            retry_strategy=self.retry_strategy,
+            retry_strategy=retry_strategy,
             env=_to_hera_env(template.env),
             node_selector=template.node_selector or None,
             tolerations=_to_hera_tolerations(template.tolerations),
