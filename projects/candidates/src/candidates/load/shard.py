@@ -32,7 +32,96 @@ PARQUET_SCHEMA = pa.schema(
     ]
 )
 
-ShardBuckets = dict[int, tuple[list[str], list[str]]]
+
+DEFAULT_MAX_BUFFERED_ROWS = 2_000_000
+
+
+class ShardWriterPool:
+    def __init__(self, source_path: Path, output_dir: Path, max_buffered_rows: int):
+        self._source_path = source_path
+        self._output_dir = output_dir
+        self._max_buffered_rows = max_buffered_rows
+        self._buffers: dict[int, tuple[list[str], list[str]]] = defaultdict(
+            lambda: ([], [])
+        )
+        self._buffered_rows = 0
+        self._writers: dict[int, pq.ParquetWriter] = {}
+        self._row_counts: dict[int, int] = defaultdict(int)
+
+    def __enter__(self) -> "ShardWriterPool":
+        return self
+
+    def __exit__(self, exc_type: type[BaseException] | None, *_: object) -> None:
+        try:
+            if exc_type is None:
+                self._flush()
+        finally:
+            self._close()
+
+    def add(self, shard_id: int, smiles: str, identifier: str) -> None:
+        smiles_batch, id_batch = self._buffers[shard_id]
+        smiles_batch.append(smiles)
+        id_batch.append(identifier)
+        self._buffered_rows += 1
+        if self._buffered_rows >= self._max_buffered_rows:
+            self._flush()
+
+    def files(self) -> list[dict]:
+        return [
+            {
+                "shard_id": shard_id,
+                "path": str(file_relative_path(shard_id, self._source_path)),
+                "rows": self._row_counts[shard_id],
+            }
+            for shard_id in sorted(self._writers)
+        ]
+
+    def _writer_for(self, shard_id: int) -> pq.ParquetWriter:
+        if shard_id not in self._writers:
+            file_path = self._output_dir / file_relative_path(
+                shard_id, self._source_path
+            )
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+            self._writers[shard_id] = pq.ParquetWriter(
+                file_path, PARQUET_SCHEMA, compression="zstd"
+            )
+        return self._writers[shard_id]
+
+    def _flush(self) -> None:
+        for shard_id, (smiles_batch, id_batch) in self._buffers.items():
+            if not smiles_batch:
+                continue
+            table = pa.table(
+                {"smiles": smiles_batch, "id": id_batch}, schema=PARQUET_SCHEMA
+            )
+            self._writer_for(shard_id).write_table(table)
+            self._row_counts[shard_id] += table.num_rows
+        self._buffers.clear()
+        self._buffered_rows = 0
+
+    def _close(self) -> None:
+        for writer in self._writers.values():
+            writer.close()
+
+
+def _shard_file(
+    source_path: Path,
+    output_dir: Path,
+    chunk_size: int,
+    num_shards: int,
+    transfers: int,
+    scratch_dir: str | None,
+    max_buffered_rows: int,
+) -> list[dict]:
+    with staged_io([source_path], output_dir, transfers, scratch_dir) as (
+        local_inputs,
+        local_output,
+    ):
+        (local_source,) = local_inputs
+        with ShardWriterPool(source_path, local_output, max_buffered_rows) as pool:
+            for smiles, identifier in _iter_smi_rows(local_source, chunk_size):
+                pool.add(get_shard_id(identifier, num_shards), smiles, identifier)
+        return pool.files()
 
 
 def source_stem(source_path: Path) -> str:
@@ -88,56 +177,6 @@ def _iter_smi_rows(path: Path, chunk_size: int) -> Iterator[tuple[str, str]]:
                         yield parsed
 
 
-def _bucket_rows(path: Path, chunk_size: int, num_shards: int) -> ShardBuckets:
-    buckets: ShardBuckets = defaultdict(lambda: ([], []))
-    for smiles, identifier in _iter_smi_rows(path, chunk_size):
-        smiles_batch, id_batch = buckets[get_shard_id(identifier, num_shards)]
-        smiles_batch.append(smiles)
-        id_batch.append(identifier)
-    return buckets
-
-
-def _write_files(
-    buckets: ShardBuckets, source_path: Path, output_dir: Path
-) -> list[dict]:
-    files = []
-    for shard_id in sorted(buckets):
-        smiles_batch, id_batch = buckets[shard_id]
-        relative_path = file_relative_path(shard_id, source_path)
-        file_path = output_dir / relative_path
-        file_path.parent.mkdir(parents=True, exist_ok=True)
-        table = pa.table(
-            {"smiles": smiles_batch, "id": id_batch},
-            schema=PARQUET_SCHEMA,
-        )
-        pq.write_table(table, file_path, compression="zstd")
-        files.append(
-            {
-                "shard_id": shard_id,
-                "path": str(relative_path),
-                "rows": table.num_rows,
-            }
-        )
-    return files
-
-
-def _shard_file(
-    source_path: Path,
-    output_dir: Path,
-    chunk_size: int,
-    num_shards: int,
-    transfers: int,
-    scratch_dir: str | None,
-) -> list[dict]:
-    with staged_io([source_path], output_dir, transfers, scratch_dir) as (
-        local_inputs,
-        local_output,
-    ):
-        (local_source,) = local_inputs
-        buckets = _bucket_rows(local_source, chunk_size, num_shards)
-        return _write_files(buckets, source_path, local_output)
-
-
 @click.command("shard_candidates")
 @click.option(
     "--input",
@@ -180,6 +219,13 @@ def _shard_file(
     default=None,
     help="Local scratch directory for staging. Defaults to the system temp dir.",
 )
+@click.option(
+    "--max-buffered-rows",
+    type=click.IntRange(min=1),
+    default=DEFAULT_MAX_BUFFERED_ROWS,
+    show_default=True,
+    help="Max rows held in memory across all shards before flushing to disk.",
+)
 @wide_log(logger)
 def shard_candidates(
     input_path: str,
@@ -188,6 +234,7 @@ def shard_candidates(
     transfers: int,
     chunk_size: int,
     scratch_dir: str | None,
+    max_buffered_rows: int,
 ):
     click.echo(f"Processing {input_path}...")
 
@@ -205,7 +252,13 @@ def shard_candidates(
     start_time = time.perf_counter()
 
     files = _shard_file(
-        source_path, output_dir, chunk_size, num_shards, transfers, scratch_dir
+        source_path,
+        output_dir,
+        chunk_size,
+        num_shards,
+        transfers,
+        scratch_dir,
+        max_buffered_rows,
     )
 
     elapsed_time = time.perf_counter() - start_time
