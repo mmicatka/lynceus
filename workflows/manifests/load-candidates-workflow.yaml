@@ -16,7 +16,7 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: prefix
-            value: candidates/shards/staging
+            value: candidates/raw/shards/staging
       - name: plan-shard
         depends: clean-staging-start
         template: plan-shard-candidates
@@ -41,7 +41,7 @@ spec:
           - name: batch
             value: '{{item}}'
           - name: output_prefix
-            value: candidates/shards/staging
+            value: candidates/raw/shards/staging
           - name: num_shards
             value: '512'
           - name: scratch_dir
@@ -567,9 +567,9 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: input_path
-            value: candidates/shards/staging/shard_id={{item}}
+            value: candidates/raw/shards/staging/shard_id={{item}}
           - name: output_path
-            value: candidates/shards/merged/shard_{{item}}.parquet
+            value: candidates/raw/shards/merged/shard_{{item}}.parquet
           - name: memory_limit
             value: 8Gi
       - name: clean-staging-end
@@ -580,7 +580,7 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: prefix
-            value: candidates/shards/staging
+            value: candidates/raw/shards/staging
   - name: clean-staging-start
     volumes:
     - name: lynceus-data
