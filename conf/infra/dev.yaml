@@ -1,24 +1,4 @@
 ---
-storage:
-  prefixes:
-    candidates:
-      raw_smiles: candidates/raw/smiles
-      raw_parquet: candidates/raw/parquet
-      shards_staging: candidates/shards_staging
-      shards: candidates/shards
-      shards_sample: candidates/shards_sample
-      conformers: candidates/conformers
-      features: candidates/features
-    target:
-      pdbs: target/pdbs
-      ensembles: target/ensembles
-    surrogate:
-      root: surrogate
-
-candidates:
-  max_batch_gib: 20
-  num_shards: 256
-
 x-defs:
   images:
     candidates: &candidates_image
@@ -49,18 +29,40 @@ x-defs:
         memory: 8Gi
       limits: *high_cpu_res
 
+    scratch: &scratch
+      mount_path: /scratch
+      size_limit: 50Gi
+
+storage:
+  prefixes:
+    candidates:
+      raw_smiles: candidates/raw/smiles
+      raw_parquet: candidates/raw/parquets
+      shards_staging: candidates/raw/shards/staging
+      shards: candidates/raw/shards/merged
+      shards_sample: candidates/5m/shards
+      conformers: candidates/5m/conformers
+      features: candidates/5m/features
+    target:
+      pdbs: target/pdbs
+      ensembles: target/ensembles
+    surrogate:
+      root: surrogate
+
+candidates:
+  max_batch_gib: 10
+  num_shards: 512
+
 templates:
   ##### Candidates #####
-  load_candidates:
-    resources: *med_cpu_high_ram
+  plan_shard_candidates:
+    resources: *low_cpu
     image: *candidates_image
 
   shard_candidates:
     resources: *med_cpu_high_ram
     image: *candidates_image
-    scratch: &scratch
-      mount_path: /scratch
-      size_limit: 50Gi
+    scratch: *scratch
 
   merge_shards:
     resources: *med_cpu_high_ram
@@ -83,7 +85,7 @@ templates:
     resources: *low_cpu
     image: *targets_image
 
-  generate_manifest:
+  generate_protein_ensemble_manifest:
     resources: *low_cpu
     image: *targets_image
 

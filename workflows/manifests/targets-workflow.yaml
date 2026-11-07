@@ -52,7 +52,7 @@ spec:
         requests:
           cpu: '2'
           memory: 1Gi
-  - name: generate-manifest
+  - name: generate-protein-ensemble-manifest
     volumes:
     - name: lynceus
       persistentVolumeClaim:
@@ -119,7 +119,7 @@ spec:
             value: target/pdbs/HSP90_N_Terminal
       - name: generate-manifest-hsp90-n-terminal
         depends: download-pdbs-hsp90-n-terminal
-        template: generate-manifest
+        template: generate-protein-ensemble-manifest
         arguments:
           parameters:
           - name: base_path

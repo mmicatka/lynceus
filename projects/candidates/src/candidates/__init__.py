@@ -2,12 +2,11 @@
 
 from .conformer import generate_conformers
 from .features import generate_features
-from .load import load_candidates
+from .load import plan_load_candidates, shard_candidates
 from .sample import sample_candidates
-from .shard import shard_candidates
 
 __all__ = [
-    "load_candidates",
+    "plan_load_candidates",
     "sample_candidates",
     "shard_candidates",
     "generate_conformers",
