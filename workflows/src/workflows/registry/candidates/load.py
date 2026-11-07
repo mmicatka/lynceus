@@ -116,6 +116,21 @@ def _merge_shards_task(
     )
 
 
+MERGE_SHARDS_PARALLELISM = 3
+
+
+def build_merge_shards_dag(
+    templates: TemplateFactory, infra_config: InfraConfig
+) -> DAG:
+    with DAG(
+        name="merge-shards-dag",
+        parallelism=MERGE_SHARDS_PARALLELISM,
+    ) as dag:
+        _merge_shards_task(templates, infra_config)
+
+    return dag
+
+
 def build_load_candidates_dag(
     templates: TemplateFactory, infra_config: InfraConfig, screen_config: ScreenConfig
 ) -> DAG:
