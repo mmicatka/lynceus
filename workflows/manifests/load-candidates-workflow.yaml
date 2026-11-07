@@ -48,7 +48,249 @@ spec:
             value: /scratch
       - name: merge-shards
         depends: shard-candidates
+        template: merge-shards-dag
+  - name: clean-staging-start
+    volumes:
+    - name: lynceus-data
+      persistentVolumeClaim:
+        claimName: lynceus-pvc
+    container:
+      image: alpine:3.20
+      args:
+      - test -n "$1" && rm -rf "$0/$1"
+      - '{{inputs.parameters.base_path}}'
+      - '{{inputs.parameters.prefix}}'
+      command:
+      - sh
+      - -c
+      volumeMounts:
+      - name: lynceus-data
+        mountPath: /mnt/data
+    inputs:
+      parameters:
+      - name: base_path
+      - name: prefix
+  - name: plan-shard-candidates
+    volumes:
+    - name: lynceus
+      persistentVolumeClaim:
+        claimName: lynceus-pvc
+    inputs:
+      parameters:
+      - name: source_root
+      - name: source_glob
+      - name: output_file
+      - name: max_batch_gib
+    outputs:
+      parameters:
+      - name: manifest
+        valueFrom:
+          path: /tmp/manifest.json
+    retryStrategy:
+      limit: 5
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 10m
+    script:
+      image: registry.nebula.lan:5000/lynceus/candidates:0.1.0
+      imagePullPolicy: Always
+      source: |-
+        import os
+        import sys
+        sys.path.append(os.getcwd())
+        import json
+        try: max_batch_gib = json.loads(r'''{{inputs.parameters.max_batch_gib}}''')
+        except: max_batch_gib = r'''{{inputs.parameters.max_batch_gib}}'''
+        try: output_file = json.loads(r'''{{inputs.parameters.output_file}}''')
+        except: output_file = r'''{{inputs.parameters.output_file}}'''
+        try: source_glob = json.loads(r'''{{inputs.parameters.source_glob}}''')
+        except: source_glob = r'''{{inputs.parameters.source_glob}}'''
+        try: source_root = json.loads(r'''{{inputs.parameters.source_root}}''')
+        except: source_root = r'''{{inputs.parameters.source_root}}'''
+
+        import subprocess
+        args = ['plan-load-candidates', '--source-root', source_root, '--source-glob', source_glob, '--output-file', output_file, '--max-batch-gib', max_batch_gib]
+        subprocess.run([str(arg) for arg in args], check=True)
+      command:
+      - python
+      volumeMounts:
+      - name: lynceus
+        mountPath: /mnt/lynceus
+      resources:
+        limits:
+          cpu: '2'
+          memory: 1Gi
+        requests:
+          cpu: '2'
+          memory: 1Gi
+  - name: shard-candidates
+    volumes:
+    - name: lynceus
+      persistentVolumeClaim:
+        claimName: lynceus-pvc
+    - name: scratch
+      emptyDir:
+        sizeLimit: 50Gi
+    inputs:
+      parameters:
+      - name: base_path
+      - name: batch
+      - name: output_prefix
+      - name: num_shards
+      - name: scratch_dir
+        default: ''
+      - name: transfers
+        default: ''
+      - name: chunk_size
+        default: ''
+    retryStrategy:
+      limit: 3
+      retryPolicy: OnFailure
+    script:
+      image: registry.nebula.lan:5000/lynceus/candidates:0.1.0
+      imagePullPolicy: Always
+      source: |-
+        import os
+        import sys
+        sys.path.append(os.getcwd())
+        import json
+        try: base_path = json.loads(r'''{{inputs.parameters.base_path}}''')
+        except: base_path = r'''{{inputs.parameters.base_path}}'''
+        try: batch = json.loads(r'''{{inputs.parameters.batch}}''')
+        except: batch = r'''{{inputs.parameters.batch}}'''
+        try: chunk_size = json.loads(r'''{{inputs.parameters.chunk_size}}''')
+        except: chunk_size = r'''{{inputs.parameters.chunk_size}}'''
+        try: num_shards = json.loads(r'''{{inputs.parameters.num_shards}}''')
+        except: num_shards = r'''{{inputs.parameters.num_shards}}'''
+        try: output_prefix = json.loads(r'''{{inputs.parameters.output_prefix}}''')
+        except: output_prefix = r'''{{inputs.parameters.output_prefix}}'''
+        try: scratch_dir = json.loads(r'''{{inputs.parameters.scratch_dir}}''')
+        except: scratch_dir = r'''{{inputs.parameters.scratch_dir}}'''
+        try: transfers = json.loads(r'''{{inputs.parameters.transfers}}''')
+        except: transfers = r'''{{inputs.parameters.transfers}}'''
+
+        import os
+        import subprocess
+        optional_flags = {'--scratch-dir': scratch_dir, '--transfers': transfers, '--chunk-size': chunk_size}
+        extra_args = [arg for flag, value in optional_flags.items() if value != '' for arg in (flag, str(value))]
+        output = os.path.join(base_path, output_prefix)
+        for path in batch:
+            subprocess.run(['shard-candidates', '--input', os.path.join(base_path, path), '--output', output, '--num-shards', str(num_shards), *extra_args], check=True)
+      command:
+      - python
+      volumeMounts:
+      - name: lynceus
+        mountPath: /mnt/lynceus
+      - name: scratch
+        mountPath: /scratch
+      resources:
+        limits:
+          cpu: '4'
+          memory: 8Gi
+        requests:
+          cpu: '4'
+          memory: 8Gi
+  - name: merge-and-clean-shard
+    dag:
+      tasks:
+      - name: merge-shard
         template: merge-shards
+        arguments:
+          parameters:
+          - name: base_path
+            value: /mnt/lynceus
+          - name: input_path
+            value: candidates/raw/shards/staging/shard_id={{inputs.parameters.shard_id}}
+          - name: output_path
+            value: candidates/raw/shards/merged/shard_{{inputs.parameters.shard_id}}.parquet
+          - name: memory_limit
+            value: 8Gi
+      - name: clean-shard
+        depends: merge-shard
+        template: clean-shard-template
+        arguments:
+          parameters:
+          - name: base_path
+            value: /mnt/lynceus
+          - name: prefix
+            value: candidates/raw/shards/staging/shard_id={{inputs.parameters.shard_id}}
+    inputs:
+      parameters:
+      - name: shard_id
+  - name: merge-shards
+    volumes:
+    - name: lynceus
+      persistentVolumeClaim:
+        claimName: lynceus-pvc
+    inputs:
+      parameters:
+      - name: base_path
+      - name: input_path
+      - name: output_path
+    retryStrategy:
+      limit: 5
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 10m
+    script:
+      image: registry.nebula.lan:5000/lynceus/candidates:0.1.0
+      imagePullPolicy: Always
+      source: |-
+        import os
+        import sys
+        sys.path.append(os.getcwd())
+        import json
+        try: base_path = json.loads(r'''{{inputs.parameters.base_path}}''')
+        except: base_path = r'''{{inputs.parameters.base_path}}'''
+        try: input_path = json.loads(r'''{{inputs.parameters.input_path}}''')
+        except: input_path = r'''{{inputs.parameters.input_path}}'''
+        try: output_path = json.loads(r'''{{inputs.parameters.output_path}}''')
+        except: output_path = r'''{{inputs.parameters.output_path}}'''
+
+        import os
+        import subprocess
+        subprocess.run(['merge-shards', '--input', os.path.join(base_path, input_path), '--output', os.path.join(base_path, output_path), '--memory-limit', '6GB'], check=True)
+      command:
+      - python
+      volumeMounts:
+      - name: lynceus
+        mountPath: /mnt/lynceus
+      resources:
+        limits:
+          cpu: '4'
+          memory: 8Gi
+        requests:
+          cpu: '4'
+          memory: 8Gi
+  - name: clean-shard-template
+    volumes:
+    - name: lynceus-data
+      persistentVolumeClaim:
+        claimName: lynceus-pvc
+    container:
+      image: alpine:3.20
+      args:
+      - test -n "$1" && rm -rf "$0/$1"
+      - '{{inputs.parameters.base_path}}'
+      - '{{inputs.parameters.prefix}}'
+      command:
+      - sh
+      - -c
+      volumeMounts:
+      - name: lynceus-data
+        mountPath: /mnt/data
+    inputs:
+      parameters:
+      - name: base_path
+      - name: prefix
+  - name: merge-shards-dag
+    parallelism: 3
+    dag:
+      tasks:
+      - name: merge-shards-fanout
+        template: merge-and-clean-shard
         withItems:
         - 0
         - 1
@@ -564,232 +806,8 @@ spec:
         - 511
         arguments:
           parameters:
-          - name: base_path
-            value: /mnt/lynceus
-          - name: input_path
-            value: candidates/raw/shards/staging/shard_id={{item}}
-          - name: output_path
-            value: candidates/raw/shards/merged/shard_{{item}}.parquet
-          - name: memory_limit
-            value: 8Gi
-      - name: clean-staging-end
-        depends: merge-shards
-        template: clean-staging-end
-        arguments:
-          parameters:
-          - name: base_path
-            value: /mnt/lynceus
-          - name: prefix
-            value: candidates/raw/shards/staging
-  - name: clean-staging-start
-    volumes:
-    - name: lynceus-data
-      persistentVolumeClaim:
-        claimName: lynceus-pvc
-    container:
-      image: alpine:3.20
-      args:
-      - test -n "$1" && rm -rf "$0/$1"
-      - '{{inputs.parameters.base_path}}'
-      - '{{inputs.parameters.prefix}}'
-      command:
-      - sh
-      - -c
-      volumeMounts:
-      - name: lynceus-data
-        mountPath: /mnt/data
-    inputs:
-      parameters:
-      - name: base_path
-      - name: prefix
-  - name: plan-shard-candidates
-    volumes:
-    - name: lynceus
-      persistentVolumeClaim:
-        claimName: lynceus-pvc
-    inputs:
-      parameters:
-      - name: source_root
-      - name: source_glob
-      - name: output_file
-      - name: max_batch_gib
-    outputs:
-      parameters:
-      - name: manifest
-        valueFrom:
-          path: /tmp/manifest.json
-    retryStrategy:
-      limit: 5
-      backoff:
-        duration: 30s
-        factor: 2
-        maxDuration: 10m
-    script:
-      image: registry.nebula.lan:5000/lynceus/candidates:0.1.0
-      imagePullPolicy: Always
-      source: |-
-        import os
-        import sys
-        sys.path.append(os.getcwd())
-        import json
-        try: max_batch_gib = json.loads(r'''{{inputs.parameters.max_batch_gib}}''')
-        except: max_batch_gib = r'''{{inputs.parameters.max_batch_gib}}'''
-        try: output_file = json.loads(r'''{{inputs.parameters.output_file}}''')
-        except: output_file = r'''{{inputs.parameters.output_file}}'''
-        try: source_glob = json.loads(r'''{{inputs.parameters.source_glob}}''')
-        except: source_glob = r'''{{inputs.parameters.source_glob}}'''
-        try: source_root = json.loads(r'''{{inputs.parameters.source_root}}''')
-        except: source_root = r'''{{inputs.parameters.source_root}}'''
-
-        import subprocess
-        args = ['plan-load-candidates', '--source-root', source_root, '--source-glob', source_glob, '--output-file', output_file, '--max-batch-gib', max_batch_gib]
-        subprocess.run([str(arg) for arg in args], check=True)
-      command:
-      - python
-      volumeMounts:
-      - name: lynceus
-        mountPath: /mnt/lynceus
-      resources:
-        limits:
-          cpu: '2'
-          memory: 1Gi
-        requests:
-          cpu: '2'
-          memory: 1Gi
-  - name: shard-candidates
-    volumes:
-    - name: lynceus
-      persistentVolumeClaim:
-        claimName: lynceus-pvc
-    - name: scratch
-      emptyDir:
-        sizeLimit: 50Gi
-    inputs:
-      parameters:
-      - name: base_path
-      - name: batch
-      - name: output_prefix
-      - name: num_shards
-      - name: scratch_dir
-        default: ''
-      - name: transfers
-        default: ''
-      - name: chunk_size
-        default: ''
-    retryStrategy:
-      limit: 2
-      retryPolicy: OnFailure
-    script:
-      image: registry.nebula.lan:5000/lynceus/candidates:0.1.0
-      imagePullPolicy: Always
-      source: |-
-        import os
-        import sys
-        sys.path.append(os.getcwd())
-        import json
-        try: base_path = json.loads(r'''{{inputs.parameters.base_path}}''')
-        except: base_path = r'''{{inputs.parameters.base_path}}'''
-        try: batch = json.loads(r'''{{inputs.parameters.batch}}''')
-        except: batch = r'''{{inputs.parameters.batch}}'''
-        try: chunk_size = json.loads(r'''{{inputs.parameters.chunk_size}}''')
-        except: chunk_size = r'''{{inputs.parameters.chunk_size}}'''
-        try: num_shards = json.loads(r'''{{inputs.parameters.num_shards}}''')
-        except: num_shards = r'''{{inputs.parameters.num_shards}}'''
-        try: output_prefix = json.loads(r'''{{inputs.parameters.output_prefix}}''')
-        except: output_prefix = r'''{{inputs.parameters.output_prefix}}'''
-        try: scratch_dir = json.loads(r'''{{inputs.parameters.scratch_dir}}''')
-        except: scratch_dir = r'''{{inputs.parameters.scratch_dir}}'''
-        try: transfers = json.loads(r'''{{inputs.parameters.transfers}}''')
-        except: transfers = r'''{{inputs.parameters.transfers}}'''
-
-        import os
-        import subprocess
-        optional_flags = {'--scratch-dir': scratch_dir, '--transfers': transfers, '--chunk-size': chunk_size}
-        extra_args = [arg for flag, value in optional_flags.items() if value != '' for arg in (flag, str(value))]
-        output = os.path.join(base_path, output_prefix)
-        for path in batch:
-            subprocess.run(['shard-candidates', '--input', os.path.join(base_path, path), '--output', output, '--num-shards', str(num_shards), *extra_args], check=True)
-      command:
-      - python
-      volumeMounts:
-      - name: lynceus
-        mountPath: /mnt/lynceus
-      - name: scratch
-        mountPath: /scratch
-      resources:
-        limits:
-          cpu: '4'
-          memory: 8Gi
-        requests:
-          cpu: '4'
-          memory: 8Gi
-  - name: merge-shards
-    volumes:
-    - name: lynceus
-      persistentVolumeClaim:
-        claimName: lynceus-pvc
-    inputs:
-      parameters:
-      - name: base_path
-      - name: input_path
-      - name: output_path
-    retryStrategy:
-      limit: 5
-      backoff:
-        duration: 30s
-        factor: 2
-        maxDuration: 10m
-    script:
-      image: registry.nebula.lan:5000/lynceus/candidates:0.1.0
-      imagePullPolicy: Always
-      source: |-
-        import os
-        import sys
-        sys.path.append(os.getcwd())
-        import json
-        try: base_path = json.loads(r'''{{inputs.parameters.base_path}}''')
-        except: base_path = r'''{{inputs.parameters.base_path}}'''
-        try: input_path = json.loads(r'''{{inputs.parameters.input_path}}''')
-        except: input_path = r'''{{inputs.parameters.input_path}}'''
-        try: output_path = json.loads(r'''{{inputs.parameters.output_path}}''')
-        except: output_path = r'''{{inputs.parameters.output_path}}'''
-
-        import os
-        import subprocess
-        subprocess.run(['merge-shards', '--input', os.path.join(base_path, input_path), '--output', os.path.join(base_path, output_path), '--memory-limit', '6GB'], check=True)
-      command:
-      - python
-      volumeMounts:
-      - name: lynceus
-        mountPath: /mnt/lynceus
-      resources:
-        limits:
-          cpu: '4'
-          memory: 8Gi
-        requests:
-          cpu: '4'
-          memory: 8Gi
-  - name: clean-staging-end
-    volumes:
-    - name: lynceus-data
-      persistentVolumeClaim:
-        claimName: lynceus-pvc
-    container:
-      image: alpine:3.20
-      args:
-      - test -n "$1" && rm -rf "$0/$1"
-      - '{{inputs.parameters.base_path}}'
-      - '{{inputs.parameters.prefix}}'
-      command:
-      - sh
-      - -c
-      volumeMounts:
-      - name: lynceus-data
-        mountPath: /mnt/data
-    inputs:
-      parameters:
-      - name: base_path
-      - name: prefix
+          - name: shard_id
+            value: '{{item}}'
   - name: main-dag
     dag:
       tasks:

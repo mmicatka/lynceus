@@ -19,8 +19,19 @@ STAGED_OUTPUT_TRANSFERS = 1
 logger = get_lynceus_logger()
 
 
+PARQUET_PATTERN = "*.parquet"
+
+
+def _expand_match(match: str) -> list[str]:
+    path = Path(match)
+    if path.is_dir():
+        return [str(file) for file in path.rglob(PARQUET_PATTERN)]
+    return [match]
+
+
 def _find_input_files(input_glob: str) -> list[str]:
-    return sorted(glob.glob(input_glob))
+    matches = glob.glob(input_glob)
+    return sorted({file for match in matches for file in _expand_match(match)})
 
 
 def _connect(memory_limit: str) -> duckdb.DuckDBPyConnection:
