@@ -33,6 +33,11 @@ x-defs:
       mount_path: /scratch
       size_limit: 50Gi
 
+volume:
+  name: lynceus
+  claim_name: lynceus-pvc
+  mount_path: /mnt/lynceus
+
 storage:
   prefixes:
     candidates:
@@ -148,8 +153,3 @@ templates:
         operator: Exists
         effect: NoSchedule
     runtime_class_name: nvidia
-
-volume:
-  name: lynceus
-  claim_name: lynceus-pvc
-  mount_path: /mnt/lynceus

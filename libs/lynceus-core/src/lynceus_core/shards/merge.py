@@ -3,7 +3,6 @@
 
 import datetime
 import glob
-import os
 import time
 from pathlib import Path
 
@@ -23,15 +22,14 @@ logger = get_lynceus_logger()
 
 PARQUET_PATTERN = "*.parquet"
 
-FILESYSTEM_ROOT = Path(os.sep)
 RUN_TIME_KEY = "run_time"
 
 
-def _input_manifest(input_files: list[str], output_file: str) -> Manifest:
+def _input_manifest(
+    input_files: list[str], output_file: str, source_root: Path
+) -> Manifest:
     manifest_path = Path(output_file).with_suffix(".manifest.json")
-    return Manifest(filepath=manifest_path).set_source_files(
-        input_files, FILESYSTEM_ROOT
-    )
+    return Manifest(filepath=manifest_path).set_source_files(input_files, source_root)
 
 
 def _already_merged(manifest: Manifest, output_file: str) -> bool:
@@ -99,6 +97,12 @@ def _merge_via_staged_output(
 
 @click.command("merge_shards")
 @click.option(
+    "--source-root",
+    required=True,
+    type=click.Path(file_okay=False, path_type=Path),
+    help="Directory to base the relative paths on in the manifest.",
+)
+@click.option(
     "--input",
     "input_glob",
     required=True,
@@ -136,6 +140,7 @@ def _merge_via_staged_output(
 )
 @wide_log(logger)
 def merge_shards(
+    source_root: Path,
     input_glob: str,
     output_file: str,
     memory_limit: str,
@@ -150,7 +155,7 @@ def merge_shards(
         click.echo("Done!")
         return
 
-    manifest = _input_manifest(input_files, output_file)
+    manifest = _input_manifest(input_files, output_file, source_root)
 
     try:
         if _already_merged(manifest, output_file):
@@ -165,6 +170,7 @@ def merge_shards(
         input_glob=input_glob,
         input_files=len(input_files),
         output_file=output_file,
+        source_root=str(source_root),
         memory_limit=memory_limit,
         row_group_size=row_group_size,
         scratch_dir=scratch_dir,
