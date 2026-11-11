@@ -6,7 +6,11 @@ import os
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Union
 
-from lynceus_core.manifest.fingerprint import FINGERPRINT_FIELDS, fingerprint_file
+from lynceus_core.manifest.fingerprint import (
+    FINGERPRINT_FIELDS,
+    FINGERPRINT_KEY,
+    fingerprint_file,
+)
 from lynceus_core.manifest.hashing import hash_file
 
 MANIFEST_SUFFIX = "manifest.json"
@@ -32,7 +36,7 @@ class Manifest:
     ) -> Dict[str, Any]:
         entry: Dict[str, Any] = {
             PATH_FIELD: os.path.relpath(path, root),
-            "fingerprint": {**fingerprint_file(path)},
+            FINGERPRINT_KEY: {**fingerprint_file(path)},
         }
         if hash_content:
             entry[HASH_FIELD] = hash_file(path)

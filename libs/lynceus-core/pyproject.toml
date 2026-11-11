@@ -15,6 +15,7 @@ dependencies = [
 
 [project.scripts]
 verify-manifest = "lynceus_core:verify_manifest"
+update-manifest = "lynceus_core:update_manifest"
 merge-shards = "lynceus_core:merge_shards"
 
 [build-system]

@@ -1,16 +1,19 @@
 # projects/candidates/src/candidates/load/shard.py
 
+
 import datetime
 import gzip
 import io
 import time
 from collections import defaultdict
 from collections.abc import Iterator
+from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
 import click
 import pyarrow as pa
 import pyarrow.parquet as pq
+from lynceus_core.cli import NumWorkers
 from lynceus_core.io import staged_io
 from lynceus_core.logging import get_lynceus_logger, wide_log
 from lynceus_core.manifest.common import Manifest
@@ -21,6 +24,7 @@ logger = get_lynceus_logger()
 DEFAULT_CHUNK_SIZE = 1024 * 1024 * 32
 DEFAULT_NUM_SHARDS = 512
 DEFAULT_TRANSFERS = 4
+DEFAULT_MAX_BUFFERED_ROWS = 5_000_000
 
 SOURCE_SUFFIX = ".smi.gz"
 MANIFEST_DIR = "_manifests"
@@ -33,11 +37,13 @@ PARQUET_SCHEMA = pa.schema(
 )
 
 
-DEFAULT_MAX_BUFFERED_ROWS = 2_000_000
-
-
 class ShardWriterPool:
-    def __init__(self, source_path: Path, output_dir: Path, max_buffered_rows: int):
+    def __init__(
+        self,
+        source_path: Path,
+        output_dir: Path,
+        max_buffered_rows: int,
+    ):
         self._source_path = source_path
         self._output_dir = output_dir
         self._max_buffered_rows = max_buffered_rows
@@ -177,13 +183,54 @@ def _iter_smi_rows(path: Path, chunk_size: int) -> Iterator[tuple[str, str]]:
                         yield parsed
 
 
+def _process_source(
+    source_path: Path,
+    output_dir: Path,
+    num_shards: int,
+    transfers: int,
+    chunk_size: int,
+    scratch_dir: str | None,
+    max_buffered_rows: int,
+) -> None:
+    manifest = build_manifest(source_path, output_dir, num_shards)
+    if manifest_is_valid(manifest):
+        logger.info("Valid manifest found.", file=source_path.name)
+        return
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    start_time = time.perf_counter()
+    files = _shard_file(
+        source_path,
+        output_dir,
+        chunk_size,
+        num_shards,
+        transfers,
+        scratch_dir,
+        max_buffered_rows,
+    )
+    elapsed_time = time.perf_counter() - start_time
+
+    manifest.data["run_time"] = str(datetime.timedelta(seconds=elapsed_time))
+    manifest.data["files"] = files
+    manifest.save()
+
+    logger.info(
+        "Sharded file",
+        file=source_path.name,
+        files=len(files),
+        rows=sum(f["rows"] for f in files),
+    )
+
+
 @click.command("shard_candidates")
 @click.option(
     "--input",
-    "input_path",
+    "input_paths",
     required=True,
+    multiple=True,
     type=str,
-    help="Input .smi.gz file.",
+    help="Input .smi.gz file. Repeat to process several files concurrently.",
 )
 @click.option(
     "--output",
@@ -224,54 +271,50 @@ def _iter_smi_rows(path: Path, chunk_size: int) -> Iterator[tuple[str, str]]:
     type=click.IntRange(min=1),
     default=DEFAULT_MAX_BUFFERED_ROWS,
     show_default=True,
-    help="Max rows held in memory across all shards before flushing to disk.",
+    help="Max rows held in memory across all shards before flushing to disk, per file.",
+)
+@click.option(
+    "--num-workers",
+    "num_workers",
+    default="auto",
+    type=NumWorkers(),
+    show_default=True,
+    help="Number of files processed concurrently (integer >= 1 or 'auto').",
 )
 @wide_log(logger)
 def shard_candidates(
-    input_path: str,
+    input_paths: tuple[str, ...],
     output_path: str,
     num_shards: int,
     transfers: int,
     chunk_size: int,
     scratch_dir: str | None,
     max_buffered_rows: int,
+    num_workers: int,
 ):
-    click.echo(f"Processing {input_path}...")
-
-    source_path = Path(input_path)
+    sources = [Path(path) for path in input_paths]
     output_dir = Path(output_path)
+    max_workers = min(num_workers, len(sources))
 
-    manifest = build_manifest(source_path, output_dir, num_shards)
-    if manifest_is_valid(manifest):
-        logger.info("Valid manifest found.", file=source_path.name)
-        click.echo("Done!")
-        return
+    click.echo(f"Processing {len(sources)} file(s) with {max_workers} workers...")
 
-    output_dir.mkdir(parents=True, exist_ok=True)
+    with ProcessPoolExecutor(max_workers=max_workers) as executor:
+        futures = [
+            executor.submit(
+                _process_source,
+                source,
+                output_dir,
+                num_shards,
+                transfers,
+                chunk_size,
+                scratch_dir,
+                max_buffered_rows // max_workers,
+            )
+            for source in sources
+        ]
+        for future in futures:
+            future.result()
 
-    start_time = time.perf_counter()
-
-    files = _shard_file(
-        source_path,
-        output_dir,
-        chunk_size,
-        num_shards,
-        transfers,
-        scratch_dir,
-        max_buffered_rows,
-    )
-
-    elapsed_time = time.perf_counter() - start_time
-    manifest.data["run_time"] = str(datetime.timedelta(seconds=elapsed_time))
-    manifest.data["files"] = files
-    manifest.save()
-
-    logger.info(
-        "Sharded file",
-        file=source_path.name,
-        files=len(files),
-        rows=sum(f["rows"] for f in files),
-    )
     click.echo("Done!")
 
 

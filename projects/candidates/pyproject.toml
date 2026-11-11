@@ -18,6 +18,7 @@ dependencies = [
 [project.scripts]
 plan-load-candidates = "candidates:plan_load_candidates"
 shard-candidates = "candidates:shard_candidates"
+verify-shard-layout = "candidates:verify_shard_layout"
 sample-candidates = "candidates:sample_candidates"
 generate-conformers = "candidates:generate_conformers"
 generate-features = "candidates:generate_features"

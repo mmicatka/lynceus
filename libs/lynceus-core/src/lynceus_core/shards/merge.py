@@ -1,7 +1,9 @@
-# libs/lynceus_core/utils/merge_shards.py
+# libs/lynceus_core/shards/merge_shards.py
+
 
 import datetime
 import glob
+import os
 import time
 from pathlib import Path
 
@@ -21,6 +23,20 @@ logger = get_lynceus_logger()
 
 PARQUET_PATTERN = "*.parquet"
 
+FILESYSTEM_ROOT = Path(os.sep)
+RUN_TIME_KEY = "run_time"
+
+
+def _input_manifest(input_files: list[str], output_file: str) -> Manifest:
+    manifest_path = Path(output_file).with_suffix(".manifest.json")
+    return Manifest(filepath=manifest_path).set_source_files(
+        input_files, FILESYSTEM_ROOT
+    )
+
+
+def _already_merged(manifest: Manifest, output_file: str) -> bool:
+    return Path(output_file).is_file() and manifest.exists_superset()
+
 
 def _expand_match(match: str) -> list[str]:
     path = Path(match)
@@ -39,6 +55,9 @@ def _connect(memory_limit: str) -> duckdb.DuckDBPyConnection:
     conn.execute("SET arrow_large_buffer_size=true")
     conn.execute("SET preserve_insertion_order=false")
     conn.execute(f"SET memory_limit='{memory_limit}'")
+
+    conn.execute("PRAGMA enable_progress_bar")
+    conn.execute("PRAGMA enable_print_progress_bar")
     return conn
 
 
@@ -131,19 +150,11 @@ def merge_shards(
         click.echo("Done!")
         return
 
-    manifest_path = str(Path(output_file).with_suffix(".manifest.json"))
-    manifest_data = {
-        "input_files": input_files,
-    }
-
-    manifest = Manifest(data=manifest_data, filepath=manifest_path)
+    manifest = _input_manifest(input_files, output_file)
 
     try:
-        if manifest.exists_superset():
-            logger.info(
-                "Valid manifest found.",
-                manifest=manifest.data,
-            )
+        if _already_merged(manifest, output_file):
+            logger.info("Valid manifest found.", manifest=manifest.data)
             click.echo("Done!")
             return
     except Exception as e:
@@ -170,8 +181,7 @@ def merge_shards(
     )
 
     elapsed_time = time.perf_counter() - start_time
-    manifest.data = manifest_data
-    manifest.data["run_time"] = str(datetime.timedelta(seconds=elapsed_time))
+    manifest.data[RUN_TIME_KEY] = str(datetime.timedelta(seconds=elapsed_time))
     manifest.save()
 
     logger.info(

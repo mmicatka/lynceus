@@ -7,6 +7,7 @@ from typing import Dict, Union
 
 from lynceus_core.io.retry import DEFAULT_RETRY_POLICY, RetryPolicy, retry_call
 
+FINGERPRINT_KEY = "fingerprint"
 SIZE_FIELD = "size"
 MTIME_FIELD = "mtime_ns"
 FINGERPRINT_FIELDS = (SIZE_FIELD, MTIME_FIELD)

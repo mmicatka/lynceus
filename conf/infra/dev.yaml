@@ -16,12 +16,12 @@ x-defs:
     med_cpu: &med_cpu
       requests: &med_cpu_res
         cpu: "4"
-        memory: 3Gi
+        memory: 4Gi
       limits: *med_cpu_res
     med_cpu_high_ram: &med_cpu_high_ram
       requests: &med_cpu_high_ram_res
         cpu: "4"
-        memory: 8Gi
+        memory: 6Gi
       limits: *med_cpu_high_ram_res
     high_cpu: &high_cpu
       requests: &high_cpu_res
@@ -40,6 +40,7 @@ storage:
       raw_parquet: candidates/raw/parquets
       shards_staging: candidates/raw/shards/staging
       shards: candidates/raw/shards/merged
+      shards_manifests: candidates/raw/shards/manifests
       shards_sample: candidates/5m/shards
       conformers: candidates/5m/conformers
       features: candidates/5m/features
@@ -59,14 +60,26 @@ templates:
     resources: *low_cpu
     image: *candidates_image
 
+  verify_shard_layout:
+    resources: *low_cpu
+    image: *candidates_image
+
+  verify_manifest_candidates:
+    resources: *low_cpu
+    image: *candidates_image
+
+  update_manifest:
+    resources: *low_cpu
+    image: *candidates_image
+
   shard_candidates:
-    resources: *med_cpu_high_ram
+    resources: *low_cpu # temporary
     image: *candidates_image
     scratch: *scratch
 
   merge_shards:
     resources: *med_cpu_high_ram
-    image: *candidates_image # TODO: move this into a dedicated image
+    image: *candidates_image
 
   subsample_candidates:
     resources: *high_cpu
