@@ -481,11 +481,11 @@ spec:
         mountPath: /scratch
       resources:
         limits:
-          cpu: '2'
-          memory: 1Gi
+          cpu: '4'
+          memory: 4Gi
         requests:
-          cpu: '2'
-          memory: 1Gi
+          cpu: '4'
+          memory: 4Gi
   - name: merge-and-clean-shard
     dag:
       tasks:
@@ -546,7 +546,7 @@ spec:
 
         import os
         import subprocess
-        subprocess.run(['merge-shards', '--input', os.path.join(base_path, input_path), '--output', os.path.join(base_path, output_path), '--memory-limit', '6GB'], check=True)
+        subprocess.run(['merge-shards', '--source-root', base_path, '--input', os.path.join(base_path, input_path), '--output', os.path.join(base_path, output_path), '--memory-limit', '6GB'], check=True)
       command:
       - python
       volumeMounts:
@@ -581,7 +581,7 @@ spec:
       - name: base_path
       - name: prefix
   - name: merge-shards-dag
-    parallelism: 2
+    parallelism: 1
     dag:
       tasks:
       - name: merge-shards-fanout

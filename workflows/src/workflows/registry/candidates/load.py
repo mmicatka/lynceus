@@ -37,7 +37,7 @@ SHARD_RETRY = RetryStrategy(limit=3, retry_policy="OnFailure")
 
 BATCHES_PARAM = "batches"
 SHARD_PARALLELISM = 8
-MERGE_SHARDS_PARALLELISM = 2
+MERGE_SHARDS_PARALLELISM = 1
 
 PLAN_FILENAME = "load_plan.json"
 MANIFEST_FILENAME = "candidate_shards.manifest.json"

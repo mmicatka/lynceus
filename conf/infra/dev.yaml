@@ -78,7 +78,7 @@ templates:
     image: *candidates_image
 
   shard_candidates:
-    resources: *low_cpu # temporary
+    resources: *med_cpu
     image: *candidates_image
     scratch: *scratch
 
