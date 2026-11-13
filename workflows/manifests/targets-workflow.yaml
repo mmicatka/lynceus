@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Workflow
 metadata:
-  generateName: 5m-poc-targets-
+  generateName: 10m-poc-targets-
 spec:
   entrypoint: main-dag
   serviceAccountName: argo-workflow

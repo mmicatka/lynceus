@@ -40,9 +40,9 @@ storage:
       raw_parquet: candidates/raw/parquets
       shards_staging: candidates/raw/shards/staging
       shards: candidates/raw/shards/merged
-      shards_sample: candidates/5m/shards
-      conformers: candidates/5m/conformers
-      features: candidates/5m/features
+      shards_sample: candidates/10m/shards
+      conformers: candidates/10m/conformers
+      features: candidates/10m/features
     target:
       pdbs: target/pdbs
       ensembles: target/ensembles
