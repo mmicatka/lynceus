@@ -1,4 +1,5 @@
-# libs/lynceus_core/utils/merge_shards.py
+# libs/lynceus_core/shards/merge_shards.py
+
 
 import datetime
 import glob
@@ -21,6 +22,19 @@ logger = get_lynceus_logger()
 
 PARQUET_PATTERN = "*.parquet"
 
+RUN_TIME_KEY = "run_time"
+
+
+def _input_manifest(
+    input_files: list[str], output_file: str, source_root: Path
+) -> Manifest:
+    manifest_path = Path(output_file).with_suffix(".manifest.json")
+    return Manifest(filepath=manifest_path).set_source_files(input_files, source_root)
+
+
+def _already_merged(manifest: Manifest, output_file: str) -> bool:
+    return Path(output_file).is_file() and manifest.exists_superset()
+
 
 def _expand_match(match: str) -> list[str]:
     path = Path(match)
@@ -39,6 +53,9 @@ def _connect(memory_limit: str) -> duckdb.DuckDBPyConnection:
     conn.execute("SET arrow_large_buffer_size=true")
     conn.execute("SET preserve_insertion_order=false")
     conn.execute(f"SET memory_limit='{memory_limit}'")
+
+    conn.execute("PRAGMA enable_progress_bar")
+    conn.execute("PRAGMA enable_print_progress_bar")
     return conn
 
 
@@ -80,6 +97,12 @@ def _merge_via_staged_output(
 
 @click.command("merge_shards")
 @click.option(
+    "--source-root",
+    required=True,
+    type=click.Path(file_okay=False, path_type=Path),
+    help="Directory to base the relative paths on in the manifest.",
+)
+@click.option(
     "--input",
     "input_glob",
     required=True,
@@ -117,6 +140,7 @@ def _merge_via_staged_output(
 )
 @wide_log(logger)
 def merge_shards(
+    source_root: Path,
     input_glob: str,
     output_file: str,
     memory_limit: str,
@@ -131,19 +155,11 @@ def merge_shards(
         click.echo("Done!")
         return
 
-    manifest_path = str(Path(output_file).with_suffix(".manifest.json"))
-    manifest_data = {
-        "input_files": input_files,
-    }
-
-    manifest = Manifest(data=manifest_data, filepath=manifest_path)
+    manifest = _input_manifest(input_files, output_file, source_root)
 
     try:
-        if manifest.exists_superset():
-            logger.info(
-                "Valid manifest found.",
-                manifest=manifest.data,
-            )
+        if _already_merged(manifest, output_file):
+            logger.info("Valid manifest found.", manifest=manifest.data)
             click.echo("Done!")
             return
     except Exception as e:
@@ -154,6 +170,7 @@ def merge_shards(
         input_glob=input_glob,
         input_files=len(input_files),
         output_file=output_file,
+        source_root=str(source_root),
         memory_limit=memory_limit,
         row_group_size=row_group_size,
         scratch_dir=scratch_dir,
@@ -170,8 +187,7 @@ def merge_shards(
     )
 
     elapsed_time = time.perf_counter() - start_time
-    manifest.data = manifest_data
-    manifest.data["run_time"] = str(datetime.timedelta(seconds=elapsed_time))
+    manifest.data[RUN_TIME_KEY] = str(datetime.timedelta(seconds=elapsed_time))
     manifest.save()
 
     logger.info(

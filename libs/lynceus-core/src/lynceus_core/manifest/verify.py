@@ -85,7 +85,7 @@ def _manifest_matches(
     default="/tmp/manifest_matches.txt",
     show_default=True,
     type=str,
-    help="File the true/false result is written to (read as an Argo output parameter).",
+    help="File the true/false result is written to.",
 )
 @wide_log(logger)
 def verify_manifest(

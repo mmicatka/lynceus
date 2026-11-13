@@ -2,21 +2,29 @@
 
 
 def verify_manifest_template(
-    manifest_path: str,
-    expect: dict | None = None,
+    base_path: str,
+    manifest: str,
+    expect: dict,
+    source_glob: str,
+    result_file: str,
 ):
     import json
+    import os
     import subprocess
 
     subprocess.run(
         [
             "verify-manifest",
             "--manifest",
-            manifest_path,
+            os.path.join(base_path, manifest),
             "--expect",
-            json.dumps(expect or {}),
+            json.dumps(expect),
+            "--source-root",
+            base_path,
+            "--source-glob",
+            source_glob,
             "--result-file",
-            "/tmp/manifest_matches.txt",
+            result_file,
         ],
         check=True,
     )

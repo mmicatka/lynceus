@@ -1,6 +1,7 @@
 # libs/lynceus-core/src/lynceus_core/io/transfer.py
 
 
+import errno
 import shutil
 import time
 from collections.abc import Callable, Sequence
@@ -16,8 +17,12 @@ logger = get_lynceus_logger()
 @dataclass(frozen=True)
 class RetryPolicy:
     attempts: int = 5
-    backoff_seconds: float = 0.5
+    backoff_seconds: float = 2.0
     retry_on: tuple[type[OSError], ...] = (FileNotFoundError,)
+    retry_errnos: frozenset[int] = frozenset({errno.EIO, errno.ESTALE, errno.EAGAIN})
+
+    def is_retryable(self, error: OSError) -> bool:
+        return isinstance(error, self.retry_on) or error.errno in self.retry_errnos
 
 
 DEFAULT_RETRY_POLICY = RetryPolicy()
@@ -30,7 +35,9 @@ def _retry(
         try:
             operation()
             return
-        except policy.retry_on as error:
+        except OSError as error:
+            if not policy.is_retryable(error):
+                raise
             if attempt == policy.attempts:
                 raise RuntimeError(
                     f"{description} failed after {policy.attempts} attempts"
