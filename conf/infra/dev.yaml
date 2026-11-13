@@ -85,6 +85,7 @@ templates:
   merge_shards:
     resources: *med_cpu_high_ram
     image: *candidates_image
+    scratch: *scratch
 
   subsample_candidates:
     resources: *high_cpu
@@ -93,10 +94,12 @@ templates:
   generate_conformers:
     resources: *med_cpu
     image: *candidates_image
+    scratch: *scratch
 
   generate_features:
     resources: *med_cpu
     image: *candidates_image
+    scratch: *scratch
 
   ##### Targets #####
   download_pdbs:

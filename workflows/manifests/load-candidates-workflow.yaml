@@ -518,6 +518,9 @@ spec:
     - name: lynceus
       persistentVolumeClaim:
         claimName: lynceus-pvc
+    - name: scratch
+      emptyDir:
+        sizeLimit: 50Gi
     inputs:
       parameters:
       - name: base_path
@@ -552,6 +555,8 @@ spec:
       volumeMounts:
       - name: lynceus
         mountPath: /mnt/lynceus
+      - name: scratch
+        mountPath: /scratch
       resources:
         limits:
           cpu: '4'
