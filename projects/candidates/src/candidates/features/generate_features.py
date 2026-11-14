@@ -1,16 +1,19 @@
 # modules/local/generate_features/src/generate_features/generate_features.py
 
+
 import datetime
-import json
 import os
 import time
 from concurrent.futures import Future, ProcessPoolExecutor
+from pathlib import Path
 
 import click
 import pyarrow as pa
 import pyarrow.parquet as pq
 from lynceus_core.cli import NumWorkers
+from lynceus_core.io.staged_io import staged_output
 from lynceus_core.logging import get_lynceus_logger, wide_log
+from lynceus_core.manifest.common import Manifest
 from rdkit import rdBase
 from rdkit.Chem import Mol, MolFromMolBlock
 
@@ -26,6 +29,15 @@ os.environ["MKL_NUM_THREADS"] = "1"
 os.environ["NUMEXPR_NUM_THREADS"] = "1"
 os.environ["VECLIB_MAXIMUM_THREADS"] = "1"
 
+STAGED_OUTPUT_TRANSFERS = 1
+
+RUN_TIME_KEY = "run_time"
+
+MANIFEST_FILE_SUFFIX = ".manifest.json"
+
+MAX_TASKS_PER_CHILD = 100
+
+DROPPED_COLUMNS = ["conformer", "smiles"]
 
 logger = get_lynceus_logger()
 
@@ -37,33 +49,24 @@ rdBase.DisableLog("rdApp.*")
 _WORKER_GENERATORS: dict[str, FeatureGenerator] | None = None
 
 
-class Manifest:
-    def __init__(self, data: dict, filepath: str):
-        self.data = data
-        self.filepath = filepath
+def _input_manifest(
+    input_path: str,
+    output_path: str,
+    source_root: Path,
+    expected_state: dict,
+) -> Manifest:
+    manifest_path = Path(output_path).with_suffix(MANIFEST_FILE_SUFFIX)
+    return Manifest(filepath=manifest_path, data=expected_state).set_source_files(
+        [input_path], source_root
+    )
 
-    def exists_superset(self) -> bool:
-        if not os.path.exists(self.filepath):
-            return False
-        try:
-            with open(self.filepath, "r") as f:
-                saved_data = json.load(f)
-            for key, value in self.data.items():
-                if saved_data.get(key) != value:
-                    return False
-            return True
-        except Exception:
-            return False
 
-    def save(self):
-        os.makedirs(os.path.dirname(self.filepath), exist_ok=True)
-        with open(self.filepath, "w") as f:
-            json.dump(self.data, f, indent=2)
+def _already_generated(manifest: Manifest, output_path: str) -> bool:
+    return Path(output_path).is_file() and manifest.exists_superset()
 
 
 def _init_worker(generator_names: list[str]) -> None:
-    global _WORKER_GENERATORS, _WORKER_GENERATOR_NAMES
-    _WORKER_GENERATOR_NAMES = generator_names
+    global _WORKER_GENERATORS
     _WORKER_GENERATORS = {
         generator.name: generator
         for generator in _build_feature_generators(generator_names)
@@ -119,7 +122,7 @@ def _process_batch(
     chunks = list(_chunk_list(batch["conformer"].to_pylist(), chunk_size))
     pending = _submit_chunks(executor, feature_generators, chunks)
 
-    base = batch.drop_columns(["conformer", "smiles"])
+    base = batch.drop_columns(DROPPED_COLUMNS)
     arrays = list(base.columns)
     names = list(base.schema.names)
 
@@ -141,19 +144,93 @@ def _expected_schema_fields(
     return field_names
 
 
+def _write_feature_file(
+    input_path: str,
+    output_file: Path,
+    feature_generators: list[FeatureGenerator],
+    features: list[str],
+    batch_size: int,
+    chunk_size: int,
+    num_workers: int,
+) -> None:
+    parquet_file = pq.ParquetFile(input_path)
+    num_rows = parquet_file.metadata.num_rows
+    writer = None
+
+    try:
+        with ProcessPoolExecutor(
+            max_workers=num_workers,
+            initializer=_init_worker,
+            initargs=(features,),
+            max_tasks_per_child=MAX_TASKS_PER_CHILD,
+        ) as executor:
+            for i, batch in enumerate(parquet_file.iter_batches(batch_size=batch_size)):
+                new_batch = _process_batch(
+                    batch, feature_generators, chunk_size, executor
+                )
+
+                if writer is None:
+                    writer = pq.ParquetWriter(output_file, new_batch.schema)
+
+                writer.write_batch(new_batch)
+                del batch, new_batch
+
+                logger.info(
+                    "Processed batch",
+                    batch_index=i + 1,
+                    processed=min((i + 1) * batch_size, num_rows),
+                    total_rows=num_rows,
+                )
+    finally:
+        if writer is not None:
+            writer.close()
+
+
+def _generate_via_staged_output(
+    input_path: str,
+    output_path: Path,
+    feature_generators: list[FeatureGenerator],
+    features: list[str],
+    batch_size: int,
+    chunk_size: int,
+    num_workers: int,
+    scratch_dir: str | None,
+) -> None:
+    with staged_output(
+        output_path.parent,
+        transfers=STAGED_OUTPUT_TRANSFERS,
+        scratch_dir=scratch_dir,
+    ) as local_output:
+        _write_feature_file(
+            input_path,
+            local_output / output_path.name,
+            feature_generators,
+            features,
+            batch_size,
+            chunk_size,
+            num_workers,
+        )
+
+
 @click.command("generate_features")
+@click.option(
+    "--source-root",
+    required=True,
+    type=click.Path(file_okay=False, path_type=Path),
+    help="Directory to base the relative paths on in the manifest.",
+)
 @click.option(
     "--input",
     "input_path",
-    type=str,
     required=True,
+    type=click.Path(exists=True, dir_okay=False, readable=True),
     help="Path to the input Parquet file.",
 )
 @click.option(
     "--output",
     "output_path",
-    type=str,
     required=True,
+    type=str,
     help="Path to the output Parquet file.",
 )
 @click.option(
@@ -190,42 +267,42 @@ def _expected_schema_fields(
     show_default=True,
     help="Features to generate.",
 )
+@click.option(
+    "--scratch-dir",
+    type=str,
+    default=None,
+    help="Local directory for the feature file before it is copied to --output "
+    "(defaults to the system temp directory).",
+)
 @wide_log(logger)
 def generate_features(
+    source_root: Path,
     input_path: str,
     output_path: str,
     batch_size: int,
     chunk_size: int,
     num_workers: int,
-    features: list[str],
-):
+    features: tuple[str, ...],
+    scratch_dir: str | None,
+) -> None:
     click.echo(f"Processing {input_path}...")
 
-    key = os.path.basename(input_path).replace(".parquet", "")
-
-    parquet_file = pq.ParquetFile(input_path)
-    num_rows = parquet_file.metadata.num_rows
-
-    feature_generators = _build_feature_generators(features)
+    feature_names = list(features)
+    feature_generators = _build_feature_generators(feature_names)
     expected_fields = _expected_schema_fields(
-        parquet_file.schema_arrow, feature_generators
+        pq.ParquetFile(input_path).schema_arrow, feature_generators
     )
 
-    manifest_data = {
-        "input_path": input_path,
-        "output_path": output_path,
-        "num_rows": num_rows,
+    expected_state = {
         "batch_size": batch_size,
         "chunk_size": chunk_size,
-        "features": sorted(list(features)),
-        "expected_fields": sorted(list(expected_fields)),
+        "features": sorted(feature_names),
+        "expected_fields": sorted(expected_fields),
     }
-
-    manifest_path = f"{output_path.rstrip('/')}.manifest.json"
-    manifest = Manifest(data=manifest_data, filepath=manifest_path)
+    manifest = _input_manifest(input_path, output_path, source_root, expected_state)
 
     try:
-        if manifest.exists_superset():
+        if _already_generated(manifest, output_path):
             logger.info(
                 "Valid manifest found. Features already generated.",
                 manifest=manifest.data,
@@ -239,51 +316,30 @@ def generate_features(
         "Generating features",
         source=input_path,
         output_path=output_path,
-        num_rows=num_rows,
+        source_root=str(source_root),
         workers=num_workers,
-        features=list(features),
+        features=feature_names,
+        scratch_dir=scratch_dir,
     )
-
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    writer = None
 
     start_time = time.perf_counter()
 
-    with ProcessPoolExecutor(
-        max_workers=num_workers,
-        initializer=_init_worker,
-        initargs=(features,),
-        max_tasks_per_child=100,
-    ) as executor:
-        for i, batch in enumerate(parquet_file.iter_batches(batch_size=batch_size)):
-            new_batch = _process_batch(batch, feature_generators, chunk_size, executor)
-
-            if writer is None:
-                writer = pq.ParquetWriter(output_path, new_batch.schema)
-
-            writer.write_batch(new_batch)
-            del batch, new_batch
-
-            logger.info(
-                "Processed batch",
-                batch_index=i + 1,
-                processed=min((i + 1) * batch_size, num_rows),
-                total_rows=num_rows,
-            )
-
-    if writer is not None:
-        writer.close()
+    _generate_via_staged_output(
+        input_path,
+        Path(output_path),
+        feature_generators,
+        feature_names,
+        batch_size,
+        chunk_size,
+        num_workers,
+        scratch_dir,
+    )
 
     elapsed_time = time.perf_counter() - start_time
-    manifest.data["run_time"] = str(datetime.timedelta(seconds=elapsed_time))
+    manifest.data[RUN_TIME_KEY] = str(datetime.timedelta(seconds=elapsed_time))
     manifest.save()
 
-    logger.info(
-        "Finished generating features",
-        file=key,
-        num_rows=num_rows,
-        output_path=output_path,
-    )
+    logger.info("Finished generating features", manifest=manifest.data)
     click.echo("Done!")
 
 
