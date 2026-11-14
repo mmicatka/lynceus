@@ -12,6 +12,8 @@ def merge_shards_template(
     subprocess.run(
         [
             "merge-shards",
+            "--source-root",
+            base_path,
             "--input",
             os.path.join(base_path, input_path),
             "--output",

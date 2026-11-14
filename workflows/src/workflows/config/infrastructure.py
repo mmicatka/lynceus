@@ -27,6 +27,9 @@ class TemplateName(StrEnum):
     SUBSAMPLE_CANDIDATES = "subsample_candidates"
     GENERATE_CONFORMERS = "generate_conformers"
     GENERATE_FEATURES = "generate_features"
+    UPDATE_MANIFEST = "update_manifest"
+    VERIFY_CANDIDATES_MANIFEST = "verify_manifest_candidates"
+    VERIFY_SHARD_LAYOUT = "verify_shard_layout"
     # Targets
     DOWNLOAD_PDBS = "download_pdbs"
     GENERATE_PROTEIN_ENSEMBLE_MANIFEST = "generate_protein_ensemble_manifest"
@@ -46,6 +49,7 @@ class CandidatePrefixes(StrictModel):
     raw_parquet: StoragePrefix
     shards_staging: StoragePrefix
     shards: StoragePrefix
+    shards_manifests: str
     shards_sample: StoragePrefix
     conformers: StoragePrefix
     features: StoragePrefix

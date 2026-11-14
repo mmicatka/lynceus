@@ -5,8 +5,10 @@ def plan_shard_candidates_template(
     source_root: str,
     source_glob: str,
     output_file: str,
+    persist_file: str,
     max_batch_gib: str,
 ):
+    import os
     import subprocess
 
     args = [
@@ -17,6 +19,8 @@ def plan_shard_candidates_template(
         source_glob,
         "--output-file",
         output_file,
+        "--persist-file",
+        os.path.join(source_root, persist_file),
         "--max-batch-gib",
         max_batch_gib,
     ]
@@ -32,6 +36,8 @@ def shard_candidates_template(
     scratch_dir: str = "",
     transfers: str = "",
     chunk_size: str = "",
+    max_buffered_rows: str = "",
+    num_workers: str = "",
 ):
     import os
     import subprocess
@@ -40,6 +46,8 @@ def shard_candidates_template(
         "--scratch-dir": scratch_dir,
         "--transfers": transfers,
         "--chunk-size": chunk_size,
+        "--max-buffered-rows": max_buffered_rows,
+        "--num-workers": num_workers,
     }
     extra_args = [
         arg
@@ -49,17 +57,19 @@ def shard_candidates_template(
     ]
     output = os.path.join(base_path, output_prefix)
 
+    cmd = ["shard-candidates"]
+
     for path in batch:
-        subprocess.run(
-            [
-                "shard-candidates",
-                "--input",
-                os.path.join(base_path, path),
-                "--output",
-                output,
-                "--num-shards",
-                str(num_shards),
-                *extra_args,
-            ],
-            check=True,
-        )
+        cmd.extend(["--input", os.path.join(base_path, path)])
+
+    cmd.extend(
+        [
+            "--output",
+            output,
+            "--num-shards",
+            str(num_shards),
+            *extra_args,
+        ]
+    )
+
+    subprocess.run(cmd, check=True)

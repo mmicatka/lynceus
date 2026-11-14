@@ -12,7 +12,9 @@ from .candidates import (
 from .common import (
     build_clean_prefix_template,
     merge_shards_template,
+    update_manifest_template,
     verify_manifest_template,
+    verify_shard_layout_template,
 )
 from .docking import run_docking_template
 from .surrogate import (
@@ -28,7 +30,9 @@ __all__ = [
     # common
     "build_clean_prefix_template",
     "merge_shards_template",
+    "update_manifest_template",
     "verify_manifest_template",
+    "verify_shard_layout_template",
     # candidates
     "generate_conformers_template",
     "generate_features_template",
