@@ -15,8 +15,8 @@ x-defs:
       limits: *low_cpu_res
     med_cpu: &med_cpu
       requests: &med_cpu_res
-        cpu: "3"
-        memory: 3Gi
+        cpu: "4"
+        memory: 4Gi
       limits: *med_cpu_res
     med_cpu_high_ram: &med_cpu_high_ram
       requests: &med_cpu_high_ram_res
@@ -109,7 +109,7 @@ templates:
     scratch: *scratch
 
   generate_features:
-    resources: *med_cpu
+    resources: *med_cpu_high_ram
     image: *candidates_image
     scratch: *scratch
 

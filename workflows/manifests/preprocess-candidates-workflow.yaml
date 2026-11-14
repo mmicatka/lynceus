@@ -285,11 +285,11 @@ spec:
         mountPath: /scratch
       resources:
         limits:
-          cpu: '3'
-          memory: 3Gi
+          cpu: '4'
+          memory: 4Gi
         requests:
-          cpu: '3'
-          memory: 3Gi
+          cpu: '4'
+          memory: 4Gi
   - name: generate-features
     volumes:
     - name: lynceus
@@ -346,11 +346,11 @@ spec:
         mountPath: /scratch
       resources:
         limits:
-          cpu: '3'
-          memory: 3Gi
+          cpu: '4'
+          memory: 6Gi
         requests:
-          cpu: '3'
-          memory: 3Gi
+          cpu: '4'
+          memory: 6Gi
   - name: process-shard-dag
     dag:
       tasks:
