@@ -15,8 +15,8 @@ x-defs:
       limits: *low_cpu_res
     med_cpu: &med_cpu
       requests: &med_cpu_res
-        cpu: "4"
-        memory: 4Gi
+        cpu: "3"
+        memory: 3Gi
       limits: *med_cpu_res
     med_cpu_high_ram: &med_cpu_high_ram
       requests: &med_cpu_high_ram_res
