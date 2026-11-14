@@ -1,36 +1,29 @@
-# modules/local/generate_features/src/generate_features/feature_generators/e3fp.py
+# projects/candidates/src/candidates/preprocess/features/generators/pharmacore_3d.py
 
 import numpy as np
 import pyarrow as pa
 from rdkit.Chem import Mol
-from skfp.fingerprints import E3FPFingerprint
+from skfp.fingerprints import PharmacophoreFingerprint
 
 from .feature_generator import FeatureGenerator
 
 
-class E3FPFeature(FeatureGenerator):
-    name = "e3fp"
+class Pharmacophore3dFeature(FeatureGenerator):
+    name = "pharmacophore_3d"
 
     DEFAULT_FP_SIZE = 1024
-    DEFAULT_LEVEL = 5
 
-    def __init__(
-        self, fp_size: int = DEFAULT_FP_SIZE, level: int = DEFAULT_LEVEL
-    ) -> None:
+    def __init__(self, fp_size: int = DEFAULT_FP_SIZE) -> None:
         self._fp_size = fp_size
-        self._fp = E3FPFingerprint(fp_size=fp_size, n_jobs=1, sparse=False, level=level)
+        self._fp = PharmacophoreFingerprint(
+            fp_size=fp_size, use_3D=True, variant="folded", n_jobs=1, sparse=False
+        )
 
     def compute_batch(self, batch: list[Mol]) -> list[list[float] | None]:
-        for idx, mol in enumerate(batch):
-            if mol is not None and (
-                not mol.HasProp("_Name") or not mol.GetProp("_Name").strip()
-            ):
-                mol.SetProp("_Name", f"mol_{idx}")
-
         fingerprints = self._fp.transform(batch)
         if not isinstance(fingerprints, np.ndarray):
             raise RuntimeError(
-                "expected dense ndarray from E3FPFingerprint.transform,"
+                "expected dense ndarray from PharmacophoreFingerprint.transform,"
                 f" got {type(fingerprints)}"
             )
         return [row.tolist() for row in fingerprints]

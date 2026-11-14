@@ -69,11 +69,11 @@ templates:
     resources: *low_cpu
     image: *candidates_image
 
-  verify_manifest_candidates:
+  verify_manifest_load_candidates:
     resources: *low_cpu
     image: *candidates_image
 
-  update_manifest:
+  update_manifest_load_candidates:
     resources: *low_cpu
     image: *candidates_image
 
@@ -89,6 +89,18 @@ templates:
 
   subsample_candidates:
     resources: *high_cpu
+    image: *candidates_image
+
+  plan_preprocess_candidates:
+    resources: *low_cpu
+    image: *candidates_image
+
+  verify_manifest_preprocess_candidates:
+    resources: *low_cpu
+    image: *candidates_image
+
+  update_manifest_preprocess_candidates:
+    resources: *low_cpu
     image: *candidates_image
 
   generate_conformers:

@@ -1,4 +1,5 @@
-# projects/candidates/src/candidates/features/__init__.py
+# projects/candidates/src/candidates/preprocess/features/__init__.py
+
 
 from .generate_features import generate_features
 

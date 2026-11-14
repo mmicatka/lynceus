@@ -1,4 +1,4 @@
-# modules/local/generate_features/src/generate_features/generate_features.py
+# projects/candidates/src/candidates/preprocess/features/generate_features.py
 
 
 import datetime
@@ -17,8 +17,8 @@ from lynceus_core.manifest.common import Manifest
 from rdkit import rdBase
 from rdkit.Chem import Mol, MolFromMolBlock
 
-from candidates.features.feature_generators import FEATURE_GENERATOR_REGISTRY
-from candidates.features.feature_generators.feature_generator import (
+from candidates.preprocess.features.generators import FEATURE_GENERATOR_REGISTRY
+from candidates.preprocess.features.generators.feature_generator import (
     FeatureChunk,
     FeatureGenerator,
 )

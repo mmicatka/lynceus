@@ -1,6 +1,5 @@
-# modules/local/generate_features/src/generate_features/feature_generators/feature_generator.py # noqa: E501
+# projects/candidates/src/candidates/preprocess/features/generators/feature_generator.py
 
-# feature_generator.py
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass

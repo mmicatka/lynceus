@@ -1,26 +1,29 @@
-# modules/local/generate_features/src/generate_features/feature_generators/morse.py
+# projects/candidates/src/candidates/preprocess/features/generators/electroshape.py
+
 
 import numpy as np
 import pyarrow as pa
 from rdkit.Chem import Mol
-from skfp.fingerprints import MORSEFingerprint
+from skfp.fingerprints import ElectroShapeFingerprint
 
 from .feature_generator import FeatureGenerator
 
 
-class MORSEFeature(FeatureGenerator):
-    name = "morse"
+class ElectroShapeFeature(FeatureGenerator):
+    name = "electroshape"
 
-    N_FEATURES = 224
+    N_FEATURES = 15
 
-    def __init__(self) -> None:
-        self._fp = MORSEFingerprint(n_jobs=1)
+    def __init__(self, partial_charge_model: str = "formal") -> None:
+        self._fp = ElectroShapeFingerprint(
+            partial_charge_model=partial_charge_model, n_jobs=1
+        )
 
     def compute_batch(self, batch: list[Mol]) -> list[list[float] | None]:
         fingerprints = self._fp.transform(batch)
         if not isinstance(fingerprints, np.ndarray):
             raise RuntimeError(
-                "expected dense ndarray from MORSEFingerprint.transform,"
+                "expected dense ndarray from ElectroShapeFingerprint.transform,"
                 f" got {type(fingerprints)}"
             )
         return [row.tolist() for row in fingerprints]

@@ -1,32 +1,26 @@
-# modules/local/generate_features/src/generate_features/feature_generators/ecfp.py
+# projects/candidates/src/candidates/preprocess/features/generators/usrcat.py
+
 
 import numpy as np
 import pyarrow as pa
 from rdkit.Chem import Mol
-from skfp.fingerprints import ECFPFingerprint
+from skfp.fingerprints import USRCATFingerprint
 
 from .feature_generator import FeatureGenerator
 
 
-class ECFPFeature(FeatureGenerator):
-    name = "ecfp"
+class USRCATFeature(FeatureGenerator):
+    name = "usrcat"
 
-    DEFAULT_FP_SIZE = 1024
-    DEFAULT_ECFP_RADIUS = 3
-
-    def __init__(
-        self, fp_size: int = DEFAULT_FP_SIZE, radius: int = DEFAULT_ECFP_RADIUS
-    ) -> None:
-        self._fp_size = fp_size
-        self._fp = ECFPFingerprint(
-            fp_size=fp_size, radius=radius, n_jobs=1, sparse=False
-        )
+    def __init__(self) -> None:
+        self._fp = USRCATFingerprint(n_jobs=1)
+        self._fp_size = self._fp.n_features_out
 
     def compute_batch(self, batch: list[Mol]) -> list[list[float] | None]:
         fingerprints = self._fp.transform(batch)
         if not isinstance(fingerprints, np.ndarray):
             raise RuntimeError(
-                "expected dense ndarray from ECFPFingerprint.transform,"
+                "expected dense ndarray from USRCATFingerprint.transform,"
                 f" got {type(fingerprints)}"
             )
         return [row.tolist() for row in fingerprints]
@@ -35,7 +29,7 @@ class ECFPFeature(FeatureGenerator):
         return self.name
 
     def feature_field_type(self) -> pa.DataType:
-        return pa.list_(pa.uint8(), self._fp_size)
+        return pa.list_(pa.float32(), self._fp_size)
 
     def placeholder_value(self) -> list[float]:
         return [0] * self._fp_size

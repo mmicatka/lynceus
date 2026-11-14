@@ -18,7 +18,7 @@ BYTES_PER_GIB = 1024**3
 SourceEntry = dict[str, Any]
 
 
-def scan_files(source_root: Path, source_glob: str) -> list[SourceEntry]:
+def _scan_files(source_root: Path, source_glob: str) -> list[SourceEntry]:
     paths = (path for path in source_root.glob(source_glob) if path.is_file())
     return Manifest.describe_files(paths, source_root)
 
@@ -94,7 +94,7 @@ def plan_load_candidates(
     persist_file: Path,
     max_batch_gib: float,
 ) -> None:
-    files = scan_files(source_root, source_glob)
+    files = _scan_files(source_root, source_glob)
     if not files:
         raise click.ClickException(
             f"No files matched {source_glob!r} under {source_root}"

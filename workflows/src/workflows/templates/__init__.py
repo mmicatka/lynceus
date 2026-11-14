@@ -5,6 +5,7 @@ from .builders import TemplateFactory
 from .candidates import (
     generate_conformers_template,
     generate_features_template,
+    plan_preprocess_candidates_template,
     plan_shard_candidates_template,
     sample_candidates_template,
     shard_candidates_template,
@@ -37,6 +38,7 @@ __all__ = [
     "generate_conformers_template",
     "generate_features_template",
     "plan_shard_candidates_template",
+    "plan_preprocess_candidates_template",
     "shard_candidates_template",
     "sample_candidates_template",
     # docking

@@ -20,6 +20,7 @@ plan-load-candidates = "candidates:plan_load_candidates"
 shard-candidates = "candidates:shard_candidates"
 verify-shard-layout = "candidates:verify_shard_layout"
 sample-candidates = "candidates:sample_candidates"
+plan-preprocess-candidates = "candidates:plan_preprocess_candidates"
 generate-conformers = "candidates:generate_conformers"
 generate-features = "candidates:generate_features"
 

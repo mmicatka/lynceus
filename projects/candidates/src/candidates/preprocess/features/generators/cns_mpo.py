@@ -1,4 +1,5 @@
-# modules/local/generate_features/src/generate_features/feature_generators/cns_mpo.py
+# projects/candidates/src/candidates/preprocess/features/generators/cns_mpo.py
+
 
 import pyarrow as pa
 from rdkit.Chem import Mol, rdMolDescriptors
