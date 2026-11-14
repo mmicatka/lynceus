@@ -16,6 +16,7 @@ from workflows.registry.common.core import (
 from workflows.templates import sample_candidates_template
 from workflows.templates.builders import TemplateFactory
 
+SAMPLE_SHARDS_PARALLELISM = 1
 SAMPLE_CANDIDATES_DAG = "sample-candidates-dag"
 
 
@@ -56,10 +57,11 @@ def build_sample_candidates_dag(
     templates: TemplateFactory,
     infra_config: InfraConfig,
     screen_config: ScreenConfig,
+    parallelism: int = SAMPLE_SHARDS_PARALLELISM,
 ) -> DAG:
     sub_sample = _require_sub_sample(screen_config)
 
-    with DAG(name=SAMPLE_CANDIDATES_DAG) as dag:
+    with DAG(name=SAMPLE_CANDIDATES_DAG, parallelism=parallelism) as dag:
         _subsample_task(templates, infra_config, sub_sample)
 
     return dag

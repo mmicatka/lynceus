@@ -11,11 +11,15 @@ def sample_candidates_template(
     import os
     import subprocess
 
+    source_root = os.path.join(base_path, source_prefix)
+
     subprocess.run(
         [
             "sample-candidates",
             "--input",
-            os.path.join(base_path, source_prefix, source),
+            os.path.join(source_root, source),
+            "--source-root",
+            source_root,
             "--output",
             os.path.join(base_path, parquet_prefix, source),
             "--num-samples",

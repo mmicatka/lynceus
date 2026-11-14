@@ -14,7 +14,6 @@ from workflows.config.base import StrictModel
 
 
 class CandidatesConfig(StrictModel):
-    sources: list[str] = Field(min_length=1)
     sub_sample: Optional[PositiveInt] = None
 
 

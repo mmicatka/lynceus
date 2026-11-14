@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Workflow
 metadata:
-  generateName: 5m-poc-candidates-pipeline-
+  generateName: 10m-poc-candidates-pipeline-
 spec:
   entrypoint: main-dag
   serviceAccountName: argo-workflow
@@ -56,7 +56,7 @@ spec:
       - name: verify-final-shards
         depends: check-sharded
         template: verify-shard-layout
-        when: '{{tasks[''check-sharded''].outputs.parameters.matches}} == false'
+        when: '{{tasks.check-sharded.outputs.parameters.matches}} == false'
         arguments:
           parameters:
           - name: base_path
@@ -76,7 +76,7 @@ spec:
       - name: shard-candidates
         depends: verify-final-shards
         template: shard-candidates-dag
-        when: '{{tasks[''check-sharded''].outputs.parameters.matches}} == false'
+        when: '{{tasks.check-sharded.outputs.parameters.matches}} == false'
         arguments:
           parameters:
           - name: batches
@@ -84,7 +84,7 @@ spec:
       - name: verify-staging
         depends: shard-candidates
         template: verify-shard-layout
-        when: '{{tasks[''check-sharded''].outputs.parameters.matches}} == false'
+        when: '{{tasks.check-sharded.outputs.parameters.matches}} == false'
         arguments:
           parameters:
           - name: base_path
@@ -104,7 +104,7 @@ spec:
       - name: write-manifest
         depends: verify-staging
         template: update-manifest
-        when: '{{tasks[''check-sharded''].outputs.parameters.matches}} == false'
+        when: '{{tasks.check-sharded.outputs.parameters.matches}} == false'
         arguments:
           parameters:
           - name: base_path
@@ -118,11 +118,11 @@ spec:
       - name: merge-shards
         depends: write-manifest && check-merged
         template: merge-shards-dag
-        when: '{{tasks[''check-merged''].outputs.parameters.matches}} == false'
+        when: '{{tasks.check-merged.outputs.parameters.matches}} == false'
       - name: verify-merged
         depends: merge-shards
         template: verify-shard-layout
-        when: '{{tasks[''check-merged''].outputs.parameters.matches}} == false'
+        when: '{{tasks.check-merged.outputs.parameters.matches}} == false'
         arguments:
           parameters:
           - name: base_path
@@ -142,7 +142,7 @@ spec:
       - name: mark-merged
         depends: verify-merged
         template: update-manifest
-        when: '{{tasks[''check-merged''].outputs.parameters.matches}} == false'
+        when: '{{tasks.check-merged.outputs.parameters.matches}} == false'
         arguments:
           parameters:
           - name: base_path
@@ -481,11 +481,11 @@ spec:
         mountPath: /scratch
       resources:
         limits:
-          cpu: '2'
-          memory: 1Gi
+          cpu: '4'
+          memory: 4Gi
         requests:
-          cpu: '2'
-          memory: 1Gi
+          cpu: '4'
+          memory: 4Gi
   - name: merge-and-clean-shard
     dag:
       tasks:
@@ -518,6 +518,9 @@ spec:
     - name: lynceus
       persistentVolumeClaim:
         claimName: lynceus-pvc
+    - name: scratch
+      emptyDir:
+        sizeLimit: 50Gi
     inputs:
       parameters:
       - name: base_path
@@ -546,12 +549,14 @@ spec:
 
         import os
         import subprocess
-        subprocess.run(['merge-shards', '--input', os.path.join(base_path, input_path), '--output', os.path.join(base_path, output_path), '--memory-limit', '6GB'], check=True)
+        subprocess.run(['merge-shards', '--source-root', base_path, '--input', os.path.join(base_path, input_path), '--output', os.path.join(base_path, output_path), '--memory-limit', '6GB'], check=True)
       command:
       - python
       volumeMounts:
       - name: lynceus
         mountPath: /mnt/lynceus
+      - name: scratch
+        mountPath: /scratch
       resources:
         limits:
           cpu: '4'
@@ -581,7 +586,7 @@ spec:
       - name: base_path
       - name: prefix
   - name: merge-shards-dag
-    parallelism: 2
+    parallelism: 1
     dag:
       tasks:
       - name: merge-shards-fanout
@@ -1129,6 +1134,9 @@ spec:
     - name: lynceus
       persistentVolumeClaim:
         claimName: lynceus-pvc
+    - name: scratch
+      emptyDir:
+        sizeLimit: 50Gi
     inputs:
       parameters:
       - name: base_path
@@ -1178,6 +1186,8 @@ spec:
       volumeMounts:
       - name: lynceus
         mountPath: /mnt/lynceus
+      - name: scratch
+        mountPath: /scratch
       resources:
         limits:
           cpu: '4'
@@ -1190,6 +1200,9 @@ spec:
     - name: lynceus
       persistentVolumeClaim:
         claimName: lynceus-pvc
+    - name: scratch
+      emptyDir:
+        sizeLimit: 50Gi
     inputs:
       parameters:
       - name: base_path
@@ -1237,6 +1250,8 @@ spec:
       volumeMounts:
       - name: lynceus
         mountPath: /mnt/lynceus
+      - name: scratch
+        mountPath: /scratch
       resources:
         limits:
           cpu: '4'
@@ -1256,9 +1271,9 @@ spec:
           - name: source
             value: '{{inputs.parameters.source}}'
           - name: input_prefix
-            value: candidates/5m/shards
+            value: candidates/10m/shards
           - name: output_prefix
-            value: candidates/5m/conformers
+            value: candidates/10m/conformers
       - name: generate-features
         depends: generate-conformers
         template: generate-features
@@ -1269,9 +1284,9 @@ spec:
           - name: source
             value: '{{inputs.parameters.source}}'
           - name: input_prefix
-            value: candidates/5m/conformers
+            value: candidates/10m/conformers
           - name: output_prefix
-            value: candidates/5m/features
+            value: candidates/10m/features
           - name: features
             value: '["atom_pair", "autocorr", "descriptors", "ecfp", "functional_groups",
               "morse", "rdf", "topological_torsion", "usrcat", "whim"]'
