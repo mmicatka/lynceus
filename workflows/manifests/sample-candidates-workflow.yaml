@@ -7,6 +7,7 @@ spec:
   serviceAccountName: argo-workflow
   templates:
   - name: sample-candidates-dag
+    parallelism: 1
     dag:
       tasks:
       - name: subsample-candidates
@@ -575,7 +576,8 @@ spec:
 
         import os
         import subprocess
-        subprocess.run(['sample-candidates', '--input', os.path.join(base_path, source_prefix, source), '--output', os.path.join(base_path, parquet_prefix, source), '--num-samples', str(num_samples)], check=True)
+        source_root = os.path.join(base_path, source_prefix)
+        subprocess.run(['sample-candidates', '--input', os.path.join(source_root, source), '--source-root', source_root, '--output', os.path.join(base_path, parquet_prefix, source), '--num-samples', str(num_samples)], check=True)
       command:
       - python
       volumeMounts:
