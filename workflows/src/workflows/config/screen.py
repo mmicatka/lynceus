@@ -10,7 +10,7 @@ from pydantic import (
     model_validator,
 )
 
-from workflows.config.base import StrictModel
+from workflows.config.common import StrictModel
 
 
 class CandidatesConfig(StrictModel):

@@ -1,10 +1,16 @@
 # workflows/src/workflows/config/base.py
 
+
 from pathlib import Path
-from typing import TypeVar
+from typing import Annotated, TypeVar
 
 import yaml
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, StringConstraints
+
+ConfigSlug = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, pattern=r"^[a-z0-9]+(-[a-z0-9]+)*$"),
+]
 
 
 class StrictModel(BaseModel):

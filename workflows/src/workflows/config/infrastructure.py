@@ -5,7 +5,7 @@ from typing import Annotated, Literal
 
 from pydantic import Field, PositiveInt, StringConstraints
 
-from workflows.config.base import StrictModel
+from workflows.config.common import StrictModel
 
 StoragePrefix = Annotated[
     str,

@@ -1,0 +1,15 @@
+---
+name: 10m
+sub_sample: 10000000
+
+feature_list:
+  - atom_pair
+  - autocorr
+  - descriptors
+  - ecfp
+  - functional_groups
+  - morse
+  - rdf
+  - topological_torsion
+  - usrcat
+  - whim
