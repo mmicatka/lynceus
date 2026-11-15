@@ -1,4 +1,4 @@
-# workflows/src/workflows/templates/surrogate/surrogate_sample.py
+# workflows/src/workflows/templates/surrogate/sample.py
 
 
 def surrogate_sample_template(
@@ -16,6 +16,8 @@ def surrogate_sample_template(
     subprocess.run(
         [
             "surrogate-sample",
+            "--source-root",
+            base_path,
             "--features-input",
             os.path.join(base_path, features_input_prefix, source),
             "--conformers-input",
@@ -50,6 +52,8 @@ def surrogate_sample_by_prediction_template(
 
     cmd = [
         "surrogate-sample-by-prediction",
+        "--source-root",
+        base_path,
         "--features-input",
         os.path.join(base_path, features_input_prefix, source),
         "--conformers-input",

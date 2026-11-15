@@ -131,7 +131,7 @@ templates:
     image: *targets_image
 
   ##### Surrogate #####
-  verify_manifest:
+  verify_manifest_surrogate:
     resources: *low_cpu
     image: *surrogate_image
 
