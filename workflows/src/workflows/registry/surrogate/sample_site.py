@@ -82,6 +82,7 @@ def _check_manifest_task(verify, layout: SiteLayout, spec: SampleSpec) -> Task:
 
 def _docking_arguments(spec: SampleSpec, layout: SiteLayout) -> dict:
     return {
+        "base_path": layout.base_path,
         "ensemble": layout.ensemble_path,
         "member_id": ref("member_id"),
         "ligands_path": layout.docking_input_path(spec.label),
