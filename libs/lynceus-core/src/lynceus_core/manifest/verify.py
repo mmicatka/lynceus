@@ -1,5 +1,6 @@
 # libs/lynceus-core/src/lynceus_core/manifest/verify.py
 
+
 import json
 import os
 from pathlib import Path
@@ -12,6 +13,8 @@ from lynceus_core.manifest.common import Manifest
 
 TRUE = "true"
 FALSE = "false"
+
+DEFAULT_SOURCE_GLOB = "*"
 
 logger = get_lynceus_logger()
 
@@ -34,11 +37,16 @@ def _write_result(result_file: str, matches: bool) -> None:
         handle.write(TRUE if matches else FALSE)
 
 
+def _scan_sources(source_root: str, source_globs: tuple[str, ...]) -> list[Path]:
+    root = Path(source_root)
+    return sorted({path for glob in source_globs for path in root.glob(glob)})
+
+
 def _manifest_matches(
     manifest_path: str,
     expected: dict,
     source_root: Optional[str],
-    source_glob: str,
+    source_globs: tuple[str, ...],
 ) -> bool:
     manifest = Manifest(data=expected, filepath=manifest_path)
     if not manifest.exists_superset():
@@ -46,7 +54,9 @@ def _manifest_matches(
     if source_root is None:
         return True
 
-    manifest.set_source_files(Path(source_root).glob(source_glob), root=source_root)
+    manifest.set_source_files(
+        _scan_sources(source_root, source_globs), root=source_root
+    )
     return manifest.exists_superset()
 
 
@@ -75,10 +85,13 @@ def _manifest_matches(
 )
 @click.option(
     "--source-glob",
-    default="*",
+    "source_globs",
+    multiple=True,
+    default=(DEFAULT_SOURCE_GLOB,),
     show_default=True,
     type=str,
-    help="Glob, relative to --source-root, selecting the expected source files.",
+    help="Glob, relative to --source-root, selecting the expected source files. "
+    "Repeat to select files from several locations.",
 )
 @click.option(
     "--result-file",
@@ -92,7 +105,7 @@ def verify_manifest(
     manifest_path: str,
     expected: dict,
     source_root: Optional[str],
-    source_glob: str,
+    source_globs: tuple[str, ...],
     result_file: str,
 ) -> None:
     click.echo(f"Checking manifest {manifest_path}...")
@@ -100,7 +113,7 @@ def verify_manifest(
     matches = False
 
     try:
-        matches = _manifest_matches(manifest_path, expected, source_root, source_glob)
+        matches = _manifest_matches(manifest_path, expected, source_root, source_globs)
     except Exception as e:
         logger.warning("Failed to load existing manifest, re-generating.", error=str(e))
 
@@ -111,7 +124,7 @@ def verify_manifest(
         manifest_path=manifest_path,
         expected=expected,
         source_root=source_root,
-        source_glob=source_glob,
+        source_globs=list(source_globs),
         manifest_matches=matches,
     )
     click.echo("Done!")

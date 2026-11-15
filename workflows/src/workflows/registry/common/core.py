@@ -19,10 +19,6 @@ SHARD_SUFFIX = ".parquet"
 SHARD_PREFIX = "shard_"
 
 
-def shard_path(prefix: str) -> str:
-    return f"{prefix}/shard_id={ITEM_PARAM}"
-
-
 def shard_ids(num_shards: int) -> list[int]:
     return list(range(num_shards))
 

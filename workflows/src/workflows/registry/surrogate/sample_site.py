@@ -1,9 +1,7 @@
 # workflows/src/workflows/registry/surrogate/sample_site.py
 
 
-import json
-import os
-from typing import Any, Sequence
+from typing import Sequence
 
 from hera.workflows import DAG, Parameter, Task
 from hera.workflows.models import ValueFrom
@@ -11,6 +9,17 @@ from hera.workflows.models import ValueFrom
 from workflows.config import InfraConfig, ScreenConfig
 from workflows.config.infrastructure import TemplateName
 from workflows.config.screen import RoundConfig, SurrogateConfig
+from workflows.registry.common.manifest_gate import (
+    MANIFEST_OUTPUT,
+    MANIFEST_PATH,
+    MATCHES_OUTPUT,
+    MATCHES_PATH,
+)
+from workflows.registry.surrogate.common import (
+    PredictionSampleSpec,
+    RandomSampleSpec,
+    SampleTemplates,
+)
 from workflows.registry.surrogate.layout import (
     SITE_PARAMETERS,
     VALIDATION_LABEL,
@@ -19,8 +28,6 @@ from workflows.registry.surrogate.layout import (
 )
 from workflows.registry.surrogate.sample import (
     SAMPLE_PARAMETERS,
-    PredictionSampleSpec,
-    RandomSampleSpec,
     SampleSpec,
     build_sample_dag,
 )
@@ -33,22 +40,14 @@ from workflows.templates import (
     surrogate_train_template,
     verify_manifest_template,
 )
+from workflows.templates.common.update_manifest import update_manifest_template
+from workflows.templates.surrogate.sample import plan_surrogate_sample_template
 
 SURROGATE_SITE_DAG = "surrogate-site-dag"
 
-MATCHES_OUTPUT = "matches"
-MATCHES_PATH = "/tmp/manifest_matches.txt"
+
 STAGING_GLOB = "*.parquet"
 INPUT_PATH_KEY = "input_path"
-
-
-def _json_arg(value: dict[str, Any]) -> str:
-    return json.dumps(value, separators=(",", ":"), sort_keys=True)
-
-
-def _when_unmatched(check_task: Task) -> str:
-    result = f"tasks.{check_task.name}.outputs.parameters.{MATCHES_OUTPUT}"
-    return f"{{{{{result}}}}} == false"
 
 
 def _build_verify_manifest(templates: TemplateFactory):
@@ -58,25 +57,6 @@ def _build_verify_manifest(templates: TemplateFactory):
         outputs=[
             Parameter(name=MATCHES_OUTPUT, value_from=ValueFrom(path=MATCHES_PATH))
         ],
-    )
-
-
-def _expected_state(spec: SampleSpec, layout: SiteLayout) -> dict[str, Any]:
-    return {INPUT_PATH_KEY: layout.staging_prefix(spec.label)}
-
-
-def _check_manifest_task(verify, layout: SiteLayout, spec: SampleSpec) -> Task:
-    return verify(
-        name=f"check-{spec.task_suffix}",
-        arguments={
-            "base_path": layout.base_path,
-            "manifest": layout.manifest_path(spec.label),
-            "expect": _json_arg(_expected_state(spec, layout)),
-            "source_glob": os.path.join(
-                layout.staging_prefix(spec.label), STAGING_GLOB
-            ),
-            "result_file": MATCHES_PATH,
-        },
     )
 
 
@@ -155,20 +135,17 @@ def _sample_and_dock(
     layout: SiteLayout,
     sample_dag,
     dock,
-    verify,
 ) -> tuple[Task, Task]:
-    check_task = _check_manifest_task(verify, layout, spec)
     sample_task = sample_dag(
         name=f"sample-{spec.task_suffix}",
-        when=_when_unmatched(check_task),
         arguments={name: ref(name) for name in SAMPLE_PARAMETERS},
     )
     dock_task = dock(
         name=f"dock-{spec.task_suffix}",
         arguments=_docking_arguments(spec, layout),
     )
-    check_task >> sample_task >> dock_task  # type: ignore
-    return check_task, dock_task
+    sample_task >> dock_task  # type: ignore
+    return sample_task, dock_task
 
 
 def _train(
@@ -199,26 +176,39 @@ def build_surrogate_site_dag(
     validation_spec = _validation_spec(surrogate)
     round_specs = _round_specs(surrogate, layout)
 
-    verify = _build_verify_manifest(templates)
     dock = templates.build(TemplateName.RUN_DOCKING, run_docking_template)
-    merge_shards = templates.build(TemplateName.MERGE_SHARDS, merge_shards_template)
     surrogate_train = templates.build(
         TemplateName.SURROGATE_TRAIN, surrogate_train_template
     )
-    sample_templates = {
-        RandomSampleSpec: templates.build(
-            TemplateName.SURROGATE_SAMPLE, surrogate_sample_template
+    sample_templates = SampleTemplates(
+        sample={
+            RandomSampleSpec: templates.build(
+                TemplateName.SURROGATE_SAMPLE, surrogate_sample_template
+            ),
+            PredictionSampleSpec: templates.build(
+                TemplateName.SURROGATE_SAMPLE_BY_PREDICTION,
+                surrogate_sample_by_prediction_template,
+            ),
+        },
+        merge_shards=templates.build(TemplateName.MERGE_SHARDS, merge_shards_template),
+        plan=templates.build(
+            TemplateName.PLAN_SURROGATE_SAMPLE,
+            plan_surrogate_sample_template,
+            outputs=[
+                Parameter(
+                    name=MANIFEST_OUTPUT,
+                    value_from=ValueFrom(path=MANIFEST_PATH),
+                )
+            ],
         ),
-        PredictionSampleSpec: templates.build(
-            TemplateName.SURROGATE_SAMPLE_BY_PREDICTION,
-            surrogate_sample_by_prediction_template,
+        verify_manifest=_build_verify_manifest(templates),
+        update_manifest=templates.build(
+            TemplateName.UPDATE_MANIFEST_SURROGATE, update_manifest_template
         ),
-    }
+    )
 
     sample_dags = {
-        spec.label: build_sample_dag(
-            sample_templates[type(spec)], merge_shards, infra_config, layout, spec
-        )
+        spec.label: build_sample_dag(sample_templates, infra_config, layout, spec)
         for spec in [validation_spec, *round_specs]
     }
 
@@ -232,22 +222,20 @@ def build_surrogate_site_dag(
             layout,
             sample_dags[validation_spec.label],
             dock,
-            verify,
         )
 
         for index, spec in enumerate(round_specs):
-            check_task, dock_task = _sample_and_dock(
+            sample_task, dock_task = _sample_and_dock(
                 spec,
                 layout,
                 sample_dags[spec.label],
                 dock,
-                verify,
             )
             train_task = _train(
                 spec, layout, surrogate_train, round_labels[: index + 1]
             )
 
-            previous_task >> check_task  # type: ignore
+            previous_task >> sample_task  # type: ignore
             dock_task >> train_task  # type: ignore
             previous_task = train_task
 

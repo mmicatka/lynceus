@@ -46,12 +46,14 @@ volume:
 storage:
   prefixes:
     candidates:
-      root: candidates
       raw_smiles: candidates/raw/smiles
       raw_parquet: candidates/raw/parquets
       shards_staging: candidates/raw/shards/staging
       shards: candidates/raw/shards/merged
       shards_manifests: candidates/raw/shards/manifests
+      shards_sample: candidates/10m/shards
+      conformers: candidates/10m/conformers
+      features: candidates/10m/features
     target:
       pdbs: target/pdbs
       ensembles: target/ensembles
@@ -134,7 +136,15 @@ templates:
     image: *targets_image
 
   ##### Surrogate #####
+  plan_surrogate_sample:
+    resources: *low_cpu
+    image: *surrogate_image
+
   verify_manifest_surrogate:
+    resources: *low_cpu
+    image: *surrogate_image
+
+  update_manifest_surrogate:
     resources: *low_cpu
     image: *surrogate_image
 

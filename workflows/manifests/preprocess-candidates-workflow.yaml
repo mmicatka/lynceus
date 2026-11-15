@@ -34,8 +34,8 @@ spec:
             value: /mnt/lynceus/candidates/raw/shards/manifests/preprocess_candidates.manifest.json
           - name: expect
             value: '{"features":["atom_pair","autocorr","descriptors","ecfp","functional_groups","morse","rdf","topological_torsion","usrcat","whim"],"preprocessed":true,"sub_sample":10000000}'
-          - name: source_glob
-            value: candidates/10m/shards/*.parquet
+          - name: source_globs
+            value: '["candidates/10m/shards/*.parquet"]'
           - name: result_file
             value: /tmp/manifest_matches.txt
       - name: process-shards-fanout
@@ -70,7 +70,7 @@ spec:
       - name: base_path
       - name: manifest
       - name: expect
-      - name: source_glob
+      - name: source_globs
       - name: result_file
     outputs:
       parameters:
@@ -78,11 +78,8 @@ spec:
         valueFrom:
           path: /tmp/manifest_matches.txt
     retryStrategy:
-      limit: 5
-      backoff:
-        duration: 30s
-        factor: 2
-        maxDuration: 10m
+      limit: 3
+      retryPolicy: OnFailure
     script:
       image: registry.nebula.lan:5000/lynceus/candidates:0.1.0
       imagePullPolicy: Always
@@ -99,13 +96,16 @@ spec:
         except: manifest = r'''{{inputs.parameters.manifest}}'''
         try: result_file = json.loads(r'''{{inputs.parameters.result_file}}''')
         except: result_file = r'''{{inputs.parameters.result_file}}'''
-        try: source_glob = json.loads(r'''{{inputs.parameters.source_glob}}''')
-        except: source_glob = r'''{{inputs.parameters.source_glob}}'''
+        try: source_globs = json.loads(r'''{{inputs.parameters.source_globs}}''')
+        except: source_globs = r'''{{inputs.parameters.source_globs}}'''
 
         import json
         import os
         import subprocess
-        subprocess.run(['verify-manifest', '--manifest', os.path.join(base_path, manifest), '--expect', json.dumps(expect), '--source-root', base_path, '--source-glob', source_glob, '--result-file', result_file], check=True)
+        cmd = ['verify-manifest', '--manifest', os.path.join(base_path, manifest), '--expect', json.dumps(expect), '--source-root', base_path, '--result-file', result_file]
+        for source_glob in source_globs:
+            cmd.extend(['--source-glob', source_glob])
+        subprocess.run(cmd, check=True)
       command:
       - python
       volumeMounts:
@@ -114,10 +114,10 @@ spec:
       resources:
         limits:
           cpu: '2'
-          memory: 1Gi
+          memory: 2Gi
         requests:
           cpu: '2'
-          memory: 1Gi
+          memory: 2Gi
   - name: update-manifest-preprocess-candidates
     volumes:
     - name: lynceus
@@ -130,11 +130,8 @@ spec:
       - name: output
       - name: fields
     retryStrategy:
-      limit: 5
-      backoff:
-        duration: 30s
-        factor: 2
-        maxDuration: 10m
+      limit: 3
+      retryPolicy: OnFailure
     script:
       image: registry.nebula.lan:5000/lynceus/candidates:0.1.0
       imagePullPolicy: Always
@@ -164,10 +161,10 @@ spec:
       resources:
         limits:
           cpu: '2'
-          memory: 1Gi
+          memory: 2Gi
         requests:
           cpu: '2'
-          memory: 1Gi
+          memory: 2Gi
   - name: plan-preprocess-candidates
     volumes:
     - name: lynceus
@@ -188,11 +185,8 @@ spec:
         valueFrom:
           path: /tmp/manifest.json
     retryStrategy:
-      limit: 5
-      backoff:
-        duration: 30s
-        factor: 2
-        maxDuration: 10m
+      limit: 3
+      retryPolicy: OnFailure
     script:
       image: registry.nebula.lan:5000/lynceus/candidates:0.1.0
       imagePullPolicy: Always
@@ -223,10 +217,10 @@ spec:
       resources:
         limits:
           cpu: '2'
-          memory: 1Gi
+          memory: 2Gi
         requests:
           cpu: '2'
-          memory: 1Gi
+          memory: 2Gi
   - name: generate-conformers
     volumes:
     - name: lynceus

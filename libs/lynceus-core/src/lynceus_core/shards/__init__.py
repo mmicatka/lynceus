@@ -1,4 +1,5 @@
-# libs/lynceus_core/utils/__init__.py
+# libs/lynceus_core/shards/__init__.py
+
 
 from .merge import merge_shards
 

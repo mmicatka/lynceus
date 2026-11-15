@@ -1,6 +1,5 @@
 # workflows/src/workflows/registry/candidates/preprocess.py
 
-import json
 from typing import Any
 
 from hera.workflows import DAG, Parameter, RetryStrategy, Task, Workflow
@@ -16,6 +15,14 @@ from workflows.registry.common.core import (
     get_template_factory,
     new_workflow,
 )
+from workflows.registry.common.manifest_gate import (
+    MANIFEST_OUTPUT,
+    MANIFEST_PATH,
+    MATCHES_OUTPUT,
+    MATCHES_PATH,
+    json_arg,
+    when_unmatched,
+)
 from workflows.templates import (
     TemplateFactory,
     generate_conformers_template,
@@ -29,10 +36,6 @@ PREPROCESS_CANDIDATES_DAG = "preprocess-candidates-dag"
 PREPROCESS_FANOUT_DAG = "preprocess-shards-fanout-dag"
 PROCESS_SHARD_DAG = "process-shard-dag"
 
-MANIFEST_OUTPUT = "manifest"
-MANIFEST_PATH = "/tmp/manifest.json"
-MATCHES_OUTPUT = "matches"
-MATCHES_PATH = "/tmp/manifest_matches.txt"
 
 SOURCES_PARAM = "sources"
 SHARD_FILE_GLOB = "*.parquet"
@@ -62,20 +65,11 @@ def _state_path(infra_config: InfraConfig, filename: str) -> str:
     return f"{infra_config.volume.mount_path}/{state_prefix}/{filename}"
 
 
-def _json_arg(value: dict[str, Any]) -> str:
-    return json.dumps(value, separators=(",", ":"), sort_keys=True)
-
-
 def _manifest_fields(screen_config: ScreenConfig) -> dict[str, Any]:
     return {
         SUB_SAMPLE_KEY: screen_config.candidates.sub_sample,
         FEATURES_KEY: list(screen_config.filter.feature_list),
     }
-
-
-def _when_unmatched(check_task: Task) -> str:
-    result = f"tasks.{check_task.name}.outputs.parameters.{MATCHES_OUTPUT}"
-    return f"{{{{{result}}}}} == false"
 
 
 def _sources_expression(plan_task: Task) -> str:
@@ -135,8 +129,8 @@ def _check_manifest_task(
         arguments={
             "base_path": infra_config.volume.mount_path,
             "manifest": _state_path(infra_config, MANIFEST_FILENAME),
-            "expect": _json_arg(expected),
-            "source_glob": f"{input_prefix}/{SHARD_FILE_GLOB}",
+            "expect": json_arg(expected),
+            "source_globs": [f"{input_prefix}/{SHARD_FILE_GLOB}"],
             "result_file": MATCHES_PATH,
         },
     )
@@ -155,7 +149,7 @@ def _update_manifest_task(
             "base_path": infra_config.volume.mount_path,
             "source": _state_path(infra_config, PLAN_FILENAME),
             "output": _state_path(infra_config, MANIFEST_FILENAME),
-            "fields": _json_arg(
+            "fields": json_arg(
                 {**_manifest_fields(screen_config), PREPROCESSED_KEY: True}
             ),
         },
@@ -240,7 +234,7 @@ def build_preprocess_candidates_dag(
 
         plan_task = _plan_preprocess_task(templates, infra_config, screen_config)
         check_task = _check_manifest_task(verify_manifest, infra_config, screen_config)
-        preprocess_gate = _when_unmatched(check_task)
+        preprocess_gate = when_unmatched(check_task)
 
         fanout_dag = _build_fanout_dag(templates, infra_config, screen_config)
         fanout_task = fanout_dag(

@@ -17,11 +17,8 @@ spec:
       - name: ensembles_prefix
       - name: ensemble_ids
     retryStrategy:
-      limit: 5
-      backoff:
-        duration: 30s
-        factor: 2
-        maxDuration: 10m
+      limit: 3
+      retryPolicy: OnFailure
     script:
       image: registry.nebula.lan:5000/lynceus/targets:0.1.0
       imagePullPolicy: Always
@@ -55,64 +52,6 @@ spec:
         requests:
           cpu: '2'
           memory: 2Gi
-  - name: verify-manifest-surrogate
-    volumes:
-    - name: lynceus
-      persistentVolumeClaim:
-        claimName: lynceus-pvc
-    inputs:
-      parameters:
-      - name: base_path
-      - name: manifest
-      - name: expect
-      - name: source_glob
-      - name: result_file
-    outputs:
-      parameters:
-      - name: matches
-        valueFrom:
-          path: /tmp/manifest_matches.txt
-    retryStrategy:
-      limit: 5
-      backoff:
-        duration: 30s
-        factor: 2
-        maxDuration: 10m
-    script:
-      image: registry.nebula.lan:5000/lynceus/surrogate-model:0.1.0
-      imagePullPolicy: Always
-      source: |-
-        import os
-        import sys
-        sys.path.append(os.getcwd())
-        import json
-        try: base_path = json.loads(r'''{{inputs.parameters.base_path}}''')
-        except: base_path = r'''{{inputs.parameters.base_path}}'''
-        try: expect = json.loads(r'''{{inputs.parameters.expect}}''')
-        except: expect = r'''{{inputs.parameters.expect}}'''
-        try: manifest = json.loads(r'''{{inputs.parameters.manifest}}''')
-        except: manifest = r'''{{inputs.parameters.manifest}}'''
-        try: result_file = json.loads(r'''{{inputs.parameters.result_file}}''')
-        except: result_file = r'''{{inputs.parameters.result_file}}'''
-        try: source_glob = json.loads(r'''{{inputs.parameters.source_glob}}''')
-        except: source_glob = r'''{{inputs.parameters.source_glob}}'''
-
-        import json
-        import os
-        import subprocess
-        subprocess.run(['verify-manifest', '--manifest', os.path.join(base_path, manifest), '--expect', json.dumps(expect), '--source-root', base_path, '--source-glob', source_glob, '--result-file', result_file], check=True)
-      command:
-      - python
-      volumeMounts:
-      - name: lynceus
-        mountPath: /mnt/lynceus
-      resources:
-        limits:
-          cpu: '2'
-          memory: 2Gi
-        requests:
-          cpu: '2'
-          memory: 2Gi
   - name: run-docking
     podSpecPatch: '{"runtimeClassName": "nvidia"}'
     tolerations:
@@ -125,6 +64,7 @@ spec:
         claimName: lynceus-pvc
     inputs:
       parameters:
+      - name: base_path
       - name: ensemble
       - name: member_id
       - name: ligands_path
@@ -148,11 +88,8 @@ spec:
     nodeSelector:
       nvidia.com/gpu.present: 'true'
     retryStrategy:
-      limit: 5
-      backoff:
-        duration: 30s
-        factor: 2
-        maxDuration: 10m
+      limit: 3
+      retryPolicy: OnFailure
     script:
       image: registry.nebula.lan:5000/lynceus/lynceus-dock:0.1.0
       imagePullPolicy: Always
@@ -163,6 +100,8 @@ spec:
         import json
         try: allow_bad_residues = json.loads(r'''{{inputs.parameters.allow_bad_residues}}''')
         except: allow_bad_residues = r'''{{inputs.parameters.allow_bad_residues}}'''
+        try: base_path = json.loads(r'''{{inputs.parameters.base_path}}''')
+        except: base_path = r'''{{inputs.parameters.base_path}}'''
         try: batch_size = json.loads(r'''{{inputs.parameters.batch_size}}''')
         except: batch_size = r'''{{inputs.parameters.batch_size}}'''
         try: center = json.loads(r'''{{inputs.parameters.center}}''')
@@ -189,7 +128,7 @@ spec:
         except: size = r'''{{inputs.parameters.size}}'''
 
         import subprocess
-        cmd = ['run-docking', '--ensemble', str(ensemble), '--member-id', str(member_id), '--ligands-path', str(ligands_path), '--center', str(center[0]), str(center[1]), str(center[2]), '--site-id', str(site_id), '--output', str(output_path), '--search-mode', str(search_mode), '--num-modes', str(num_modes), '--parquet-batch-rows', str(parquet_batch_rows), '--default-altloc', str(default_altloc)]
+        cmd = ['run-docking', '--source-root', str(base_path), '--ensemble', str(ensemble), '--member-id', str(member_id), '--ligands-path', str(ligands_path), '--center', str(center[0]), str(center[1]), str(center[2]), '--site-id', str(site_id), '--output', str(output_path), '--search-mode', str(search_mode), '--num-modes', str(num_modes), '--parquet-batch-rows', str(parquet_batch_rows), '--default-altloc', str(default_altloc)]
         if size is not None:
             cmd.extend(['--size', str(size[0]), str(size[1]), str(size[2])])
         if batch_size is not None:
@@ -216,57 +155,6 @@ spec:
           cpu: '4'
           memory: 8Gi
           nvidia.com/gpu: '1'
-  - name: merge-shards
-    volumes:
-    - name: lynceus
-      persistentVolumeClaim:
-        claimName: lynceus-pvc
-    - name: scratch
-      emptyDir:
-        sizeLimit: 50Gi
-    inputs:
-      parameters:
-      - name: base_path
-      - name: input_path
-      - name: output_path
-    retryStrategy:
-      limit: 5
-      backoff:
-        duration: 30s
-        factor: 2
-        maxDuration: 10m
-    script:
-      image: registry.nebula.lan:5000/lynceus/candidates:0.1.0
-      imagePullPolicy: Always
-      source: |-
-        import os
-        import sys
-        sys.path.append(os.getcwd())
-        import json
-        try: base_path = json.loads(r'''{{inputs.parameters.base_path}}''')
-        except: base_path = r'''{{inputs.parameters.base_path}}'''
-        try: input_path = json.loads(r'''{{inputs.parameters.input_path}}''')
-        except: input_path = r'''{{inputs.parameters.input_path}}'''
-        try: output_path = json.loads(r'''{{inputs.parameters.output_path}}''')
-        except: output_path = r'''{{inputs.parameters.output_path}}'''
-
-        import os
-        import subprocess
-        subprocess.run(['merge-shards', '--source-root', base_path, '--input', os.path.join(base_path, input_path), '--output', os.path.join(base_path, output_path), '--memory-limit', '6GB'], check=True)
-      command:
-      - python
-      volumeMounts:
-      - name: lynceus
-        mountPath: /mnt/lynceus
-      - name: scratch
-        mountPath: /scratch
-      resources:
-        limits:
-          cpu: '4'
-          memory: 6Gi
-        requests:
-          cpu: '4'
-          memory: 6Gi
   - name: surrogate-train
     volumes:
     - name: lynceus
@@ -283,11 +171,8 @@ spec:
       - name: features
         default: 'null'
     retryStrategy:
-      limit: 5
-      backoff:
-        duration: 30s
-        factor: 2
-        maxDuration: 10m
+      limit: 3
+      retryPolicy: OnFailure
     script:
       image: registry.nebula.lan:5000/lynceus/surrogate-model:0.1.0
       imagePullPolicy: Always
@@ -345,11 +230,8 @@ spec:
       - name: id_column
         default: id
     retryStrategy:
-      limit: 5
-      backoff:
-        duration: 30s
-        factor: 2
-        maxDuration: 10m
+      limit: 3
+      retryPolicy: OnFailure
     script:
       image: registry.nebula.lan:5000/lynceus/surrogate-model:0.1.0
       imagePullPolicy: Always
@@ -412,11 +294,8 @@ spec:
       - name: features
         default: 'null'
     retryStrategy:
-      limit: 5
-      backoff:
-        duration: 30s
-        factor: 2
-        maxDuration: 10m
+      limit: 3
+      retryPolicy: OnFailure
     script:
       image: registry.nebula.lan:5000/lynceus/surrogate-model:0.1.0
       imagePullPolicy: Always
@@ -471,11 +350,274 @@ spec:
         requests:
           cpu: '2'
           memory: 4Gi
+  - name: merge-shards
+    volumes:
+    - name: lynceus
+      persistentVolumeClaim:
+        claimName: lynceus-pvc
+    - name: scratch
+      emptyDir:
+        sizeLimit: 50Gi
+    inputs:
+      parameters:
+      - name: base_path
+      - name: input_path
+      - name: output_path
+    retryStrategy:
+      limit: 3
+      retryPolicy: OnFailure
+    script:
+      image: registry.nebula.lan:5000/lynceus/candidates:0.1.0
+      imagePullPolicy: Always
+      source: |-
+        import os
+        import sys
+        sys.path.append(os.getcwd())
+        import json
+        try: base_path = json.loads(r'''{{inputs.parameters.base_path}}''')
+        except: base_path = r'''{{inputs.parameters.base_path}}'''
+        try: input_path = json.loads(r'''{{inputs.parameters.input_path}}''')
+        except: input_path = r'''{{inputs.parameters.input_path}}'''
+        try: output_path = json.loads(r'''{{inputs.parameters.output_path}}''')
+        except: output_path = r'''{{inputs.parameters.output_path}}'''
+
+        import os
+        import subprocess
+        subprocess.run(['merge-shards', '--source-root', base_path, '--input', os.path.join(base_path, input_path), '--output', os.path.join(base_path, output_path), '--memory-limit', '6GB'], check=True)
+      command:
+      - python
+      volumeMounts:
+      - name: lynceus
+        mountPath: /mnt/lynceus
+      - name: scratch
+        mountPath: /scratch
+      resources:
+        limits:
+          cpu: '4'
+          memory: 6Gi
+        requests:
+          cpu: '4'
+          memory: 6Gi
+  - name: plan-surrogate-sample
+    volumes:
+    - name: lynceus
+      persistentVolumeClaim:
+        claimName: lynceus-pvc
+    inputs:
+      parameters:
+      - name: base_path
+      - name: features_prefix
+      - name: conformers_prefix
+      - name: persist_file
+      - name: source_glob
+        default: '*.parquet'
+      - name: model_path
+        default: ''
+      - name: output_file
+        default: /tmp/manifest.json
+    outputs:
+      parameters:
+      - name: manifest
+        valueFrom:
+          path: /tmp/manifest.json
+    retryStrategy:
+      limit: 3
+      retryPolicy: OnFailure
+    script:
+      image: registry.nebula.lan:5000/lynceus/surrogate-model:0.1.0
+      imagePullPolicy: Always
+      source: |-
+        import os
+        import sys
+        sys.path.append(os.getcwd())
+        import json
+        try: base_path = json.loads(r'''{{inputs.parameters.base_path}}''')
+        except: base_path = r'''{{inputs.parameters.base_path}}'''
+        try: conformers_prefix = json.loads(r'''{{inputs.parameters.conformers_prefix}}''')
+        except: conformers_prefix = r'''{{inputs.parameters.conformers_prefix}}'''
+        try: features_prefix = json.loads(r'''{{inputs.parameters.features_prefix}}''')
+        except: features_prefix = r'''{{inputs.parameters.features_prefix}}'''
+        try: model_path = json.loads(r'''{{inputs.parameters.model_path}}''')
+        except: model_path = r'''{{inputs.parameters.model_path}}'''
+        try: output_file = json.loads(r'''{{inputs.parameters.output_file}}''')
+        except: output_file = r'''{{inputs.parameters.output_file}}'''
+        try: persist_file = json.loads(r'''{{inputs.parameters.persist_file}}''')
+        except: persist_file = r'''{{inputs.parameters.persist_file}}'''
+        try: source_glob = json.loads(r'''{{inputs.parameters.source_glob}}''')
+        except: source_glob = r'''{{inputs.parameters.source_glob}}'''
+
+        import os
+        import subprocess
+        cmd = ['plan-surrogate-sample', '--source-root', base_path, '--features-glob', os.path.join(features_prefix, source_glob), '--conformers-glob', os.path.join(conformers_prefix, source_glob), '--output-file', output_file, '--persist-file', os.path.join(base_path, persist_file)]
+        if model_path:
+            cmd.extend(['--model-file', model_path])
+        subprocess.run(cmd, check=True)
+      command:
+      - python
+      volumeMounts:
+      - name: lynceus
+        mountPath: /mnt/lynceus
+      resources:
+        limits:
+          cpu: '2'
+          memory: 2Gi
+        requests:
+          cpu: '2'
+          memory: 2Gi
+  - name: verify-manifest-surrogate
+    volumes:
+    - name: lynceus
+      persistentVolumeClaim:
+        claimName: lynceus-pvc
+    inputs:
+      parameters:
+      - name: base_path
+      - name: manifest
+      - name: expect
+      - name: source_globs
+      - name: result_file
+    outputs:
+      parameters:
+      - name: matches
+        valueFrom:
+          path: /tmp/manifest_matches.txt
+    retryStrategy:
+      limit: 3
+      retryPolicy: OnFailure
+    script:
+      image: registry.nebula.lan:5000/lynceus/surrogate-model:0.1.0
+      imagePullPolicy: Always
+      source: |-
+        import os
+        import sys
+        sys.path.append(os.getcwd())
+        import json
+        try: base_path = json.loads(r'''{{inputs.parameters.base_path}}''')
+        except: base_path = r'''{{inputs.parameters.base_path}}'''
+        try: expect = json.loads(r'''{{inputs.parameters.expect}}''')
+        except: expect = r'''{{inputs.parameters.expect}}'''
+        try: manifest = json.loads(r'''{{inputs.parameters.manifest}}''')
+        except: manifest = r'''{{inputs.parameters.manifest}}'''
+        try: result_file = json.loads(r'''{{inputs.parameters.result_file}}''')
+        except: result_file = r'''{{inputs.parameters.result_file}}'''
+        try: source_globs = json.loads(r'''{{inputs.parameters.source_globs}}''')
+        except: source_globs = r'''{{inputs.parameters.source_globs}}'''
+
+        import json
+        import os
+        import subprocess
+        cmd = ['verify-manifest', '--manifest', os.path.join(base_path, manifest), '--expect', json.dumps(expect), '--source-root', base_path, '--result-file', result_file]
+        for source_glob in source_globs:
+            cmd.extend(['--source-glob', source_glob])
+        subprocess.run(cmd, check=True)
+      command:
+      - python
+      volumeMounts:
+      - name: lynceus
+        mountPath: /mnt/lynceus
+      resources:
+        limits:
+          cpu: '2'
+          memory: 2Gi
+        requests:
+          cpu: '2'
+          memory: 2Gi
+  - name: update-manifest-surrogate
+    volumes:
+    - name: lynceus
+      persistentVolumeClaim:
+        claimName: lynceus-pvc
+    inputs:
+      parameters:
+      - name: base_path
+      - name: source
+      - name: output
+      - name: fields
+    retryStrategy:
+      limit: 3
+      retryPolicy: OnFailure
+    script:
+      image: registry.nebula.lan:5000/lynceus/surrogate-model:0.1.0
+      imagePullPolicy: Always
+      source: |-
+        import os
+        import sys
+        sys.path.append(os.getcwd())
+        import json
+        try: base_path = json.loads(r'''{{inputs.parameters.base_path}}''')
+        except: base_path = r'''{{inputs.parameters.base_path}}'''
+        try: fields = json.loads(r'''{{inputs.parameters.fields}}''')
+        except: fields = r'''{{inputs.parameters.fields}}'''
+        try: output = json.loads(r'''{{inputs.parameters.output}}''')
+        except: output = r'''{{inputs.parameters.output}}'''
+        try: source = json.loads(r'''{{inputs.parameters.source}}''')
+        except: source = r'''{{inputs.parameters.source}}'''
+
+        import json
+        import os
+        import subprocess
+        subprocess.run(['update-manifest', '--source', os.path.join(base_path, source), '--output', os.path.join(base_path, output), '--set', json.dumps(fields)], check=True)
+      command:
+      - python
+      volumeMounts:
+      - name: lynceus
+        mountPath: /mnt/lynceus
+      resources:
+        limits:
+          cpu: '2'
+          memory: 2Gi
+        requests:
+          cpu: '2'
+          memory: 2Gi
   - name: surrogate-sample-validation-dag
     dag:
       tasks:
+      - name: plan-sources
+        template: plan-surrogate-sample
+        arguments:
+          parameters:
+          - name: base_path
+            value: /mnt/lynceus
+          - name: features_prefix
+            value: candidates/10m/features
+          - name: conformers_prefix
+            value: candidates/10m/conformers
+          - name: persist_file
+            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet.manifest.plan.json
+      - name: check-sampled
+        depends: plan-sources
+        template: verify-manifest-surrogate
+        arguments:
+          parameters:
+          - name: base_path
+            value: /mnt/lynceus
+          - name: manifest
+            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet.manifest.state.json
+          - name: expect
+            value: '{"num_samples":39,"num_shards":512,"sampled":true,"seed":1000}'
+          - name: source_globs
+            value: '["candidates/10m/features/*.parquet", "candidates/10m/conformers/*.parquet"]'
+          - name: result_file
+            value: /tmp/manifest_matches.txt
+      - name: check-merged
+        depends: plan-sources
+        template: verify-manifest-surrogate
+        arguments:
+          parameters:
+          - name: base_path
+            value: /mnt/lynceus
+          - name: manifest
+            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet.manifest.state.json
+          - name: expect
+            value: '{"merged":true,"num_samples":39,"num_shards":512,"seed":1000}'
+          - name: source_globs
+            value: '["candidates/10m/features/*.parquet", "candidates/10m/conformers/*.parquet"]'
+          - name: result_file
+            value: /tmp/manifest_matches.txt
       - name: sample-shards
+        depends: check-sampled
         template: surrogate-sample
+        when: '{{tasks.check-sampled.outputs.parameters.matches}} == false'
         withItems:
         - 0
         - 1
@@ -1005,9 +1147,24 @@ spec:
             value: '39'
           - name: seed
             value: '1000'
-      - name: merge-samples
+      - name: write-manifest
         depends: sample-shards
+        template: update-manifest-surrogate
+        when: '{{tasks.check-sampled.outputs.parameters.matches}} == false'
+        arguments:
+          parameters:
+          - name: base_path
+            value: /mnt/lynceus
+          - name: source
+            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet.manifest.plan.json
+          - name: output
+            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet.manifest.state.json
+          - name: fields
+            value: '{"num_samples":39,"num_shards":512,"sampled":true,"seed":1000}'
+      - name: merge-samples
+        depends: write-manifest && check-merged
         template: merge-shards
+        when: '{{tasks.check-merged.outputs.parameters.matches}} == false'
         arguments:
           parameters:
           - name: base_path
@@ -1016,6 +1173,20 @@ spec:
             value: surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/staging
           - name: output_path
             value: surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet
+      - name: mark-merged
+        depends: merge-samples
+        template: update-manifest-surrogate
+        when: '{{tasks.check-merged.outputs.parameters.matches}} == false'
+        arguments:
+          parameters:
+          - name: base_path
+            value: /mnt/lynceus
+          - name: source
+            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet.manifest.state.json
+          - name: output
+            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet.manifest.state.json
+          - name: fields
+            value: '{"merged":true}'
     inputs:
       parameters:
       - name: ensemble
@@ -1023,8 +1194,52 @@ spec:
   - name: surrogate-sample-round-0-dag
     dag:
       tasks:
+      - name: plan-sources
+        template: plan-surrogate-sample
+        arguments:
+          parameters:
+          - name: base_path
+            value: /mnt/lynceus
+          - name: features_prefix
+            value: candidates/10m/features
+          - name: conformers_prefix
+            value: candidates/10m/conformers
+          - name: persist_file
+            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet.manifest.plan.json
+      - name: check-sampled
+        depends: plan-sources
+        template: verify-manifest-surrogate
+        arguments:
+          parameters:
+          - name: base_path
+            value: /mnt/lynceus
+          - name: manifest
+            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet.manifest.state.json
+          - name: expect
+            value: '{"num_samples":39,"num_shards":512,"sampled":true,"seed":1001}'
+          - name: source_globs
+            value: '["candidates/10m/features/*.parquet", "candidates/10m/conformers/*.parquet"]'
+          - name: result_file
+            value: /tmp/manifest_matches.txt
+      - name: check-merged
+        depends: plan-sources
+        template: verify-manifest-surrogate
+        arguments:
+          parameters:
+          - name: base_path
+            value: /mnt/lynceus
+          - name: manifest
+            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet.manifest.state.json
+          - name: expect
+            value: '{"merged":true,"num_samples":39,"num_shards":512,"seed":1001}'
+          - name: source_globs
+            value: '["candidates/10m/features/*.parquet", "candidates/10m/conformers/*.parquet"]'
+          - name: result_file
+            value: /tmp/manifest_matches.txt
       - name: sample-shards
+        depends: check-sampled
         template: surrogate-sample
+        when: '{{tasks.check-sampled.outputs.parameters.matches}} == false'
         withItems:
         - 0
         - 1
@@ -1554,9 +1769,24 @@ spec:
             value: '39'
           - name: seed
             value: '1001'
-      - name: merge-samples
+      - name: write-manifest
         depends: sample-shards
+        template: update-manifest-surrogate
+        when: '{{tasks.check-sampled.outputs.parameters.matches}} == false'
+        arguments:
+          parameters:
+          - name: base_path
+            value: /mnt/lynceus
+          - name: source
+            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet.manifest.plan.json
+          - name: output
+            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet.manifest.state.json
+          - name: fields
+            value: '{"num_samples":39,"num_shards":512,"sampled":true,"seed":1001}'
+      - name: merge-samples
+        depends: write-manifest && check-merged
         template: merge-shards
+        when: '{{tasks.check-merged.outputs.parameters.matches}} == false'
         arguments:
           parameters:
           - name: base_path
@@ -1565,6 +1795,20 @@ spec:
             value: surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/staging
           - name: output_path
             value: surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet
+      - name: mark-merged
+        depends: merge-samples
+        template: update-manifest-surrogate
+        when: '{{tasks.check-merged.outputs.parameters.matches}} == false'
+        arguments:
+          parameters:
+          - name: base_path
+            value: /mnt/lynceus
+          - name: source
+            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet.manifest.state.json
+          - name: output
+            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet.manifest.state.json
+          - name: fields
+            value: '{"merged":true}'
     inputs:
       parameters:
       - name: ensemble
@@ -1572,8 +1816,56 @@ spec:
   - name: surrogate-sample-round-1-dag
     dag:
       tasks:
+      - name: plan-sources
+        template: plan-surrogate-sample
+        arguments:
+          parameters:
+          - name: base_path
+            value: /mnt/lynceus
+          - name: features_prefix
+            value: candidates/10m/features
+          - name: conformers_prefix
+            value: candidates/10m/conformers
+          - name: persist_file
+            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet.manifest.plan.json
+          - name: model_path
+            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/model.joblib
+      - name: check-sampled
+        depends: plan-sources
+        template: verify-manifest-surrogate
+        arguments:
+          parameters:
+          - name: base_path
+            value: /mnt/lynceus
+          - name: manifest
+            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet.manifest.state.json
+          - name: expect
+            value: '{"model_path":"/mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/model.joblib","num_random":19,"num_shards":512,"num_top":19,"sampled":true,"seed":1002}'
+          - name: source_globs
+            value: '["candidates/10m/features/*.parquet", "candidates/10m/conformers/*.parquet",
+              "surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/model.joblib"]'
+          - name: result_file
+            value: /tmp/manifest_matches.txt
+      - name: check-merged
+        depends: plan-sources
+        template: verify-manifest-surrogate
+        arguments:
+          parameters:
+          - name: base_path
+            value: /mnt/lynceus
+          - name: manifest
+            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet.manifest.state.json
+          - name: expect
+            value: '{"merged":true,"model_path":"/mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/model.joblib","num_random":19,"num_shards":512,"num_top":19,"seed":1002}'
+          - name: source_globs
+            value: '["candidates/10m/features/*.parquet", "candidates/10m/conformers/*.parquet",
+              "surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/model.joblib"]'
+          - name: result_file
+            value: /tmp/manifest_matches.txt
       - name: sample-shards
+        depends: check-sampled
         template: surrogate-sample-by-prediction
+        when: '{{tasks.check-sampled.outputs.parameters.matches}} == false'
         withItems:
         - 0
         - 1
@@ -2107,9 +2399,24 @@ spec:
             value: '19'
           - name: seed
             value: '1002'
-      - name: merge-samples
+      - name: write-manifest
         depends: sample-shards
+        template: update-manifest-surrogate
+        when: '{{tasks.check-sampled.outputs.parameters.matches}} == false'
+        arguments:
+          parameters:
+          - name: base_path
+            value: /mnt/lynceus
+          - name: source
+            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet.manifest.plan.json
+          - name: output
+            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet.manifest.state.json
+          - name: fields
+            value: '{"model_path":"/mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/model.joblib","num_random":19,"num_shards":512,"num_top":19,"sampled":true,"seed":1002}'
+      - name: merge-samples
+        depends: write-manifest && check-merged
         template: merge-shards
+        when: '{{tasks.check-merged.outputs.parameters.matches}} == false'
         arguments:
           parameters:
           - name: base_path
@@ -2118,6 +2425,20 @@ spec:
             value: surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/staging
           - name: output_path
             value: surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet
+      - name: mark-merged
+        depends: merge-samples
+        template: update-manifest-surrogate
+        when: '{{tasks.check-merged.outputs.parameters.matches}} == false'
+        arguments:
+          parameters:
+          - name: base_path
+            value: /mnt/lynceus
+          - name: source
+            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet.manifest.state.json
+          - name: output
+            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet.manifest.state.json
+          - name: fields
+            value: '{"merged":true}'
     inputs:
       parameters:
       - name: ensemble
@@ -2125,8 +2446,56 @@ spec:
   - name: surrogate-sample-round-2-dag
     dag:
       tasks:
+      - name: plan-sources
+        template: plan-surrogate-sample
+        arguments:
+          parameters:
+          - name: base_path
+            value: /mnt/lynceus
+          - name: features_prefix
+            value: candidates/10m/features
+          - name: conformers_prefix
+            value: candidates/10m/conformers
+          - name: persist_file
+            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet.manifest.plan.json
+          - name: model_path
+            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/model.joblib
+      - name: check-sampled
+        depends: plan-sources
+        template: verify-manifest-surrogate
+        arguments:
+          parameters:
+          - name: base_path
+            value: /mnt/lynceus
+          - name: manifest
+            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet.manifest.state.json
+          - name: expect
+            value: '{"model_path":"/mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/model.joblib","num_random":19,"num_shards":512,"num_top":19,"sampled":true,"seed":1003}'
+          - name: source_globs
+            value: '["candidates/10m/features/*.parquet", "candidates/10m/conformers/*.parquet",
+              "surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/model.joblib"]'
+          - name: result_file
+            value: /tmp/manifest_matches.txt
+      - name: check-merged
+        depends: plan-sources
+        template: verify-manifest-surrogate
+        arguments:
+          parameters:
+          - name: base_path
+            value: /mnt/lynceus
+          - name: manifest
+            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet.manifest.state.json
+          - name: expect
+            value: '{"merged":true,"model_path":"/mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/model.joblib","num_random":19,"num_shards":512,"num_top":19,"seed":1003}'
+          - name: source_globs
+            value: '["candidates/10m/features/*.parquet", "candidates/10m/conformers/*.parquet",
+              "surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/model.joblib"]'
+          - name: result_file
+            value: /tmp/manifest_matches.txt
       - name: sample-shards
+        depends: check-sampled
         template: surrogate-sample-by-prediction
+        when: '{{tasks.check-sampled.outputs.parameters.matches}} == false'
         withItems:
         - 0
         - 1
@@ -2660,9 +3029,24 @@ spec:
             value: '19'
           - name: seed
             value: '1003'
-      - name: merge-samples
+      - name: write-manifest
         depends: sample-shards
+        template: update-manifest-surrogate
+        when: '{{tasks.check-sampled.outputs.parameters.matches}} == false'
+        arguments:
+          parameters:
+          - name: base_path
+            value: /mnt/lynceus
+          - name: source
+            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet.manifest.plan.json
+          - name: output
+            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet.manifest.state.json
+          - name: fields
+            value: '{"model_path":"/mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/model.joblib","num_random":19,"num_shards":512,"num_top":19,"sampled":true,"seed":1003}'
+      - name: merge-samples
+        depends: write-manifest && check-merged
         template: merge-shards
+        when: '{{tasks.check-merged.outputs.parameters.matches}} == false'
         arguments:
           parameters:
           - name: base_path
@@ -2671,6 +3055,20 @@ spec:
             value: surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/staging
           - name: output_path
             value: surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet
+      - name: mark-merged
+        depends: merge-samples
+        template: update-manifest-surrogate
+        when: '{{tasks.check-merged.outputs.parameters.matches}} == false'
+        arguments:
+          parameters:
+          - name: base_path
+            value: /mnt/lynceus
+          - name: source
+            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet.manifest.state.json
+          - name: output
+            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet.manifest.state.json
+          - name: fields
+            value: '{"merged":true}'
     inputs:
       parameters:
       - name: ensemble
@@ -2678,8 +3076,56 @@ spec:
   - name: surrogate-sample-round-3-dag
     dag:
       tasks:
+      - name: plan-sources
+        template: plan-surrogate-sample
+        arguments:
+          parameters:
+          - name: base_path
+            value: /mnt/lynceus
+          - name: features_prefix
+            value: candidates/10m/features
+          - name: conformers_prefix
+            value: candidates/10m/conformers
+          - name: persist_file
+            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/features.parquet.manifest.plan.json
+          - name: model_path
+            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/model.joblib
+      - name: check-sampled
+        depends: plan-sources
+        template: verify-manifest-surrogate
+        arguments:
+          parameters:
+          - name: base_path
+            value: /mnt/lynceus
+          - name: manifest
+            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/features.parquet.manifest.state.json
+          - name: expect
+            value: '{"model_path":"/mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/model.joblib","num_random":19,"num_shards":512,"num_top":19,"sampled":true,"seed":1004}'
+          - name: source_globs
+            value: '["candidates/10m/features/*.parquet", "candidates/10m/conformers/*.parquet",
+              "surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/model.joblib"]'
+          - name: result_file
+            value: /tmp/manifest_matches.txt
+      - name: check-merged
+        depends: plan-sources
+        template: verify-manifest-surrogate
+        arguments:
+          parameters:
+          - name: base_path
+            value: /mnt/lynceus
+          - name: manifest
+            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/features.parquet.manifest.state.json
+          - name: expect
+            value: '{"merged":true,"model_path":"/mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/model.joblib","num_random":19,"num_shards":512,"num_top":19,"seed":1004}'
+          - name: source_globs
+            value: '["candidates/10m/features/*.parquet", "candidates/10m/conformers/*.parquet",
+              "surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/model.joblib"]'
+          - name: result_file
+            value: /tmp/manifest_matches.txt
       - name: sample-shards
+        depends: check-sampled
         template: surrogate-sample-by-prediction
+        when: '{{tasks.check-sampled.outputs.parameters.matches}} == false'
         withItems:
         - 0
         - 1
@@ -3213,9 +3659,24 @@ spec:
             value: '19'
           - name: seed
             value: '1004'
-      - name: merge-samples
+      - name: write-manifest
         depends: sample-shards
+        template: update-manifest-surrogate
+        when: '{{tasks.check-sampled.outputs.parameters.matches}} == false'
+        arguments:
+          parameters:
+          - name: base_path
+            value: /mnt/lynceus
+          - name: source
+            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/features.parquet.manifest.plan.json
+          - name: output
+            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/features.parquet.manifest.state.json
+          - name: fields
+            value: '{"model_path":"/mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/model.joblib","num_random":19,"num_shards":512,"num_top":19,"sampled":true,"seed":1004}'
+      - name: merge-samples
+        depends: write-manifest && check-merged
         template: merge-shards
+        when: '{{tasks.check-merged.outputs.parameters.matches}} == false'
         arguments:
           parameters:
           - name: base_path
@@ -3224,6 +3685,20 @@ spec:
             value: surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/staging
           - name: output_path
             value: surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/features.parquet
+      - name: mark-merged
+        depends: merge-samples
+        template: update-manifest-surrogate
+        when: '{{tasks.check-merged.outputs.parameters.matches}} == false'
+        arguments:
+          parameters:
+          - name: base_path
+            value: /mnt/lynceus
+          - name: source
+            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/features.parquet.manifest.state.json
+          - name: output
+            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/features.parquet.manifest.state.json
+          - name: fields
+            value: '{"merged":true}'
     inputs:
       parameters:
       - name: ensemble
@@ -3231,8 +3706,56 @@ spec:
   - name: surrogate-sample-round-4-dag
     dag:
       tasks:
+      - name: plan-sources
+        template: plan-surrogate-sample
+        arguments:
+          parameters:
+          - name: base_path
+            value: /mnt/lynceus
+          - name: features_prefix
+            value: candidates/10m/features
+          - name: conformers_prefix
+            value: candidates/10m/conformers
+          - name: persist_file
+            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/features.parquet.manifest.plan.json
+          - name: model_path
+            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/model.joblib
+      - name: check-sampled
+        depends: plan-sources
+        template: verify-manifest-surrogate
+        arguments:
+          parameters:
+          - name: base_path
+            value: /mnt/lynceus
+          - name: manifest
+            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/features.parquet.manifest.state.json
+          - name: expect
+            value: '{"model_path":"/mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/model.joblib","num_random":19,"num_shards":512,"num_top":19,"sampled":true,"seed":1005}'
+          - name: source_globs
+            value: '["candidates/10m/features/*.parquet", "candidates/10m/conformers/*.parquet",
+              "surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/model.joblib"]'
+          - name: result_file
+            value: /tmp/manifest_matches.txt
+      - name: check-merged
+        depends: plan-sources
+        template: verify-manifest-surrogate
+        arguments:
+          parameters:
+          - name: base_path
+            value: /mnt/lynceus
+          - name: manifest
+            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/features.parquet.manifest.state.json
+          - name: expect
+            value: '{"merged":true,"model_path":"/mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/model.joblib","num_random":19,"num_shards":512,"num_top":19,"seed":1005}'
+          - name: source_globs
+            value: '["candidates/10m/features/*.parquet", "candidates/10m/conformers/*.parquet",
+              "surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/model.joblib"]'
+          - name: result_file
+            value: /tmp/manifest_matches.txt
       - name: sample-shards
+        depends: check-sampled
         template: surrogate-sample-by-prediction
+        when: '{{tasks.check-sampled.outputs.parameters.matches}} == false'
         withItems:
         - 0
         - 1
@@ -3766,9 +4289,24 @@ spec:
             value: '19'
           - name: seed
             value: '1005'
-      - name: merge-samples
+      - name: write-manifest
         depends: sample-shards
+        template: update-manifest-surrogate
+        when: '{{tasks.check-sampled.outputs.parameters.matches}} == false'
+        arguments:
+          parameters:
+          - name: base_path
+            value: /mnt/lynceus
+          - name: source
+            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/features.parquet.manifest.plan.json
+          - name: output
+            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/features.parquet.manifest.state.json
+          - name: fields
+            value: '{"model_path":"/mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/model.joblib","num_random":19,"num_shards":512,"num_top":19,"sampled":true,"seed":1005}'
+      - name: merge-samples
+        depends: write-manifest && check-merged
         template: merge-shards
+        when: '{{tasks.check-merged.outputs.parameters.matches}} == false'
         arguments:
           parameters:
           - name: base_path
@@ -3777,6 +4315,20 @@ spec:
             value: surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/staging
           - name: output_path
             value: surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/features.parquet
+      - name: mark-merged
+        depends: merge-samples
+        template: update-manifest-surrogate
+        when: '{{tasks.check-merged.outputs.parameters.matches}} == false'
+        arguments:
+          parameters:
+          - name: base_path
+            value: /mnt/lynceus
+          - name: source
+            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/features.parquet.manifest.state.json
+          - name: output
+            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/features.parquet.manifest.state.json
+          - name: fields
+            value: '{"merged":true}'
     inputs:
       parameters:
       - name: ensemble
@@ -3784,8 +4336,56 @@ spec:
   - name: surrogate-sample-round-5-dag
     dag:
       tasks:
+      - name: plan-sources
+        template: plan-surrogate-sample
+        arguments:
+          parameters:
+          - name: base_path
+            value: /mnt/lynceus
+          - name: features_prefix
+            value: candidates/10m/features
+          - name: conformers_prefix
+            value: candidates/10m/conformers
+          - name: persist_file
+            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_5/features.parquet.manifest.plan.json
+          - name: model_path
+            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/model.joblib
+      - name: check-sampled
+        depends: plan-sources
+        template: verify-manifest-surrogate
+        arguments:
+          parameters:
+          - name: base_path
+            value: /mnt/lynceus
+          - name: manifest
+            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_5/features.parquet.manifest.state.json
+          - name: expect
+            value: '{"model_path":"/mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/model.joblib","num_random":19,"num_shards":512,"num_top":19,"sampled":true,"seed":1006}'
+          - name: source_globs
+            value: '["candidates/10m/features/*.parquet", "candidates/10m/conformers/*.parquet",
+              "surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/model.joblib"]'
+          - name: result_file
+            value: /tmp/manifest_matches.txt
+      - name: check-merged
+        depends: plan-sources
+        template: verify-manifest-surrogate
+        arguments:
+          parameters:
+          - name: base_path
+            value: /mnt/lynceus
+          - name: manifest
+            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_5/features.parquet.manifest.state.json
+          - name: expect
+            value: '{"merged":true,"model_path":"/mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/model.joblib","num_random":19,"num_shards":512,"num_top":19,"seed":1006}'
+          - name: source_globs
+            value: '["candidates/10m/features/*.parquet", "candidates/10m/conformers/*.parquet",
+              "surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/model.joblib"]'
+          - name: result_file
+            value: /tmp/manifest_matches.txt
       - name: sample-shards
+        depends: check-sampled
         template: surrogate-sample-by-prediction
+        when: '{{tasks.check-sampled.outputs.parameters.matches}} == false'
         withItems:
         - 0
         - 1
@@ -4319,9 +4919,24 @@ spec:
             value: '19'
           - name: seed
             value: '1006'
-      - name: merge-samples
+      - name: write-manifest
         depends: sample-shards
+        template: update-manifest-surrogate
+        when: '{{tasks.check-sampled.outputs.parameters.matches}} == false'
+        arguments:
+          parameters:
+          - name: base_path
+            value: /mnt/lynceus
+          - name: source
+            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_5/features.parquet.manifest.plan.json
+          - name: output
+            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_5/features.parquet.manifest.state.json
+          - name: fields
+            value: '{"model_path":"/mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/model.joblib","num_random":19,"num_shards":512,"num_top":19,"sampled":true,"seed":1006}'
+      - name: merge-samples
+        depends: write-manifest && check-merged
         template: merge-shards
+        when: '{{tasks.check-merged.outputs.parameters.matches}} == false'
         arguments:
           parameters:
           - name: base_path
@@ -4330,6 +4945,20 @@ spec:
             value: surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_5/staging
           - name: output_path
             value: surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_5/features.parquet
+      - name: mark-merged
+        depends: merge-samples
+        template: update-manifest-surrogate
+        when: '{{tasks.check-merged.outputs.parameters.matches}} == false'
+        arguments:
+          parameters:
+          - name: base_path
+            value: /mnt/lynceus
+          - name: source
+            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_5/features.parquet.manifest.state.json
+          - name: output
+            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_5/features.parquet.manifest.state.json
+          - name: fields
+            value: '{"merged":true}'
     inputs:
       parameters:
       - name: ensemble
@@ -4337,8 +4966,56 @@ spec:
   - name: surrogate-sample-round-6-dag
     dag:
       tasks:
+      - name: plan-sources
+        template: plan-surrogate-sample
+        arguments:
+          parameters:
+          - name: base_path
+            value: /mnt/lynceus
+          - name: features_prefix
+            value: candidates/10m/features
+          - name: conformers_prefix
+            value: candidates/10m/conformers
+          - name: persist_file
+            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_6/features.parquet.manifest.plan.json
+          - name: model_path
+            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_5/model.joblib
+      - name: check-sampled
+        depends: plan-sources
+        template: verify-manifest-surrogate
+        arguments:
+          parameters:
+          - name: base_path
+            value: /mnt/lynceus
+          - name: manifest
+            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_6/features.parquet.manifest.state.json
+          - name: expect
+            value: '{"model_path":"/mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_5/model.joblib","num_random":19,"num_shards":512,"num_top":19,"sampled":true,"seed":1007}'
+          - name: source_globs
+            value: '["candidates/10m/features/*.parquet", "candidates/10m/conformers/*.parquet",
+              "surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_5/model.joblib"]'
+          - name: result_file
+            value: /tmp/manifest_matches.txt
+      - name: check-merged
+        depends: plan-sources
+        template: verify-manifest-surrogate
+        arguments:
+          parameters:
+          - name: base_path
+            value: /mnt/lynceus
+          - name: manifest
+            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_6/features.parquet.manifest.state.json
+          - name: expect
+            value: '{"merged":true,"model_path":"/mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_5/model.joblib","num_random":19,"num_shards":512,"num_top":19,"seed":1007}'
+          - name: source_globs
+            value: '["candidates/10m/features/*.parquet", "candidates/10m/conformers/*.parquet",
+              "surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_5/model.joblib"]'
+          - name: result_file
+            value: /tmp/manifest_matches.txt
       - name: sample-shards
+        depends: check-sampled
         template: surrogate-sample-by-prediction
+        when: '{{tasks.check-sampled.outputs.parameters.matches}} == false'
         withItems:
         - 0
         - 1
@@ -4872,9 +5549,24 @@ spec:
             value: '19'
           - name: seed
             value: '1007'
-      - name: merge-samples
+      - name: write-manifest
         depends: sample-shards
+        template: update-manifest-surrogate
+        when: '{{tasks.check-sampled.outputs.parameters.matches}} == false'
+        arguments:
+          parameters:
+          - name: base_path
+            value: /mnt/lynceus
+          - name: source
+            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_6/features.parquet.manifest.plan.json
+          - name: output
+            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_6/features.parquet.manifest.state.json
+          - name: fields
+            value: '{"model_path":"/mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_5/model.joblib","num_random":19,"num_shards":512,"num_top":19,"sampled":true,"seed":1007}'
+      - name: merge-samples
+        depends: write-manifest && check-merged
         template: merge-shards
+        when: '{{tasks.check-merged.outputs.parameters.matches}} == false'
         arguments:
           parameters:
           - name: base_path
@@ -4883,6 +5575,20 @@ spec:
             value: surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_6/staging
           - name: output_path
             value: surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_6/features.parquet
+      - name: mark-merged
+        depends: merge-samples
+        template: update-manifest-surrogate
+        when: '{{tasks.check-merged.outputs.parameters.matches}} == false'
+        arguments:
+          parameters:
+          - name: base_path
+            value: /mnt/lynceus
+          - name: source
+            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_6/features.parquet.manifest.state.json
+          - name: output
+            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_6/features.parquet.manifest.state.json
+          - name: fields
+            value: '{"merged":true}'
     inputs:
       parameters:
       - name: ensemble
@@ -4890,24 +5596,8 @@ spec:
   - name: surrogate-site-dag
     dag:
       tasks:
-      - name: check-validation
-        template: verify-manifest-surrogate
-        arguments:
-          parameters:
-          - name: base_path
-            value: /mnt/lynceus
-          - name: manifest
-            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet.manifest.json
-          - name: expect
-            value: '{"input_path":"surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/staging"}'
-          - name: source_glob
-            value: surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/staging/*.parquet
-          - name: result_file
-            value: /tmp/manifest_matches.txt
       - name: sample-validation
-        depends: check-validation
         template: surrogate-sample-validation-dag
-        when: '{{tasks.check-validation.outputs.parameters.matches}} == false'
         arguments:
           parameters:
           - name: ensemble
@@ -4919,6 +5609,8 @@ spec:
         template: run-docking
         arguments:
           parameters:
+          - name: base_path
+            value: /mnt/lynceus
           - name: ensemble
             value: /mnt/lynceus/target/ensembles/{{inputs.parameters.ensemble}}
           - name: member_id
@@ -4931,25 +5623,9 @@ spec:
             value: '{{inputs.parameters.site_id}}'
           - name: output_path
             value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation
-      - name: check-round-0
-        depends: dock-validation
-        template: verify-manifest-surrogate
-        arguments:
-          parameters:
-          - name: base_path
-            value: /mnt/lynceus
-          - name: manifest
-            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet.manifest.json
-          - name: expect
-            value: '{"input_path":"surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/staging"}'
-          - name: source_glob
-            value: surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/staging/*.parquet
-          - name: result_file
-            value: /tmp/manifest_matches.txt
       - name: sample-round-0
-        depends: check-round-0
+        depends: dock-validation
         template: surrogate-sample-round-0-dag
-        when: '{{tasks.check-round-0.outputs.parameters.matches}} == false'
         arguments:
           parameters:
           - name: ensemble
@@ -4961,6 +5637,8 @@ spec:
         template: run-docking
         arguments:
           parameters:
+          - name: base_path
+            value: /mnt/lynceus
           - name: ensemble
             value: /mnt/lynceus/target/ensembles/{{inputs.parameters.ensemble}}
           - name: member_id
@@ -4990,25 +5668,9 @@ spec:
             value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/docking.results.parquet
           - name: model_path
             value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/model.joblib
-      - name: check-round-1
-        depends: train-round-0
-        template: verify-manifest-surrogate
-        arguments:
-          parameters:
-          - name: base_path
-            value: /mnt/lynceus
-          - name: manifest
-            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet.manifest.json
-          - name: expect
-            value: '{"input_path":"surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/staging"}'
-          - name: source_glob
-            value: surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/staging/*.parquet
-          - name: result_file
-            value: /tmp/manifest_matches.txt
       - name: sample-round-1
-        depends: check-round-1
+        depends: train-round-0
         template: surrogate-sample-round-1-dag
-        when: '{{tasks.check-round-1.outputs.parameters.matches}} == false'
         arguments:
           parameters:
           - name: ensemble
@@ -5020,6 +5682,8 @@ spec:
         template: run-docking
         arguments:
           parameters:
+          - name: base_path
+            value: /mnt/lynceus
           - name: ensemble
             value: /mnt/lynceus/target/ensembles/{{inputs.parameters.ensemble}}
           - name: member_id
@@ -5049,25 +5713,9 @@ spec:
             value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/docking.results.parquet
           - name: model_path
             value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/model.joblib
-      - name: check-round-2
-        depends: train-round-1
-        template: verify-manifest-surrogate
-        arguments:
-          parameters:
-          - name: base_path
-            value: /mnt/lynceus
-          - name: manifest
-            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet.manifest.json
-          - name: expect
-            value: '{"input_path":"surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/staging"}'
-          - name: source_glob
-            value: surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/staging/*.parquet
-          - name: result_file
-            value: /tmp/manifest_matches.txt
       - name: sample-round-2
-        depends: check-round-2
+        depends: train-round-1
         template: surrogate-sample-round-2-dag
-        when: '{{tasks.check-round-2.outputs.parameters.matches}} == false'
         arguments:
           parameters:
           - name: ensemble
@@ -5079,6 +5727,8 @@ spec:
         template: run-docking
         arguments:
           parameters:
+          - name: base_path
+            value: /mnt/lynceus
           - name: ensemble
             value: /mnt/lynceus/target/ensembles/{{inputs.parameters.ensemble}}
           - name: member_id
@@ -5108,25 +5758,9 @@ spec:
             value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/docking.results.parquet
           - name: model_path
             value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/model.joblib
-      - name: check-round-3
-        depends: train-round-2
-        template: verify-manifest-surrogate
-        arguments:
-          parameters:
-          - name: base_path
-            value: /mnt/lynceus
-          - name: manifest
-            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/features.parquet.manifest.json
-          - name: expect
-            value: '{"input_path":"surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/staging"}'
-          - name: source_glob
-            value: surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/staging/*.parquet
-          - name: result_file
-            value: /tmp/manifest_matches.txt
       - name: sample-round-3
-        depends: check-round-3
+        depends: train-round-2
         template: surrogate-sample-round-3-dag
-        when: '{{tasks.check-round-3.outputs.parameters.matches}} == false'
         arguments:
           parameters:
           - name: ensemble
@@ -5138,6 +5772,8 @@ spec:
         template: run-docking
         arguments:
           parameters:
+          - name: base_path
+            value: /mnt/lynceus
           - name: ensemble
             value: /mnt/lynceus/target/ensembles/{{inputs.parameters.ensemble}}
           - name: member_id
@@ -5167,25 +5803,9 @@ spec:
             value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/docking.results.parquet
           - name: model_path
             value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/model.joblib
-      - name: check-round-4
-        depends: train-round-3
-        template: verify-manifest-surrogate
-        arguments:
-          parameters:
-          - name: base_path
-            value: /mnt/lynceus
-          - name: manifest
-            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/features.parquet.manifest.json
-          - name: expect
-            value: '{"input_path":"surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/staging"}'
-          - name: source_glob
-            value: surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/staging/*.parquet
-          - name: result_file
-            value: /tmp/manifest_matches.txt
       - name: sample-round-4
-        depends: check-round-4
+        depends: train-round-3
         template: surrogate-sample-round-4-dag
-        when: '{{tasks.check-round-4.outputs.parameters.matches}} == false'
         arguments:
           parameters:
           - name: ensemble
@@ -5197,6 +5817,8 @@ spec:
         template: run-docking
         arguments:
           parameters:
+          - name: base_path
+            value: /mnt/lynceus
           - name: ensemble
             value: /mnt/lynceus/target/ensembles/{{inputs.parameters.ensemble}}
           - name: member_id
@@ -5226,25 +5848,9 @@ spec:
             value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/docking.results.parquet
           - name: model_path
             value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/model.joblib
-      - name: check-round-5
-        depends: train-round-4
-        template: verify-manifest-surrogate
-        arguments:
-          parameters:
-          - name: base_path
-            value: /mnt/lynceus
-          - name: manifest
-            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_5/features.parquet.manifest.json
-          - name: expect
-            value: '{"input_path":"surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_5/staging"}'
-          - name: source_glob
-            value: surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_5/staging/*.parquet
-          - name: result_file
-            value: /tmp/manifest_matches.txt
       - name: sample-round-5
-        depends: check-round-5
+        depends: train-round-4
         template: surrogate-sample-round-5-dag
-        when: '{{tasks.check-round-5.outputs.parameters.matches}} == false'
         arguments:
           parameters:
           - name: ensemble
@@ -5256,6 +5862,8 @@ spec:
         template: run-docking
         arguments:
           parameters:
+          - name: base_path
+            value: /mnt/lynceus
           - name: ensemble
             value: /mnt/lynceus/target/ensembles/{{inputs.parameters.ensemble}}
           - name: member_id
@@ -5285,25 +5893,9 @@ spec:
             value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/docking.results.parquet
           - name: model_path
             value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_5/model.joblib
-      - name: check-round-6
-        depends: train-round-5
-        template: verify-manifest-surrogate
-        arguments:
-          parameters:
-          - name: base_path
-            value: /mnt/lynceus
-          - name: manifest
-            value: /mnt/lynceus/surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_6/features.parquet.manifest.json
-          - name: expect
-            value: '{"input_path":"surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_6/staging"}'
-          - name: source_glob
-            value: surrogate/10m-poc/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_6/staging/*.parquet
-          - name: result_file
-            value: /tmp/manifest_matches.txt
       - name: sample-round-6
-        depends: check-round-6
+        depends: train-round-5
         template: surrogate-sample-round-6-dag
-        when: '{{tasks.check-round-6.outputs.parameters.matches}} == false'
         arguments:
           parameters:
           - name: ensemble
@@ -5315,6 +5907,8 @@ spec:
         template: run-docking
         arguments:
           parameters:
+          - name: base_path
+            value: /mnt/lynceus
           - name: ensemble
             value: /mnt/lynceus/target/ensembles/{{inputs.parameters.ensemble}}
           - name: member_id

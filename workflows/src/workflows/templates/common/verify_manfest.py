@@ -5,26 +5,26 @@ def verify_manifest_template(
     base_path: str,
     manifest: str,
     expect: dict,
-    source_glob: str,
+    source_globs: list[str],
     result_file: str,
 ):
     import json
     import os
     import subprocess
 
-    subprocess.run(
-        [
-            "verify-manifest",
-            "--manifest",
-            os.path.join(base_path, manifest),
-            "--expect",
-            json.dumps(expect),
-            "--source-root",
-            base_path,
-            "--source-glob",
-            source_glob,
-            "--result-file",
-            result_file,
-        ],
-        check=True,
-    )
+    cmd = [
+        "verify-manifest",
+        "--manifest",
+        os.path.join(base_path, manifest),
+        "--expect",
+        json.dumps(expect),
+        "--source-root",
+        base_path,
+        "--result-file",
+        result_file,
+    ]
+
+    for source_glob in source_globs:
+        cmd.extend(["--source-glob", source_glob])
+
+    subprocess.run(cmd, check=True)
