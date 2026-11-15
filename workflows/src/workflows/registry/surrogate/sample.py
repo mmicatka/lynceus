@@ -14,8 +14,6 @@ from workflows.registry.surrogate.layout import SiteLayout
 SHARD_FILENAME_PATTERN = "shard_{shard}.parquet"
 SAMPLE_PARAMETERS = ("ensemble", "site_id")
 
-MAX_PARALLEL_SOURCES = 3
-
 
 @dataclass(frozen=True)
 class SampleSpec(ABC):
@@ -111,7 +109,6 @@ def build_sample_dag(
 ) -> DAG:
     with DAG(
         name=spec.dag_name,
-        parallelism=MAX_PARALLEL_SOURCES,
         inputs=[Parameter(name=name) for name in SAMPLE_PARAMETERS],
     ) as dag:
         sample_task = _sample_shards_task(surrogate_sample, infra_config, layout, spec)

@@ -4,7 +4,7 @@
 import json
 from typing import Any
 
-from hera.workflows import DAG, Parameter, RetryStrategy, Task, Workflow
+from hera.workflows import DAG, Parameter, Task, Workflow
 from hera.workflows.models import ValueFrom
 
 from workflows.config import InfraConfig, ScreenConfig
@@ -33,7 +33,6 @@ LOAD_CANDIDATES_DAG = "load-candidates-dag"
 MANIFEST_OUTPUT = "manifest"
 MANIFEST_PATH = "/tmp/manifest.json"
 SOURCE_FILE_GLOB = "**/*.smi.gz"
-SHARD_RETRY = RetryStrategy(limit=3, retry_policy="OnFailure")
 
 BATCHES_PARAM = "batches"
 SHARD_PARALLELISM = 8
@@ -128,7 +127,6 @@ def _shard_task(templates: TemplateFactory, infra_config: InfraConfig) -> Task:
     shard = templates.build(
         TemplateName.SHARD_CANDIDATES,
         shard_candidates_template,
-        retry_strategy=SHARD_RETRY,
     )
 
     return shard(

@@ -51,10 +51,10 @@ spec:
       resources:
         limits:
           cpu: '2'
-          memory: 1Gi
+          memory: 2Gi
         requests:
           cpu: '2'
-          memory: 1Gi
+          memory: 2Gi
   - name: verify-manifest-surrogate
     volumes:
     - name: lynceus
@@ -109,10 +109,10 @@ spec:
       resources:
         limits:
           cpu: '2'
-          memory: 1Gi
+          memory: 2Gi
         requests:
           cpu: '2'
-          memory: 1Gi
+          memory: 2Gi
   - name: run-docking
     podSpecPatch: '{"runtimeClassName": "nvidia"}'
     tolerations:
@@ -383,11 +383,11 @@ spec:
         mountPath: /mnt/lynceus
       resources:
         limits:
-          cpu: '8'
-          memory: 8Gi
+          cpu: '2'
+          memory: 4Gi
         requests:
-          cpu: '8'
-          memory: 8Gi
+          cpu: '2'
+          memory: 4Gi
   - name: surrogate-sample-by-prediction
     volumes:
     - name: lynceus
@@ -466,13 +466,12 @@ spec:
         mountPath: /mnt/lynceus
       resources:
         limits:
-          cpu: '8'
-          memory: 8Gi
+          cpu: '2'
+          memory: 4Gi
         requests:
-          cpu: '8'
-          memory: 8Gi
+          cpu: '2'
+          memory: 4Gi
   - name: surrogate-sample-validation-dag
-    parallelism: 3
     dag:
       tasks:
       - name: sample-shards
@@ -1022,7 +1021,6 @@ spec:
       - name: ensemble
       - name: site_id
   - name: surrogate-sample-round-0-dag
-    parallelism: 3
     dag:
       tasks:
       - name: sample-shards
@@ -1572,7 +1570,6 @@ spec:
       - name: ensemble
       - name: site_id
   - name: surrogate-sample-round-1-dag
-    parallelism: 3
     dag:
       tasks:
       - name: sample-shards
@@ -2126,7 +2123,6 @@ spec:
       - name: ensemble
       - name: site_id
   - name: surrogate-sample-round-2-dag
-    parallelism: 3
     dag:
       tasks:
       - name: sample-shards
@@ -2680,7 +2676,6 @@ spec:
       - name: ensemble
       - name: site_id
   - name: surrogate-sample-round-3-dag
-    parallelism: 3
     dag:
       tasks:
       - name: sample-shards
@@ -3234,7 +3229,6 @@ spec:
       - name: ensemble
       - name: site_id
   - name: surrogate-sample-round-4-dag
-    parallelism: 3
     dag:
       tasks:
       - name: sample-shards
@@ -3788,7 +3782,6 @@ spec:
       - name: ensemble
       - name: site_id
   - name: surrogate-sample-round-5-dag
-    parallelism: 3
     dag:
       tasks:
       - name: sample-shards
@@ -4342,7 +4335,6 @@ spec:
       - name: ensemble
       - name: site_id
   - name: surrogate-sample-round-6-dag
-    parallelism: 3
     dag:
       tasks:
       - name: sample-shards

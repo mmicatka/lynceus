@@ -11,8 +11,13 @@ x-defs:
     low_cpu: &low_cpu
       requests: &low_cpu_res
         cpu: "2"
-        memory: 1Gi
+        memory: 2Gi
       limits: *low_cpu_res
+    low_cpu_high_ram: &low_cpu_high_ram
+      requests: &low_cpu_high_ram_res
+        cpu: "2"
+        memory: 4Gi
+      limits: *low_cpu_high_ram_res
     med_cpu: &med_cpu
       requests: &med_cpu_res
         cpu: "4"
@@ -136,11 +141,11 @@ templates:
     image: *surrogate_image
 
   surrogate_sample:
-    resources: *high_cpu
+    resources: *low_cpu_high_ram
     image: *surrogate_image
 
   surrogate_sample_by_prediction:
-    resources: *high_cpu
+    resources: *low_cpu_high_ram
     image: *surrogate_image
 
   surrogate_train:
