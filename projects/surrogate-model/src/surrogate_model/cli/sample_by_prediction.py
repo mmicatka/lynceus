@@ -11,6 +11,7 @@ import numpy as np
 import polars as pl
 import pyarrow as pa
 import pyarrow.parquet as pq
+from lynceus_core.io.staged_io import staged_output
 from lynceus_core.logging import get_lynceus_logger, wide_log
 from lynceus_core.manifest.common import Manifest
 
@@ -34,8 +35,30 @@ GROUP_COLUMN = "selection_group"
 TOP_GROUP = "top"
 RANDOM_GROUP = "random"
 
+STAGED_OUTPUT_TRANSFERS = 1
+
+RUN_TIME_KEY = "run_time"
+
+MANIFEST_FILE_SUFFIX = ".manifest.json"
+
 
 logger = get_lynceus_logger()
+
+
+def _input_manifest(
+    input_files: list[str],
+    output_path: str,
+    source_root: Path,
+    expected_state: dict,
+) -> Manifest:
+    manifest_path = Path(output_path).with_suffix(MANIFEST_FILE_SUFFIX)
+    return Manifest(filepath=manifest_path, data=expected_state).set_source_files(
+        input_files, source_root
+    )
+
+
+def _already_sampled(manifest: Manifest, output_path: str) -> bool:
+    return Path(output_path).is_file() and manifest.exists_superset()
 
 
 def _load_model(model_path: str) -> ProbabilisticClassifier:
@@ -116,7 +139,39 @@ def _select_random(
     return np.sort(chosen), len(remaining_positions)
 
 
+def _write_selection_via_staged_output(
+    features_files: list[str],
+    conformers_files: list[str],
+    positions: np.ndarray,
+    output_path: Path,
+    id_column: str,
+    batch_size: int,
+    scratch_dir: str | None,
+) -> None:
+    with staged_output(
+        output_path.parent,
+        transfers=STAGED_OUTPUT_TRANSFERS,
+        scratch_dir=scratch_dir,
+    ) as local_output:
+        local_file = local_output / output_path.name
+        write_aligned_selection(
+            features_files=features_files,
+            conformers_files=conformers_files,
+            positions=positions,
+            output_file=str(local_file),
+            id_column=id_column,
+            batch_size=batch_size,
+        )
+        verify_written(str(local_file), len(positions))
+
+
 @click.command("sample_by_prediction")
+@click.option(
+    "--source-root",
+    required=True,
+    type=click.Path(file_okay=False, path_type=Path),
+    help="Directory to base the relative paths on in the manifest.",
+)
 @click.option("--features-input", "features_input", required=True, type=str)
 @click.option("--conformers-input", "conformers_input", required=True, type=str)
 @click.option(
@@ -151,8 +206,16 @@ def _select_random(
     type=click.IntRange(min=1),
 )
 @click.option("--seed", "seed", default=DEFAULT_RANDOM_SEED, type=int)
+@click.option(
+    "--scratch-dir",
+    type=str,
+    default=None,
+    help="Local directory for the sampled file before it is copied to --output "
+    "(defaults to the system temp directory).",
+)
 @wide_log(logger)
 def sample_candidates_by_prediction(
+    source_root: Path,
     features_input: str,
     conformers_input: str,
     model_path: str,
@@ -163,6 +226,7 @@ def sample_candidates_by_prediction(
     id_column: str,
     batch_size: int,
     seed: int,
+    scratch_dir: str | None,
 ) -> None:
     click.echo(
         f"Sampling by prediction from {features_input} and {conformers_input}..."
@@ -174,24 +238,22 @@ def sample_candidates_by_prediction(
     features_files = resolve_parquet_files(features_input)
     conformers_files = resolve_parquet_files(conformers_input)
 
-    manifest_data = {
-        "features_files": features_files,
-        "conformers_files": conformers_files,
+    expected_state = {
         "num_top": num_top,
         "num_random": num_random,
         "feature_cols": feature_cols,
         "seed": seed,
     }
-
-    manifest_path = str(Path(output_path).with_suffix(".manifest.json"))
-    manifest = Manifest(data=manifest_data, filepath=manifest_path)
+    manifest = _input_manifest(
+        [*features_files, *conformers_files, model_path],
+        output_path,
+        source_root,
+        expected_state,
+    )
 
     try:
-        if manifest.exists_superset():
-            logger.info(
-                "Valid manifest found.",
-                manifest=manifest.data,
-            )
+        if _already_sampled(manifest, output_path):
+            logger.info("Valid manifest found.", manifest=manifest.data)
             click.echo("Done!")
             return
     except Exception as e:
@@ -249,22 +311,22 @@ def sample_candidates_by_prediction(
         scored_total=n_scored,
         remaining_total=n_remaining,
         output_path=output_path,
+        source_root=str(source_root),
+        scratch_dir=scratch_dir,
     )
 
-    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
-
-    write_aligned_selection(
-        features_files=features_files,
-        conformers_files=conformers_files,
-        positions=positions,
-        output_file=output_path,
-        id_column=id_column,
-        batch_size=batch_size,
+    _write_selection_via_staged_output(
+        features_files,
+        conformers_files,
+        positions,
+        Path(output_path),
+        id_column,
+        batch_size,
+        scratch_dir,
     )
-    verify_written(output_path, len(positions))
 
     elapsed_time = time.perf_counter() - start_time
-    manifest.data["run_time"] = str(datetime.timedelta(seconds=elapsed_time))
+    manifest.data[RUN_TIME_KEY] = str(datetime.timedelta(seconds=elapsed_time))
     manifest.save()
 
     logger.info(

@@ -1,10 +1,11 @@
-# workflows/src/workflows/templates/surrogate/surrogate_train.py
+# workflows/src/workflows/templates/surrogate/train.py
 
 
 from typing import List, Optional
 
 
 def surrogate_train_template(
+    base_path: str,
     train_features: str,
     train_labels: str,
     validation_features: str,
@@ -16,6 +17,8 @@ def surrogate_train_template(
 
     cmd = [
         "surrogate-train",
+        "--source-root",
+        base_path,
         "--train-features",
         train_features,
         "--train-labels",

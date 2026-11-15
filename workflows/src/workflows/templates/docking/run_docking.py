@@ -2,6 +2,7 @@
 
 
 def run_docking_template(
+    base_path: str,
     ensemble: str,
     member_id: str,
     ligands_path: str,
@@ -20,6 +21,8 @@ def run_docking_template(
 
     cmd = [
         "run-docking",
+        "--source-root",
+        str(base_path),
         "--ensemble",
         str(ensemble),
         "--member-id",

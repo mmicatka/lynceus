@@ -17,6 +17,7 @@ dependencies = [
 verify-manifest = "lynceus_core:verify_manifest"
 update-manifest = "lynceus_core:update_manifest"
 merge-shards = "lynceus_core:merge_shards"
+plan-manifest = "lynceus_core:plan_manifest"
 
 [build-system]
 requires = ["uv_build>=0.12.23,<0.13.0"]

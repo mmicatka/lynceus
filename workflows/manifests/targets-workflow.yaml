@@ -17,11 +17,8 @@ spec:
       - name: pdb_ids
       - name: output_prefix
     retryStrategy:
-      limit: 5
-      backoff:
-        duration: 30s
-        factor: 2
-        maxDuration: 10m
+      limit: 3
+      retryPolicy: OnFailure
     script:
       image: registry.nebula.lan:5000/lynceus/targets:0.1.0
       imagePullPolicy: Always
@@ -48,10 +45,10 @@ spec:
       resources:
         limits:
           cpu: '2'
-          memory: 1Gi
+          memory: 2Gi
         requests:
           cpu: '2'
-          memory: 1Gi
+          memory: 2Gi
   - name: generate-protein-ensemble-manifest
     volumes:
     - name: lynceus
@@ -65,11 +62,8 @@ spec:
       - name: ensemble_id
       - name: structure_glob
     retryStrategy:
-      limit: 5
-      backoff:
-        duration: 30s
-        factor: 2
-        maxDuration: 10m
+      limit: 3
+      retryPolicy: OnFailure
     script:
       image: registry.nebula.lan:5000/lynceus/targets:0.1.0
       imagePullPolicy: Always
@@ -100,10 +94,10 @@ spec:
       resources:
         limits:
           cpu: '2'
-          memory: 1Gi
+          memory: 2Gi
         requests:
           cpu: '2'
-          memory: 1Gi
+          memory: 2Gi
   - name: load-targets
     dag:
       tasks:
@@ -145,11 +139,8 @@ spec:
       - name: num_workers
         default: auto
     retryStrategy:
-      limit: 5
-      backoff:
-        duration: 30s
-        factor: 2
-        maxDuration: 10m
+      limit: 3
+      retryPolicy: OnFailure
     script:
       image: registry.nebula.lan:5000/lynceus/targets:0.1.0
       imagePullPolicy: Always
@@ -175,10 +166,10 @@ spec:
       resources:
         limits:
           cpu: '2'
-          memory: 1Gi
+          memory: 2Gi
         requests:
           cpu: '2'
-          memory: 1Gi
+          memory: 2Gi
   - name: detect-binding-sites-dag
     dag:
       tasks:

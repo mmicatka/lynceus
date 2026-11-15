@@ -1,13 +1,14 @@
 # projects/surrogate-model/src/surrogate_model/cli/sample.py
 
+
 import datetime
-import os
 import time
 from pathlib import Path
 
 import click
 import numpy as np
 import pyarrow.parquet as pq
+from lynceus_core.io.staged_io import staged_output
 from lynceus_core.logging import get_lynceus_logger, wide_log
 from lynceus_core.manifest.common import Manifest
 
@@ -26,8 +27,30 @@ CONFORMER_COLUMN = "conformer"
 COMPRESSION = "zstd"
 DEFAULT_BATCH_SIZE = 50_000
 
+STAGED_OUTPUT_TRANSFERS = 1
+
+RUN_TIME_KEY = "run_time"
+
+MANIFEST_FILE_SUFFIX = ".manifest.json"
+
 
 logger = get_lynceus_logger()
+
+
+def _input_manifest(
+    input_files: list[str],
+    output_path: str,
+    source_root: Path,
+    expected_state: dict,
+) -> Manifest:
+    manifest_path = Path(output_path).with_suffix(MANIFEST_FILE_SUFFIX)
+    return Manifest(filepath=manifest_path, data=expected_state).set_source_files(
+        input_files, source_root
+    )
+
+
+def _already_sampled(manifest: Manifest, output_path: str) -> bool:
+    return Path(output_path).is_file() and manifest.exists_superset()
 
 
 def _select_positions(
@@ -67,7 +90,39 @@ def _write_sample(
             writer.close()
 
 
+def _sample_via_staged_output(
+    features_files: list[str],
+    conformers_files: list[str],
+    positions: np.ndarray,
+    output_path: Path,
+    id_column: str,
+    batch_size: int,
+    scratch_dir: str | None,
+) -> None:
+    with staged_output(
+        output_path.parent,
+        transfers=STAGED_OUTPUT_TRANSFERS,
+        scratch_dir=scratch_dir,
+    ) as local_output:
+        local_file = local_output / output_path.name
+        _write_sample(
+            features_files,
+            conformers_files,
+            positions,
+            str(local_file),
+            id_column,
+            batch_size,
+        )
+        verify_written(str(local_file), len(positions))
+
+
 @click.command("sample_aligned")
+@click.option(
+    "--source-root",
+    required=True,
+    type=click.Path(file_okay=False, path_type=Path),
+    help="Directory to base the relative paths on in the manifest.",
+)
 @click.option(
     "--features-input",
     "features_input",
@@ -119,8 +174,16 @@ def _write_sample(
     type=int,
     help="Seed for reproducible sampling.",
 )
+@click.option(
+    "--scratch-dir",
+    type=str,
+    default=None,
+    help="Local directory for the sampled file before it is copied to --output "
+    "(defaults to the system temp directory).",
+)
 @wide_log(logger)
 def sample_surrogate_candidates(
+    source_root: Path,
     features_input: str,
     conformers_input: str,
     output_path: str,
@@ -128,6 +191,7 @@ def sample_surrogate_candidates(
     id_column: str,
     batch_size: int,
     seed: int,
+    scratch_dir: str | None,
 ) -> None:
     click.echo(
         f"Processing aligned samples from {features_input} and {conformers_input}..."
@@ -138,23 +202,17 @@ def sample_surrogate_candidates(
     features_files = resolve_parquet_files(features_input)
     conformers_files = resolve_parquet_files(conformers_input)
 
-    manifest_data = {
-        "features_files": features_files,
-        "conformers_files": conformers_files,
-        "output_path": output_path,
-        "num_samples": num_samples,
-        "seed": seed,
-    }
-
-    manifest_path = str(Path(output_path).with_suffix(".manifest.json"))
-    manifest = Manifest(data=manifest_data, filepath=manifest_path)
+    expected_state = {"num_samples": num_samples, "seed": seed}
+    manifest = _input_manifest(
+        [*features_files, *conformers_files],
+        output_path,
+        source_root,
+        expected_state,
+    )
 
     try:
-        if manifest.exists_superset():
-            logger.info(
-                "Valid manifest found.",
-                manifest=manifest.data,
-            )
+        if _already_sampled(manifest, output_path):
+            logger.info("Valid manifest found.", manifest=manifest.data)
             click.echo("Done!")
             return
     except Exception as e:
@@ -186,27 +244,26 @@ def sample_surrogate_candidates(
         total_rows=total_rows,
         num_samples=effective_samples,
         output_path=output_path,
+        source_root=str(source_root),
+        scratch_dir=scratch_dir,
     )
-
-    os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
 
     start_time = time.perf_counter()
 
     positions = _select_positions(total_rows, effective_samples, seed)
 
-    _write_sample(
-        features_files=features_files,
-        conformers_files=conformers_files,
-        positions=positions,
-        output_file=output_path,
-        id_column=id_column,
-        batch_size=batch_size,
+    _sample_via_staged_output(
+        features_files,
+        conformers_files,
+        positions,
+        Path(output_path),
+        id_column,
+        batch_size,
+        scratch_dir,
     )
 
-    verify_written(output_path, num_samples)
-
     elapsed_time = time.perf_counter() - start_time
-    manifest.data["run_time"] = str(datetime.timedelta(seconds=elapsed_time))
+    manifest.data[RUN_TIME_KEY] = str(datetime.timedelta(seconds=elapsed_time))
     manifest.save()
 
     logger.info(

@@ -22,6 +22,7 @@ dependencies = [
 ]
 
 [project.scripts]
+plan-surrogate-sample = "surrogate_model:plan_surrogate_sample"
 surrogate-sample = "surrogate_model:sample_surrogate_candidates"
 surrogate-train = "surrogate_model:train_model"
 surrogate-sample-by-prediction = "surrogate_model:sample_candidates_by_prediction"

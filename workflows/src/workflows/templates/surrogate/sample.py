@@ -1,4 +1,39 @@
-# workflows/src/workflows/templates/surrogate/surrogate_sample.py
+# workflows/src/workflows/templates/surrogate/sample.py
+
+
+from workflows.registry.common.manifest_gate import MANIFEST_PATH
+
+
+def plan_surrogate_sample_template(
+    base_path: str,
+    features_prefix: str,
+    conformers_prefix: str,
+    persist_file: str,
+    source_glob: str = "*.parquet",
+    model_path: str = "",
+    output_file: str = MANIFEST_PATH,
+):
+    import os
+    import subprocess
+
+    cmd = [
+        "plan-surrogate-sample",
+        "--source-root",
+        base_path,
+        "--features-glob",
+        os.path.join(features_prefix, source_glob),
+        "--conformers-glob",
+        os.path.join(conformers_prefix, source_glob),
+        "--output-file",
+        output_file,
+        "--persist-file",
+        os.path.join(base_path, persist_file),
+    ]
+
+    if model_path:
+        cmd.extend(["--model-file", model_path])
+
+    subprocess.run(cmd, check=True)
 
 
 def surrogate_sample_template(
@@ -16,6 +51,8 @@ def surrogate_sample_template(
     subprocess.run(
         [
             "surrogate-sample",
+            "--source-root",
+            base_path,
             "--features-input",
             os.path.join(base_path, features_input_prefix, source),
             "--conformers-input",
@@ -50,6 +87,8 @@ def surrogate_sample_by_prediction_template(
 
     cmd = [
         "surrogate-sample-by-prediction",
+        "--source-root",
+        base_path,
         "--features-input",
         os.path.join(base_path, features_input_prefix, source),
         "--conformers-input",

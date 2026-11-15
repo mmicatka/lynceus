@@ -1,5 +1,6 @@
 # workflows/src/workflows/registry/surrogate/sample_site.py
 
+
 from typing import Sequence
 
 from hera.workflows import DAG, Parameter, Task
@@ -8,6 +9,17 @@ from hera.workflows.models import ValueFrom
 from workflows.config import InfraConfig, ScreenConfig
 from workflows.config.infrastructure import TemplateName
 from workflows.config.screen import RoundConfig, SurrogateConfig
+from workflows.registry.common.manifest_gate import (
+    MANIFEST_OUTPUT,
+    MANIFEST_PATH,
+    MATCHES_OUTPUT,
+    MATCHES_PATH,
+)
+from workflows.registry.surrogate.common import (
+    PredictionSampleSpec,
+    RandomSampleSpec,
+    SampleTemplates,
+)
 from workflows.registry.surrogate.layout import (
     SITE_PARAMETERS,
     VALIDATION_LABEL,
@@ -16,8 +28,6 @@ from workflows.registry.surrogate.layout import (
 )
 from workflows.registry.surrogate.sample import (
     SAMPLE_PARAMETERS,
-    PredictionSampleSpec,
-    RandomSampleSpec,
     SampleSpec,
     build_sample_dag,
 )
@@ -30,17 +40,29 @@ from workflows.templates import (
     surrogate_train_template,
     verify_manifest_template,
 )
+from workflows.templates.common.update_manifest import update_manifest_template
+from workflows.templates.surrogate.sample import plan_surrogate_sample_template
 
 SURROGATE_SITE_DAG = "surrogate-site-dag"
-VERIFY_RESULT_OUTPUT = "result"
 
 
-def _run_unless_verified(verify_task: Task) -> str:
-    return f"{verify_task.get_parameter(VERIFY_RESULT_OUTPUT)} != true"
+STAGING_GLOB = "*.parquet"
+INPUT_PATH_KEY = "input_path"
+
+
+def _build_verify_manifest(templates: TemplateFactory):
+    return templates.build(
+        TemplateName.VERIFY_MANIFEST_SURROGATE,
+        verify_manifest_template,
+        outputs=[
+            Parameter(name=MATCHES_OUTPUT, value_from=ValueFrom(path=MATCHES_PATH))
+        ],
+    )
 
 
 def _docking_arguments(spec: SampleSpec, layout: SiteLayout) -> dict:
     return {
+        "base_path": layout.base_path,
         "ensemble": layout.ensemble_path,
         "member_id": ref("member_id"),
         "ligands_path": layout.docking_input_path(spec.label),
@@ -70,6 +92,7 @@ def _train_arguments(
     spec: SampleSpec, layout: SiteLayout, training_labels: Sequence[str]
 ) -> dict:
     return {
+        "base_path": layout.base_path,
         "train_features": layout.features_paths(training_labels),
         "train_labels": layout.labels_paths(training_labels),
         "validation_features": layout.features_path(VALIDATION_LABEL),
@@ -112,26 +135,17 @@ def _sample_and_dock(
     layout: SiteLayout,
     sample_dag,
     dock,
-    verify_manifest,
 ) -> tuple[Task, Task]:
-    verify_task = verify_manifest(
-        name=f"verify-manifest-{spec.task_suffix}",
-        arguments={
-            "manifest_path": layout.manifest_path(spec.label),
-            "expect": {"input_path": layout.staging_prefix(spec.label)},
-        },
-    )
     sample_task = sample_dag(
         name=f"sample-{spec.task_suffix}",
         arguments={name: ref(name) for name in SAMPLE_PARAMETERS},
-        when=_run_unless_verified(verify_task),
     )
     dock_task = dock(
         name=f"dock-{spec.task_suffix}",
         arguments=_docking_arguments(spec, layout),
     )
-    verify_task >> sample_task >> dock_task  # type: ignore
-    return verify_task, dock_task
+    sample_task >> dock_task  # type: ignore
+    return sample_task, dock_task
 
 
 def _train(
@@ -162,35 +176,39 @@ def build_surrogate_site_dag(
     validation_spec = _validation_spec(surrogate)
     round_specs = _round_specs(surrogate, layout)
 
-    verify_manifest = templates.build(
-        TemplateName.VERIFY_MANIFEST,
-        verify_manifest_template,
-        outputs=[
-            Parameter(
-                name=VERIFY_RESULT_OUTPUT,
-                value_from=ValueFrom(path="/tmp/manifest_matches.txt"),
-            )
-        ],
-    )
     dock = templates.build(TemplateName.RUN_DOCKING, run_docking_template)
-    merge_shards = templates.build(TemplateName.MERGE_SHARDS, merge_shards_template)
     surrogate_train = templates.build(
         TemplateName.SURROGATE_TRAIN, surrogate_train_template
     )
-    sample_templates = {
-        RandomSampleSpec: templates.build(
-            TemplateName.SURROGATE_SAMPLE, surrogate_sample_template
+    sample_templates = SampleTemplates(
+        sample={
+            RandomSampleSpec: templates.build(
+                TemplateName.SURROGATE_SAMPLE, surrogate_sample_template
+            ),
+            PredictionSampleSpec: templates.build(
+                TemplateName.SURROGATE_SAMPLE_BY_PREDICTION,
+                surrogate_sample_by_prediction_template,
+            ),
+        },
+        merge_shards=templates.build(TemplateName.MERGE_SHARDS, merge_shards_template),
+        plan=templates.build(
+            TemplateName.PLAN_SURROGATE_SAMPLE,
+            plan_surrogate_sample_template,
+            outputs=[
+                Parameter(
+                    name=MANIFEST_OUTPUT,
+                    value_from=ValueFrom(path=MANIFEST_PATH),
+                )
+            ],
         ),
-        PredictionSampleSpec: templates.build(
-            TemplateName.SURROGATE_SAMPLE_BY_PREDICTION,
-            surrogate_sample_by_prediction_template,
+        verify_manifest=_build_verify_manifest(templates),
+        update_manifest=templates.build(
+            TemplateName.UPDATE_MANIFEST_SURROGATE, update_manifest_template
         ),
-    }
+    )
 
     sample_dags = {
-        spec.label: build_sample_dag(
-            sample_templates[type(spec)], merge_shards, infra_config, layout, spec
-        )
+        spec.label: build_sample_dag(sample_templates, infra_config, layout, spec)
         for spec in [validation_spec, *round_specs]
     }
 
@@ -204,22 +222,20 @@ def build_surrogate_site_dag(
             layout,
             sample_dags[validation_spec.label],
             dock,
-            verify_manifest,
         )
 
         for index, spec in enumerate(round_specs):
-            verify_manifest_task, dock_task = _sample_and_dock(
+            sample_task, dock_task = _sample_and_dock(
                 spec,
                 layout,
                 sample_dags[spec.label],
                 dock,
-                verify_manifest,
             )
             train_task = _train(
                 spec, layout, surrogate_train, round_labels[: index + 1]
             )
 
-            previous_task >> verify_manifest_task  # type: ignore
+            previous_task >> sample_task  # type: ignore
             dock_task >> train_task  # type: ignore
             previous_task = train_task
 

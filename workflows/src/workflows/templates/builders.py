@@ -25,6 +25,8 @@ from workflows.config.infrastructure import (
     VolumeConfig,
 )
 
+RETRY_STRATEGY = RetryStrategy(limit=3, retry_policy="OnFailure")
+
 SCRATCH_VOLUME_NAME = "scratch"
 MEMORY_MEDIUM = "Memory"
 GPU_RESOURCE_NAME = "nvidia.com/gpu"
@@ -111,14 +113,10 @@ class TemplateFactory:
         name: TemplateName,
         func: Callable,
         *,
-        retry_strategy: RetryStrategy | None = None,
+        retry_strategy: RetryStrategy = RETRY_STRATEGY,
         **kwargs,
     ) -> Callable:
         template = self.templates[name]
-
-        retry_strategy = (
-            retry_strategy if retry_strategy is not None else self.retry_strategy
-        )
 
         return script(
             name=_to_template_name(name),

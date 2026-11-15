@@ -1,13 +1,16 @@
 # projects/lynceus-dock/src/lynceus_dock/run_docking.py
 
+
 import datetime
 import tempfile
 import time
 from contextlib import contextmanager
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Generator
 
 import click
+from lynceus_core.io.staged_io import staged_output
 from lynceus_core.logging import get_lynceus_logger, wide_log
 from lynceus_core.manifest.common import Manifest as LynceusManifest
 from protein_ensemble import Manifest
@@ -20,9 +23,53 @@ from lynceus_dock.registry.registry import get_provider
 
 from .common.types import DockingError, LigandRecord, SearchBox
 
-logger = get_lynceus_logger()
+STAGED_OUTPUT_TRANSFERS = 1
+
+RUN_TIME_KEY = "run_time"
+
+NUM_DOCKED_KEY = "num_docked"
 
 MANIFEST_FILENAME = "docking.manifest.json"
+
+logger = get_lynceus_logger()
+
+
+@dataclass(frozen=True)
+class DockingJob:
+    ensemble: Path
+    member_id: str
+    ligands_path: str
+    box: SearchBox
+    site_id: str
+    search_mode: str
+    num_modes: int
+    batch_size: int | None
+    parquet_batch_rows: int
+    default_altloc: str
+    allow_bad_residues: bool
+    keep_docking_output: bool
+
+
+def _input_manifest(
+    ligands_path: str,
+    output_path: str,
+    source_root: Path,
+    expected_state: dict,
+) -> LynceusManifest:
+    manifest_path = Path(output_path) / MANIFEST_FILENAME
+    return LynceusManifest(
+        filepath=manifest_path, data=expected_state
+    ).set_source_files([ligands_path], source_root)
+
+
+def _is_run_complete(manifest: LynceusManifest) -> bool:
+    try:
+        return manifest.exists_superset()
+    except Exception as exc:
+        logger.warning(
+            "Failed to load existing manifest, re-generating.", error=str(exc)
+        )
+        return False
 
 
 def _build_provider(
@@ -83,48 +130,71 @@ def _receptor_file(member_id: str, pdbqt_string: str) -> Generator[Path, None, N
         yield receptor_path
 
 
-def _is_run_complete(manifest: LynceusManifest) -> bool:
-    try:
-        return manifest.exists_superset()
-    except Exception as exc:
-        logger.warning(
-            "Failed to load existing manifest, re-generating.", error=str(exc)
-        )
-        return False
-
-
 def _dock_and_write(
     provider,
     receptor_path: Path,
     ligands: list[LigandRecord],
-    box: SearchBox,
-    *,
-    member_id: str,
-    site_id: str,
+    job: DockingJob,
     output_path: str,
-    batch_size: int | None,
-    parquet_batch_rows: int,
 ) -> int:
     results = provider.dock_batch(
         receptor_path=receptor_path,
         ligands=ligands,
-        box=box,
-        batch_size=batch_size,
+        box=job.box,
+        batch_size=job.batch_size,
     )
     try:
         return write_results(
             results,
             output_path,
-            member_id=member_id,
-            site_id=site_id,
-            batch_rows=parquet_batch_rows,
+            member_id=job.member_id,
+            site_id=job.site_id,
+            batch_rows=job.parquet_batch_rows,
             drop_pose_column=True,
         )
     except DockingError as exc:
         raise click.ClickException(str(exc)) from exc
 
 
+def _run_job(job: DockingJob, output_path: str) -> int:
+    provider = _build_provider(
+        job.search_mode, job.num_modes, output_path, job.keep_docking_output
+    )
+    pdbqt_string = _prepare_receptor_pdbqt(
+        job.ensemble,
+        job.member_id,
+        default_altloc=job.default_altloc,
+        allow_bad_residues=job.allow_bad_residues,
+    )
+    ligands = _load_ligands(job.ligands_path)
+    logger.info(
+        "Starting docking run",
+        ligand_count=len(ligands),
+        ligands_path=job.ligands_path,
+    )
+
+    with _receptor_file(job.member_id, pdbqt_string) as receptor_path:
+        return _dock_and_write(provider, receptor_path, ligands, job, output_path)
+
+
+def _dock_via_staged_output(
+    job: DockingJob, output_path: Path, scratch_dir: str | None
+) -> int:
+    with staged_output(
+        output_path,
+        transfers=STAGED_OUTPUT_TRANSFERS,
+        scratch_dir=scratch_dir,
+    ) as local_output:
+        return _run_job(job, str(local_output))
+
+
 @click.command(help="Dock candidate conformers against a receptor.")
+@click.option(
+    "--source-root",
+    required=True,
+    type=click.Path(file_okay=False, path_type=Path),
+    help="Directory to base the relative paths on in the manifest.",
+)
 @click.option(
     "--ensemble",
     type=click.Path(exists=True, path_type=Path),
@@ -139,7 +209,7 @@ def _dock_and_write(
 )
 @click.option(
     "--ligands-path",
-    type=str,
+    type=click.Path(exists=True, dir_okay=False),
     required=True,
     help="Parquet file of candidate conformers.",
 )
@@ -210,8 +280,16 @@ def _dock_and_write(
     is_flag=True,
     help="Keep docking output.",
 )
+@click.option(
+    "--scratch-dir",
+    type=str,
+    default=None,
+    help="Local directory for docking output before it is copied to --output "
+    "(defaults to the system temp directory).",
+)
 @wide_log(logger)
 def run_docking(
+    source_root: Path,
     ensemble: Path,
     member_id: str,
     ligands_path: str,
@@ -226,61 +304,58 @@ def run_docking(
     default_altloc: str,
     allow_bad_residues: bool,
     keep_docking_output: bool,
+    scratch_dir: str | None,
 ) -> None:
     click.echo(
         f"Running docking for {ensemble}:{member_id} with ligands {ligands_path}..."
     )
 
-    start_time = time.perf_counter()
-
-    manifest = LynceusManifest(
-        data={
-            "ensemble": str(ensemble),
-            "member_id": member_id,
-            "ligands_path": ligands_path,
-            "center": center,
-            "size": size,
-            "search_mode": search_mode,
-            "num_modes": num_modes,
-            "output_path": output_path,
-        },
-        filepath=Path(output_path) / MANIFEST_FILENAME,
-    )
+    expected_state = {
+        "ensemble": str(ensemble),
+        "member_id": member_id,
+        "site_id": site_id,
+        "center": list(center),
+        "size": list(size),
+        "search_mode": search_mode,
+        "num_modes": num_modes,
+    }
+    manifest = _input_manifest(ligands_path, output_path, source_root, expected_state)
 
     if _is_run_complete(manifest):
         logger.info("Valid manifest found.", manifest=manifest.data)
         click.echo("Done!")
         return
 
-    provider = _build_provider(search_mode, num_modes, output_path, keep_docking_output)
-    pdbqt_string = _prepare_receptor_pdbqt(
-        ensemble,
-        member_id,
+    job = DockingJob(
+        ensemble=ensemble,
+        member_id=member_id,
+        ligands_path=ligands_path,
+        box=SearchBox(center=center, size=size),
+        site_id=site_id,
+        search_mode=search_mode,
+        num_modes=num_modes,
+        batch_size=batch_size,
+        parquet_batch_rows=parquet_batch_rows,
         default_altloc=default_altloc,
         allow_bad_residues=allow_bad_residues,
-    )
-    ligands = _load_ligands(ligands_path)
-    logger.info(
-        "Starting docking run",
-        ligand_count=len(ligands),
-        ligands_path=ligands_path,
+        keep_docking_output=keep_docking_output,
     )
 
-    with _receptor_file(member_id, pdbqt_string) as receptor_path:
-        manifest.data["num_docked"] = _dock_and_write(
-            provider,
-            receptor_path,
-            ligands,
-            SearchBox(center=center, size=size),
-            member_id=member_id,
-            site_id=site_id,
-            output_path=output_path,
-            batch_size=batch_size,
-            parquet_batch_rows=parquet_batch_rows,
-        )
+    logger.info(
+        "Executing docking",
+        output_path=output_path,
+        source_root=str(source_root),
+        scratch_dir=scratch_dir,
+    )
+
+    start_time = time.perf_counter()
+
+    manifest.data[NUM_DOCKED_KEY] = _dock_via_staged_output(
+        job, Path(output_path), scratch_dir
+    )
 
     elapsed_time = time.perf_counter() - start_time
-    manifest.data["run_time"] = str(datetime.timedelta(seconds=elapsed_time))
+    manifest.data[RUN_TIME_KEY] = str(datetime.timedelta(seconds=elapsed_time))
     manifest.save()
 
     logger.info(
@@ -288,3 +363,4 @@ def run_docking(
         manifest=manifest.data,
         elapsed_time=elapsed_time,
     )
+    click.echo("Done!")

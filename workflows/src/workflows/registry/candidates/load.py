@@ -1,10 +1,9 @@
 # workflows/src/workflows/registry/candidates/load.py
 
 
-import json
 from typing import Any
 
-from hera.workflows import DAG, Parameter, RetryStrategy, Task, Workflow
+from hera.workflows import DAG, Parameter, Task, Workflow
 from hera.workflows.models import ValueFrom
 
 from workflows.config import InfraConfig, ScreenConfig
@@ -18,6 +17,14 @@ from workflows.registry.common.core import (
     shard_filename,
     shard_ids,
 )
+from workflows.registry.common.manifest_gate import (
+    MANIFEST_OUTPUT,
+    MANIFEST_PATH,
+    MATCHES_OUTPUT,
+    MATCHES_PATH,
+    json_arg,
+    when_unmatched,
+)
 from workflows.templates import (
     build_clean_prefix_template,
     merge_shards_template,
@@ -30,10 +37,7 @@ from workflows.templates import (
 from workflows.templates.builders import TemplateFactory
 
 LOAD_CANDIDATES_DAG = "load-candidates-dag"
-MANIFEST_OUTPUT = "manifest"
-MANIFEST_PATH = "/tmp/manifest.json"
 SOURCE_FILE_GLOB = "**/*.smi.gz"
-SHARD_RETRY = RetryStrategy(limit=3, retry_policy="OnFailure")
 
 BATCHES_PARAM = "batches"
 SHARD_PARALLELISM = 8
@@ -41,8 +45,6 @@ MERGE_SHARDS_PARALLELISM = 1
 
 PLAN_FILENAME = "load_plan.json"
 MANIFEST_FILENAME = "candidate_shards.manifest.json"
-MATCHES_OUTPUT = "matches"
-MATCHES_PATH = "/tmp/manifest_matches.txt"
 SCHEME_VERSION = "zinc22-id-hash-mod-v1"
 ID_PLACEHOLDER = "{id}"
 
@@ -65,20 +67,11 @@ def _state_path(infra_config: InfraConfig, filename: str) -> str:
     return _volume_path(infra_config, f"{state_prefix}/{filename}")
 
 
-def _json_arg(value: dict[str, Any]) -> str:
-    return json.dumps(value, separators=(",", ":"), sort_keys=True)
-
-
 def _manifest_fields(infra_config: InfraConfig) -> dict[str, Any]:
     return {
         NUM_SHARDS_KEY: infra_config.candidates.num_shards,
         SCHEME_KEY: SCHEME_VERSION,
     }
-
-
-def _when_unmatched(check_task: Task) -> str:
-    result = f"tasks.{check_task.name}.outputs.parameters.{MATCHES_OUTPUT}"
-    return f"{{{{{result}}}}} == false"
 
 
 def _batches_expression(plan_task: Task) -> str:
@@ -128,7 +121,6 @@ def _shard_task(templates: TemplateFactory, infra_config: InfraConfig) -> Task:
     shard = templates.build(
         TemplateName.SHARD_CANDIDATES,
         shard_candidates_template,
-        retry_strategy=SHARD_RETRY,
     )
 
     return shard(
@@ -232,8 +224,8 @@ def _check_manifest_task(
         arguments={
             "base_path": infra_config.volume.mount_path,
             "manifest": _state_path(infra_config, MANIFEST_FILENAME),
-            "expect": _json_arg(expected),
-            "source_glob": f"{prefixes.raw_smiles}/{SOURCE_FILE_GLOB}",
+            "expect": json_arg(expected),
+            "source_globs": [f"{prefixes.raw_smiles}/{SOURCE_FILE_GLOB}"],
             "result_file": MATCHES_PATH,
         },
     )
@@ -273,7 +265,7 @@ def _update_manifest_task(
             "base_path": infra_config.volume.mount_path,
             "source": source,
             "output": _state_path(infra_config, MANIFEST_FILENAME),
-            "fields": _json_arg(fields),
+            "fields": json_arg(fields),
         },
     )
 
@@ -299,8 +291,8 @@ def build_load_candidates_dag(
         check_merged = _check_manifest_task(
             verify_manifest, infra_config, "check-merged", MERGED_KEY
         )
-        shard_gate = _when_unmatched(check_sharded)
-        merge_gate = _when_unmatched(check_merged)
+        shard_gate = when_unmatched(check_sharded)
+        merge_gate = when_unmatched(check_merged)
 
         guard_task = _layout_task(
             verify_layout,

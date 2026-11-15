@@ -9,7 +9,7 @@ INFRA_CONFIG ?= conf/infra/dev.yaml
 NAMESPACE ?= workflows
 VERSION ?= 0.1.0
 
-WORKFLOWS ?= candidates-workflow targets-workflow
+WORKFLOWS ?= load-candidates-workflow sample-candidates-workflow preprocess-candidates-workflow targets-workflow surrogate-workflow
 OUT_DIR ?= workflows/manifests
 
 .PHONY: build push build-* clean lint lint-python lint-argo generate generate-workflows submit-workflows run logs
