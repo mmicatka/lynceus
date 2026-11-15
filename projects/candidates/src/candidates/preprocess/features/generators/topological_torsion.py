@@ -1,21 +1,22 @@
-# modules/local/generate_features/src/generate_features/feature_generators/atom_pair.py # noqa: E501
+# projects/candidates/src/candidates/preprocess/features/generators/topological_torsion.py # noqa: E501
+
 
 import numpy as np
 import pyarrow as pa
 from rdkit.Chem import Mol
-from skfp.fingerprints import AtomPairFingerprint
+from skfp.fingerprints import TopologicalTorsionFingerprint
 
 from .feature_generator import FeatureGenerator
 
 
-class AtomPairFeature(FeatureGenerator):
-    name = "atom_pair"
+class TopologicalTorsionFeature(FeatureGenerator):
+    name = "topological_torsion"
 
     DEFAULT_FP_SIZE = 2048
 
     def __init__(self, fp_size: int = DEFAULT_FP_SIZE) -> None:
         self._fp_size = fp_size
-        self._fp = AtomPairFingerprint(
+        self._fp = TopologicalTorsionFingerprint(
             fp_size=fp_size, count=True, n_jobs=1, sparse=False
         )
 
@@ -23,7 +24,7 @@ class AtomPairFeature(FeatureGenerator):
         fingerprints = self._fp.transform(batch)
         if not isinstance(fingerprints, np.ndarray):
             raise RuntimeError(
-                "expected dense ndarray from AtomPairFingerprint.transform,"
+                "expected dense ndarray from TopologicalTorsionFingerprint.transform,"
                 f" got {type(fingerprints)}"
             )
         return [row.tolist() for row in fingerprints]

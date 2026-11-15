@@ -7,7 +7,7 @@ spec:
   serviceAccountName: argo-workflow
   templates:
   - name: sample-candidates-dag
-    parallelism: 1
+    parallelism: 5
     dag:
       tasks:
       - name: subsample-candidates

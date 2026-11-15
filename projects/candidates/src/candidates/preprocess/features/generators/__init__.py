@@ -1,4 +1,5 @@
-# modules/local/feature_generation/src/feature_generation/features/__init__.py
+# projects/candidates/src/candidates/preprocess/features/generators/__init__.py
+
 
 from typing import Callable, Type
 

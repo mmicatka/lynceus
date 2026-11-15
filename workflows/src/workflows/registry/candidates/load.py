@@ -214,7 +214,7 @@ def build_merge_shards_dag(
 
 def _build_verify_manifest(templates: TemplateFactory):
     return templates.build(
-        TemplateName.VERIFY_CANDIDATES_MANIFEST,
+        TemplateName.VERIFY_MANIFEST_LOAD_CANDIDATES,
         verify_manifest_template,
         outputs=[
             Parameter(name=MATCHES_OUTPUT, value_from=ValueFrom(path=MATCHES_PATH))
@@ -289,7 +289,7 @@ def build_load_candidates_dag(
             TemplateName.VERIFY_SHARD_LAYOUT, verify_shard_layout_template
         )
         update_manifest = templates.build(
-            TemplateName.UPDATE_MANIFEST, update_manifest_template
+            TemplateName.UPDATE_MANIFEST_LOAD_CANDIDATES, update_manifest_template
         )
 
         plan_task = _plan_shard_task(templates, infra_config)
