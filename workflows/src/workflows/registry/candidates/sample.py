@@ -4,7 +4,7 @@
 from hera.workflows import DAG, RetryStrategy, Task, Workflow
 
 from workflows.config import InfraConfig, ScreenConfig
-from workflows.config.infrastructure import TemplateName
+from workflows.config.infrastructure import ComputeTemplateName
 from workflows.registry.common.core import (
     ENTRYPOINT_DAG,
     ITEM_PARAM,
@@ -38,7 +38,7 @@ def _subsample_task(
     prefixes = infra_config.storage.prefixes.candidates
     num_shards = infra_config.candidates.num_shards
     subsample_candidates = templates.build(
-        TemplateName.SUBSAMPLE_CANDIDATES,
+        ComputeTemplateName.SUBSAMPLE_CANDIDATES,
         sample_candidates_template,
         retry_strategy=SAMPLE_RETRY,
     )

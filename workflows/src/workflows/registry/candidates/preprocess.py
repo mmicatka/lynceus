@@ -6,7 +6,7 @@ from hera.workflows import DAG, Parameter, RetryStrategy, Task, Workflow
 from hera.workflows.models import ValueFrom
 
 from workflows.config import InfraConfig, ScreenConfig
-from workflows.config.infrastructure import TemplateName
+from workflows.config.infrastructure import ComputeTemplateName
 from workflows.registry.common.core import (
     ENTRYPOINT_DAG,
     ITEM_PARAM,
@@ -85,7 +85,7 @@ def _plan_preprocess_task(
     input_prefix = _conformer_input_prefix(infra_config, screen_config)
     state_prefix = infra_config.storage.prefixes.candidates.shards_manifests
     plan = templates.build(
-        TemplateName.PLAN_PREPROCESS_CANDIDATES,
+        ComputeTemplateName.PLAN_PREPROCESS_CANDIDATES,
         plan_preprocess_candidates_template,
         outputs=[
             Parameter(
@@ -109,7 +109,7 @@ def _plan_preprocess_task(
 
 def _build_verify_manifest(templates: TemplateFactory):
     return templates.build(
-        TemplateName.VERIFY_MANIFEST_PREPROCESS_CANDIDATES,
+        ComputeTemplateName.VERIFY_MANIFEST_PREPROCESS_CANDIDATES,
         verify_manifest_template,
         outputs=[
             Parameter(name=MATCHES_OUTPUT, value_from=ValueFrom(path=MATCHES_PATH))
@@ -165,12 +165,12 @@ def _build_process_shard_dag(
     base_path = infra_config.volume.mount_path
 
     generate_conformers = templates.build(
-        TemplateName.GENERATE_CONFORMERS,
+        ComputeTemplateName.GENERATE_CONFORMERS,
         generate_conformers_template,
         retry_strategy=SHARD_RETRY,
     )
     generate_features = templates.build(
-        TemplateName.GENERATE_FEATURES,
+        ComputeTemplateName.GENERATE_FEATURES,
         generate_features_template,
         retry_strategy=SHARD_RETRY,
     )
@@ -229,7 +229,8 @@ def build_preprocess_candidates_dag(
     with DAG(name=PREPROCESS_CANDIDATES_DAG) as dag:
         verify_manifest = _build_verify_manifest(templates)
         update_manifest = templates.build(
-            TemplateName.UPDATE_MANIFEST_PREPROCESS_CANDIDATES, update_manifest_template
+            ComputeTemplateName.UPDATE_MANIFEST_PREPROCESS_CANDIDATES,
+            update_manifest_template,
         )
 
         plan_task = _plan_preprocess_task(templates, infra_config, screen_config)

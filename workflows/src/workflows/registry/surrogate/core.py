@@ -4,7 +4,7 @@
 from hera.workflows import DAG, Workflow
 
 from workflows.config import InfraConfig, ScreenConfig
-from workflows.config.infrastructure import TemplateName
+from workflows.config.infrastructure import ComputeTemplateName
 from workflows.registry.common.core import (
     ENTRYPOINT_DAG,
     get_template_factory,
@@ -23,7 +23,7 @@ def build_surrogate_workflow(
 
     with new_workflow(screen_config.name, "surrogate") as w:
         resolve_sites = templates.build(
-            TemplateName.RESOLVE_BINDING_SITES, resolve_binding_sites_template
+            ComputeTemplateName.RESOLVE_BINDING_SITES, resolve_binding_sites_template
         )
         surrogate_site_dag = build_surrogate_site_dag(
             templates, infra_config, screen_config
