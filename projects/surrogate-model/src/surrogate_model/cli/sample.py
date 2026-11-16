@@ -8,7 +8,7 @@ from pathlib import Path
 import click
 import numpy as np
 import pyarrow.parquet as pq
-from lynceus_core.io.staged_io import staged_output
+from lynceus_core.io.staged_io import staged_io
 from lynceus_core.logging import get_lynceus_logger, wide_log
 from lynceus_core.manifest.common import Manifest
 
@@ -27,7 +27,7 @@ CONFORMER_COLUMN = "conformer"
 COMPRESSION = "zstd"
 DEFAULT_BATCH_SIZE = 50_000
 
-STAGED_OUTPUT_TRANSFERS = 1
+STAGED_IO_TRANSFERS = 4
 
 RUN_TIME_KEY = "run_time"
 
@@ -90,7 +90,7 @@ def _write_sample(
             writer.close()
 
 
-def _sample_via_staged_output(
+def _sample_via_staged_io(
     features_files: list[str],
     conformers_files: list[str],
     positions: np.ndarray,
@@ -99,15 +99,22 @@ def _sample_via_staged_output(
     batch_size: int,
     scratch_dir: str | None,
 ) -> None:
-    with staged_output(
+    all_inputs = [Path(f) for f in (*features_files, *conformers_files)]
+    split_idx = len(features_files)
+
+    with staged_io(
+        all_inputs,
         output_path.parent,
-        transfers=STAGED_OUTPUT_TRANSFERS,
+        transfers=STAGED_IO_TRANSFERS,
         scratch_dir=scratch_dir,
-    ) as local_output:
+    ) as (local_inputs, local_output):
+        local_features = [str(p) for p in local_inputs[:split_idx]]
+        local_conformers = [str(p) for p in local_inputs[split_idx:]]
         local_file = local_output / output_path.name
+
         _write_sample(
-            features_files,
-            conformers_files,
+            local_features,
+            local_conformers,
             positions,
             str(local_file),
             id_column,
@@ -178,7 +185,7 @@ def _sample_via_staged_output(
     "--scratch-dir",
     type=str,
     default=None,
-    help="Local directory for the sampled file before it is copied to --output "
+    help="Local directory for staging input and output files "
     "(defaults to the system temp directory).",
 )
 @wide_log(logger)
@@ -252,7 +259,7 @@ def sample_surrogate_candidates(
 
     positions = _select_positions(total_rows, effective_samples, seed)
 
-    _sample_via_staged_output(
+    _sample_via_staged_io(
         features_files,
         conformers_files,
         positions,
