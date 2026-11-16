@@ -2,7 +2,7 @@
 
 ## Overview
 
-Placeholder
+Lynceus is orchestrated using [Argo Workflows](https://argoproj.github.io/workflows/) running on kubernetes.
 
 ## Workflow
 
