@@ -23,6 +23,7 @@ samples:
       shards_sample: raw
       conformers: conformers
       features: features
+      manifests: manifests
     feature_types:
       - atom_pair
       - autocorr

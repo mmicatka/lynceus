@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Workflow
 metadata:
-  generateName: 10m-poc-preprocess-candidates-
+  generateName: hsp90_n_terminal-preprocess-candidates-
 spec:
   entrypoint: main-dag
   serviceAccountName: argo-workflow
@@ -16,13 +16,13 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: input_prefix
-            value: candidates/10m/shards
+            value: candidates/100k/raw
           - name: source_glob
             value: '*.parquet'
           - name: output_file
             value: /tmp/manifest.json
           - name: persist_file
-            value: candidates/raw/shards/manifests/preprocess_plan.json
+            value: candidates/100k/manifests/preprocess_plan.json
       - name: check-preprocessed
         depends: plan-preprocess
         template: verify-manifest-preprocess-candidates
@@ -31,11 +31,11 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: manifest
-            value: /mnt/lynceus/candidates/raw/shards/manifests/preprocess_candidates.manifest.json
+            value: /mnt/lynceus/candidates/100k/manifests/preprocess_candidates.manifest.json
           - name: expect
-            value: '{"features":["atom_pair","autocorr","descriptors","ecfp","functional_groups","morse","rdf","topological_torsion","usrcat","whim"],"preprocessed":true,"sub_sample":10000000}'
+            value: '{"features":["atom_pair","autocorr","descriptors","ecfp","functional_groups","morse","rdf","topological_torsion","usrcat","whim"],"preprocessed":true,"sample":"100k"}'
           - name: source_globs
-            value: '["candidates/10m/shards/*.parquet"]'
+            value: '["candidates/100k/raw/*.parquet"]'
           - name: result_file
             value: /tmp/manifest_matches.txt
       - name: process-shards-fanout
@@ -55,11 +55,11 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: source
-            value: /mnt/lynceus/candidates/raw/shards/manifests/preprocess_plan.json
+            value: /mnt/lynceus/candidates/100k/manifests/preprocess_plan.json
           - name: output
-            value: /mnt/lynceus/candidates/raw/shards/manifests/preprocess_candidates.manifest.json
+            value: /mnt/lynceus/candidates/100k/manifests/preprocess_candidates.manifest.json
           - name: fields
-            value: '{"features":["atom_pair","autocorr","descriptors","ecfp","functional_groups","morse","rdf","topological_torsion","usrcat","whim"],"preprocessed":true,"sub_sample":10000000}'
+            value: '{"features":["atom_pair","autocorr","descriptors","ecfp","functional_groups","morse","rdf","topological_torsion","usrcat","whim"],"preprocessed":true,"sample":"100k"}'
   - name: verify-manifest-preprocess-candidates
     volumes:
     - name: lynceus
@@ -357,9 +357,9 @@ spec:
           - name: source
             value: '{{inputs.parameters.source}}'
           - name: input_prefix
-            value: candidates/10m/shards
+            value: candidates/100k/raw
           - name: output_prefix
-            value: candidates/10m/conformers
+            value: candidates/100k/conformers
       - name: generate-features
         depends: generate-conformers
         template: generate-features
@@ -370,9 +370,9 @@ spec:
           - name: source
             value: '{{inputs.parameters.source}}'
           - name: input_prefix
-            value: candidates/10m/conformers
+            value: candidates/100k/conformers
           - name: output_prefix
-            value: candidates/10m/features
+            value: candidates/100k/features
           - name: features
             value: '["atom_pair", "autocorr", "descriptors", "ecfp", "functional_groups",
               "morse", "rdf", "topological_torsion", "usrcat", "whim"]'

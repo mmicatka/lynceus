@@ -1,4 +1,4 @@
-# workflows/src/workflows/config/workflow.py
+# workflows/src/workflows/config/core.py
 
 
 from dataclasses import dataclass
@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Self
 
 from workflows.config.candidates import CandidatesConfig, load_candidates_config
+from workflows.config.paths import WorkflowPaths
 from workflows.config.screen import ScreenConfig, load_screen_config
 from workflows.config.templates import TemplatesConfig, load_templates_config
 
@@ -15,6 +16,14 @@ class WorkflowConfigs:
     candidates: CandidatesConfig
     templates: TemplatesConfig
     screen: ScreenConfig
+
+    @property
+    def paths(self) -> WorkflowPaths:
+        return WorkflowPaths(
+            self.candidates,
+            self.screen,
+            self.templates.volume.mount_path,
+        )
 
     @classmethod
     def load(

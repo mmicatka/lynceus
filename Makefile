@@ -3,8 +3,10 @@
 REGISTRY ?= registry.nebula.lan:5000
 IMAGE_PREFIX := $(REGISTRY)/lynceus
 
-SCREEN_CONFIG ?= conf/screen/10m-poc.yaml
-INFRA_CONFIG ?= conf/infra/dev.yaml
+TEMPLATES_CONFIG ?= conf/templates.yaml
+CANDIDATES_CONFIG ?= conf/candidates.yaml
+
+SCREEN_CONFIG ?= conf/screen/hsp90_n_terminal.yaml
 
 NAMESPACE ?= workflows
 VERSION ?= 0.1.0
@@ -34,8 +36,9 @@ generate-workflows:
 	generate-workflows \
 		$(foreach wf,$(WORKFLOWS),-w $(wf)) \
 		-o $(OUT_DIR) \
-		-s $(SCREEN_CONFIG) \
-		-i $(INFRA_CONFIG)
+		-t $(TEMPLATES_CONFIG) \
+		-c $(CANDIDATES_CONFIG) \
+		-s $(SCREEN_CONFIG)
 
 submit-workflows: generate
 	@echo "Submitting workflows: $(WORKFLOWS) to namespace $(NAMESPACE)..."

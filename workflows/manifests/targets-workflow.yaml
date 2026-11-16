@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Workflow
 metadata:
-  generateName: 10m-poc-targets-
+  generateName: hsp90_n_terminal-targets-
 spec:
   entrypoint: main-dag
   serviceAccountName: argo-workflow
@@ -106,11 +106,11 @@ spec:
         arguments:
           parameters:
           - name: pdb_ids
-            value: 1UYM
+            value: 1UYM,1YET
           - name: base_path
             value: /mnt/lynceus
           - name: output_prefix
-            value: target/pdbs/HSP90_N_Terminal
+            value: screens/hsp90_n_terminal/targets/pdbs/HSP90_N_Terminal
       - name: generate-manifest-hsp90-n-terminal
         depends: download-pdbs-hsp90-n-terminal
         template: generate-protein-ensemble-manifest
@@ -119,9 +119,9 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: input_path
-            value: target/pdbs/HSP90_N_Terminal
+            value: screens/hsp90_n_terminal/targets/pdbs/HSP90_N_Terminal
           - name: output_path
-            value: target/ensembles/HSP90_N_Terminal
+            value: screens/hsp90_n_terminal/targets/ensembles/HSP90_N_Terminal
           - name: ensemble_id
             value: HSP90_N_Terminal
           - name: structure_glob
@@ -178,7 +178,7 @@ spec:
         arguments:
           parameters:
           - name: ensemble_path
-            value: /mnt/lynceus/target/ensembles/HSP90_N_Terminal
+            value: /mnt/lynceus/screens/hsp90_n_terminal/targets/ensembles/HSP90_N_Terminal
           - name: min_pocket_score
             value: '15.0'
   - name: main-dag

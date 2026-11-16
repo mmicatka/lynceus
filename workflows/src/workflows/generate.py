@@ -8,6 +8,7 @@ import yaml
 from pydantic import ValidationError
 
 from workflows.config.common import ConfigError
+from workflows.config.core import WorkflowConfigs
 from workflows.registry import WORKFLOW_REGISTRY
 
 CONFIG_ERRORS = (ConfigError, ValidationError, yaml.YAMLError)

@@ -3,8 +3,7 @@
 
 from hera.workflows import Workflow
 
-from workflows.config import InfraConfig
-from workflows.resources.retry import IO_RETRY_STRATEGY
+from workflows.config.templates import TemplatesConfig
 from workflows.templates import TemplateFactory
 
 ITEM_PARAM = "{{item}}"
@@ -27,8 +26,8 @@ def shard_filename(shard: str) -> str:
     return f"{SHARD_PREFIX}{shard}{SHARD_SUFFIX}"
 
 
-def get_template_factory(infra_config: InfraConfig) -> TemplateFactory:
-    return TemplateFactory.from_config(infra_config, retry_strategy=IO_RETRY_STRATEGY)
+def get_template_factory(templates_config: TemplatesConfig) -> TemplateFactory:
+    return TemplateFactory.from_config(templates_config)
 
 
 def new_workflow(name_prefix: str, suffix: str) -> Workflow:

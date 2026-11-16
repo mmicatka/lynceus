@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Workflow
 metadata:
-  generateName: 10m-poc-candidates-sample-
+  generateName: hsp90_n_terminal-candidates-sample-
 spec:
   entrypoint: main-dag
   serviceAccountName: argo-workflow
@@ -532,11 +532,11 @@ spec:
           - name: source
             value: shard_{{item}}.parquet
           - name: source_prefix
-            value: candidates/raw/shards/merged
+            value: candidates/raw/merged
           - name: parquet_prefix
-            value: candidates/10m/shards/
+            value: candidates/100k/raw/
           - name: num_samples
-            value: '19531'
+            value: '195'
   - name: subsample-candidates
     volumes:
     - name: lynceus

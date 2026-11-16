@@ -1,12 +1,15 @@
 # workflows/src/workflows/registry/candidates/preprocess.py
 
+
+from collections.abc import Callable
 from typing import Any
 
 from hera.workflows import DAG, Parameter, RetryStrategy, Task, Workflow
 from hera.workflows.models import ValueFrom
 
-from workflows.config import InfraConfig, ScreenConfig
-from workflows.config.infrastructure import TemplateName
+from workflows.config.core import WorkflowConfigs
+from workflows.config.paths import SamplePaths
+from workflows.config.templates import TemplateName
 from workflows.registry.common.core import (
     ENTRYPOINT_DAG,
     ITEM_PARAM,
@@ -24,18 +27,17 @@ from workflows.registry.common.manifest_gate import (
     when_unmatched,
 )
 from workflows.templates import (
-    TemplateFactory,
     generate_conformers_template,
     generate_features_template,
     plan_preprocess_candidates_template,
     update_manifest_template,
     verify_manifest_template,
 )
+from workflows.templates.builders import TemplateFactory
 
 PREPROCESS_CANDIDATES_DAG = "preprocess-candidates-dag"
 PREPROCESS_FANOUT_DAG = "preprocess-shards-fanout-dag"
 PROCESS_SHARD_DAG = "process-shard-dag"
-
 
 SOURCES_PARAM = "sources"
 SHARD_FILE_GLOB = "*.parquet"
@@ -45,30 +47,21 @@ PLAN_FILENAME = "preprocess_plan.json"
 MANIFEST_FILENAME = "preprocess_candidates.manifest.json"
 PREPROCESSED_KEY = "preprocessed"
 FEATURES_KEY = "features"
-SUB_SAMPLE_KEY = "sub_sample"
+SAMPLE_KEY = "sample"
+
+TaskFactory = Callable[..., Task]
 
 
-def _conformer_input_prefix(
-    infra_config: InfraConfig,
-    screen_config: ScreenConfig,
-) -> str:
-    prefixes = infra_config.storage.prefixes.candidates
-    return (
-        prefixes.shards_sample
-        if screen_config.candidates.sub_sample
-        else prefixes.shards
-    )
+def _sample_paths(configs: WorkflowConfigs) -> SamplePaths:
+    return configs.paths.sample(configs.screen.candidates)
 
 
-def _state_path(infra_config: InfraConfig, filename: str) -> str:
-    state_prefix = infra_config.storage.prefixes.candidates.shards_manifests
-    return f"{infra_config.volume.mount_path}/{state_prefix}/{filename}"
-
-
-def _manifest_fields(screen_config: ScreenConfig) -> dict[str, Any]:
+def _manifest_fields(configs: WorkflowConfigs) -> dict[str, Any]:
+    sample_name = configs.screen.candidates
+    sample = configs.candidates.samples[sample_name]
     return {
-        SUB_SAMPLE_KEY: screen_config.candidates.sub_sample,
-        FEATURES_KEY: list(screen_config.filter.feature_list),
+        SAMPLE_KEY: sample_name,
+        FEATURES_KEY: [feature.value for feature in sample.feature_types],
     }
 
 
@@ -79,11 +72,8 @@ def _sources_expression(plan_task: Task) -> str:
 
 def _plan_preprocess_task(
     templates: TemplateFactory,
-    infra_config: InfraConfig,
-    screen_config: ScreenConfig,
+    sample_paths: SamplePaths,
 ) -> Task:
-    input_prefix = _conformer_input_prefix(infra_config, screen_config)
-    state_prefix = infra_config.storage.prefixes.candidates.shards_manifests
     plan = templates.build(
         TemplateName.PLAN_PREPROCESS_CANDIDATES,
         plan_preprocess_candidates_template,
@@ -98,16 +88,16 @@ def _plan_preprocess_task(
     return plan(
         name="plan-preprocess",
         arguments={
-            "base_path": infra_config.volume.mount_path,
-            "input_prefix": input_prefix,
+            "base_path": sample_paths.mount_path,
+            "input_prefix": sample_paths.shards_sample,
             "source_glob": SHARD_FILE_GLOB,
             "output_file": MANIFEST_PATH,
-            "persist_file": f"{state_prefix}/{PLAN_FILENAME}",
+            "persist_file": f"{sample_paths.manifests}/{PLAN_FILENAME}",
         },
     )
 
 
-def _build_verify_manifest(templates: TemplateFactory):
+def _build_verify_manifest(templates: TemplateFactory) -> TaskFactory:
     return templates.build(
         TemplateName.VERIFY_MANIFEST_PREPROCESS_CANDIDATES,
         verify_manifest_template,
@@ -118,52 +108,46 @@ def _build_verify_manifest(templates: TemplateFactory):
 
 
 def _check_manifest_task(
-    verify,
-    infra_config: InfraConfig,
-    screen_config: ScreenConfig,
+    verify: TaskFactory,
+    sample_paths: SamplePaths,
+    configs: WorkflowConfigs,
 ) -> Task:
-    input_prefix = _conformer_input_prefix(infra_config, screen_config)
-    expected = {**_manifest_fields(screen_config), PREPROCESSED_KEY: True}
+    expected = {**_manifest_fields(configs), PREPROCESSED_KEY: True}
     return verify(
         name="check-preprocessed",
         arguments={
-            "base_path": infra_config.volume.mount_path,
-            "manifest": _state_path(infra_config, MANIFEST_FILENAME),
+            "base_path": sample_paths.mount_path,
+            "manifest": sample_paths.state_path(MANIFEST_FILENAME),
             "expect": json_arg(expected),
-            "source_globs": [f"{input_prefix}/{SHARD_FILE_GLOB}"],
+            "source_globs": [f"{sample_paths.shards_sample}/{SHARD_FILE_GLOB}"],
             "result_file": MATCHES_PATH,
         },
     )
 
 
 def _update_manifest_task(
-    update,
-    infra_config: InfraConfig,
-    screen_config: ScreenConfig,
+    update: TaskFactory,
+    sample_paths: SamplePaths,
+    configs: WorkflowConfigs,
     when: str,
 ) -> Task:
     return update(
         name="write-manifest",
         when=when,
         arguments={
-            "base_path": infra_config.volume.mount_path,
-            "source": _state_path(infra_config, PLAN_FILENAME),
-            "output": _state_path(infra_config, MANIFEST_FILENAME),
-            "fields": json_arg(
-                {**_manifest_fields(screen_config), PREPROCESSED_KEY: True}
-            ),
+            "base_path": sample_paths.mount_path,
+            "source": sample_paths.state_path(PLAN_FILENAME),
+            "output": sample_paths.state_path(MANIFEST_FILENAME),
+            "fields": json_arg({**_manifest_fields(configs), PREPROCESSED_KEY: True}),
         },
     )
 
 
 def _build_process_shard_dag(
     templates: TemplateFactory,
-    infra_config: InfraConfig,
-    screen_config: ScreenConfig,
+    sample_paths: SamplePaths,
+    configs: WorkflowConfigs,
 ) -> DAG:
-    prefixes = infra_config.storage.prefixes.candidates
-    base_path = infra_config.volume.mount_path
-
     generate_conformers = templates.build(
         TemplateName.GENERATE_CONFORMERS,
         generate_conformers_template,
@@ -179,20 +163,21 @@ def _build_process_shard_dag(
         conformers_task = generate_conformers(
             name="generate-conformers",
             arguments={
-                "base_path": base_path,
+                "base_path": sample_paths.mount_path,
                 "source": SOURCE_PARAM,
-                "input_prefix": _conformer_input_prefix(infra_config, screen_config),
-                "output_prefix": prefixes.conformers,
+                "input_prefix": sample_paths.shards_sample,
+                "output_prefix": sample_paths.conformers,
             },
         )
+        sample = configs.candidates.samples[configs.screen.candidates]
         features_task = generate_features(
             name="generate-features",
             arguments={
-                "base_path": base_path,
+                "base_path": sample_paths.mount_path,
                 "source": SOURCE_PARAM,
-                "input_prefix": prefixes.conformers,
-                "output_prefix": prefixes.features,
-                "features": screen_config.filter.feature_list,
+                "input_prefix": sample_paths.conformers,
+                "output_prefix": sample_paths.features,
+                "features": [feature.value for feature in sample.feature_types],
             },
         )
         conformers_task >> features_task  # type: ignore
@@ -202,10 +187,10 @@ def _build_process_shard_dag(
 
 def _build_fanout_dag(
     templates: TemplateFactory,
-    infra_config: InfraConfig,
-    screen_config: ScreenConfig,
+    sample_paths: SamplePaths,
+    configs: WorkflowConfigs,
 ) -> DAG:
-    process_shard_dag = _build_process_shard_dag(templates, infra_config, screen_config)
+    process_shard_dag = _build_process_shard_dag(templates, sample_paths, configs)
 
     with DAG(
         name=PREPROCESS_FANOUT_DAG,
@@ -223,27 +208,28 @@ def _build_fanout_dag(
 
 def build_preprocess_candidates_dag(
     templates: TemplateFactory,
-    infra_config: InfraConfig,
-    screen_config: ScreenConfig,
+    configs: WorkflowConfigs,
 ) -> DAG:
+    sample_paths = _sample_paths(configs)
+
     with DAG(name=PREPROCESS_CANDIDATES_DAG) as dag:
         verify_manifest = _build_verify_manifest(templates)
         update_manifest = templates.build(
             TemplateName.UPDATE_MANIFEST_PREPROCESS_CANDIDATES, update_manifest_template
         )
 
-        plan_task = _plan_preprocess_task(templates, infra_config, screen_config)
-        check_task = _check_manifest_task(verify_manifest, infra_config, screen_config)
+        plan_task = _plan_preprocess_task(templates, sample_paths)
+        check_task = _check_manifest_task(verify_manifest, sample_paths, configs)
         preprocess_gate = when_unmatched(check_task)
 
-        fanout_dag = _build_fanout_dag(templates, infra_config, screen_config)
+        fanout_dag = _build_fanout_dag(templates, sample_paths, configs)
         fanout_task = fanout_dag(
             name="process-shards-fanout",
             when=preprocess_gate,
             arguments={SOURCES_PARAM: _sources_expression(plan_task)},
         )
         write_task = _update_manifest_task(
-            update_manifest, infra_config, screen_config, preprocess_gate
+            update_manifest, sample_paths, configs, preprocess_gate
         )
 
         plan_task >> check_task >> fanout_task >> write_task  # type: ignore
@@ -251,16 +237,11 @@ def build_preprocess_candidates_dag(
     return dag
 
 
-def build_preprocess_candidates_workflow(
-    infra_config: InfraConfig,
-    screen_config: ScreenConfig,
-) -> Workflow:
-    templates = get_template_factory(infra_config)
+def build_preprocess_candidates_workflow(configs: WorkflowConfigs) -> Workflow:
+    templates = get_template_factory(configs.templates)
 
-    with new_workflow(screen_config.name, "preprocess-candidates") as workflow:
-        preprocess_dag = build_preprocess_candidates_dag(
-            templates, infra_config, screen_config
-        )
+    with new_workflow(configs.screen.name, "preprocess-candidates") as workflow:
+        preprocess_dag = build_preprocess_candidates_dag(templates, configs)
 
         with DAG(name=ENTRYPOINT_DAG):
             preprocess_dag(name="preprocess-candidates")

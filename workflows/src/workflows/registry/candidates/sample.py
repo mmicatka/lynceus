@@ -3,8 +3,8 @@
 
 from hera.workflows import DAG, RetryStrategy, Task, Workflow
 
-from workflows.config import InfraConfig, ScreenConfig
-from workflows.config.infrastructure import TemplateName
+from workflows.config.core import WorkflowConfigs
+from workflows.config.templates import TemplateName
 from workflows.registry.common.core import (
     ENTRYPOINT_DAG,
     ITEM_PARAM,
@@ -21,22 +21,26 @@ SAMPLE_RETRY = RetryStrategy(limit=3, retry_policy="OnFailure")
 SAMPLE_CANDIDATES_DAG = "sample-candidates-dag"
 
 
-def _require_sub_sample(screen_config: ScreenConfig) -> int:
-    sub_sample = screen_config.candidates.sub_sample
-    if not sub_sample:
+def _sample_spec(configs: WorkflowConfigs) -> tuple[str, int]:
+    sample_name = configs.screen.candidates
+    sample_cfg = configs.candidates.samples.get(sample_name)
+    if sample_cfg is None:
         raise RuntimeError(
-            "candidates.sub_sample must be set to build the sample workflow"
+            f"Unknown sample {sample_name!r}; "
+            f"available: {sorted(configs.candidates.samples)}"
         )
-    return sub_sample
+    return sample_name, sample_cfg.num_samples
 
 
 def _subsample_task(
     templates: TemplateFactory,
-    infra_config: InfraConfig,
-    sub_sample: int,
+    configs: WorkflowConfigs,
 ) -> Task:
-    prefixes = infra_config.storage.prefixes.candidates
-    num_shards = infra_config.candidates.num_shards
+    sample_name, sub_sample = _sample_spec(configs)
+    paths = configs.paths
+    sample_paths = paths.sample(sample_name)
+    num_shards = configs.candidates.candidate_pool.sharding.num_shards
+
     subsample_candidates = templates.build(
         TemplateName.SUBSAMPLE_CANDIDATES,
         sample_candidates_template,
@@ -47,10 +51,10 @@ def _subsample_task(
         name="subsample-candidates",
         with_items=shard_ids(num_shards),
         arguments={
-            "base_path": infra_config.volume.mount_path,
+            "base_path": paths.mount_path,
             "source": shard_filename(ITEM_PARAM),
-            "source_prefix": prefixes.shards,
-            "parquet_prefix": f"{prefixes.shards_sample}/",
+            "source_prefix": paths.merged,
+            "parquet_prefix": f"{sample_paths.shards_sample}/",
             "num_samples": sub_sample // num_shards,
         },
     )
@@ -58,26 +62,20 @@ def _subsample_task(
 
 def build_sample_candidates_dag(
     templates: TemplateFactory,
-    infra_config: InfraConfig,
-    screen_config: ScreenConfig,
+    configs: WorkflowConfigs,
     parallelism: int = SAMPLE_SHARDS_PARALLELISM,
 ) -> DAG:
-    sub_sample = _require_sub_sample(screen_config)
-
     with DAG(name=SAMPLE_CANDIDATES_DAG, parallelism=parallelism) as dag:
-        _subsample_task(templates, infra_config, sub_sample)
+        _subsample_task(templates, configs)
 
     return dag
 
 
-def build_sample_candidates_workflow(
-    infra_config: InfraConfig,
-    screen_config: ScreenConfig,
-) -> Workflow:
-    templates = get_template_factory(infra_config)
+def build_sample_candidates_workflow(configs: WorkflowConfigs) -> Workflow:
+    templates = get_template_factory(configs.templates)
 
-    with new_workflow(screen_config.name, "candidates-sample") as workflow:
-        sample_dag = build_sample_candidates_dag(templates, infra_config, screen_config)
+    with new_workflow(configs.screen.name, "candidates-sample") as workflow:
+        sample_dag = build_sample_candidates_dag(templates, configs)
 
         with DAG(name=ENTRYPOINT_DAG):
             sample_dag(name="sample-candidates")

@@ -61,6 +61,7 @@ class SampleStorage(PrefixGroup):
     shards_sample: StoragePrefix
     conformers: StoragePrefix
     features: StoragePrefix
+    manifests: StoragePrefix
 
 
 class ShardingConfig(StrictModel):
@@ -104,6 +105,9 @@ class CandidateSampleConfig(StrictModel):
 
     def features_prefix(self, sample_root: PurePosixPath) -> PurePosixPath:
         return sample_root / self.storage.features
+
+    def manifests_prefix(self, sample_root: PurePosixPath) -> PurePosixPath:
+        return sample_root / self.storage.manifests
 
 
 class CandidatesConfig(StrictModel):
