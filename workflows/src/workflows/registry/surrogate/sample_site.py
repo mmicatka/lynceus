@@ -7,7 +7,7 @@ from hera.workflows import DAG, Parameter, Task
 from hera.workflows.models import ValueFrom
 
 from workflows.config import InfraConfig, ScreenConfig
-from workflows.config.infrastructure import ComputeTemplateName
+from workflows.config.infrastructure import TemplateName
 from workflows.config.screen import RoundConfig, SurrogateConfig
 from workflows.registry.common.manifest_gate import (
     MANIFEST_OUTPUT,
@@ -52,7 +52,7 @@ INPUT_PATH_KEY = "input_path"
 
 def _build_verify_manifest(templates: TemplateFactory):
     return templates.build(
-        ComputeTemplateName.VERIFY_MANIFEST_SURROGATE,
+        TemplateName.VERIFY_MANIFEST_SURROGATE,
         verify_manifest_template,
         outputs=[
             Parameter(name=MATCHES_OUTPUT, value_from=ValueFrom(path=MATCHES_PATH))
@@ -176,25 +176,23 @@ def build_surrogate_site_dag(
     validation_spec = _validation_spec(surrogate)
     round_specs = _round_specs(surrogate, layout)
 
-    dock = templates.build(ComputeTemplateName.RUN_DOCKING, run_docking_template)
+    dock = templates.build(TemplateName.RUN_DOCKING, run_docking_template)
     surrogate_train = templates.build(
-        ComputeTemplateName.SURROGATE_TRAIN, surrogate_train_template
+        TemplateName.SURROGATE_TRAIN, surrogate_train_template
     )
     sample_templates = SampleTemplates(
         sample={
             RandomSampleSpec: templates.build(
-                ComputeTemplateName.SURROGATE_SAMPLE, surrogate_sample_template
+                TemplateName.SURROGATE_SAMPLE, surrogate_sample_template
             ),
             PredictionSampleSpec: templates.build(
-                ComputeTemplateName.SURROGATE_SAMPLE_BY_PREDICTION,
+                TemplateName.SURROGATE_SAMPLE_BY_PREDICTION,
                 surrogate_sample_by_prediction_template,
             ),
         },
-        merge_shards=templates.build(
-            ComputeTemplateName.MERGE_SHARDS, merge_shards_template
-        ),
+        merge_shards=templates.build(TemplateName.MERGE_SHARDS, merge_shards_template),
         plan=templates.build(
-            ComputeTemplateName.PLAN_SURROGATE_SAMPLE,
+            TemplateName.PLAN_SURROGATE_SAMPLE,
             plan_surrogate_sample_template,
             outputs=[
                 Parameter(
@@ -205,7 +203,7 @@ def build_surrogate_site_dag(
         ),
         verify_manifest=_build_verify_manifest(templates),
         update_manifest=templates.build(
-            ComputeTemplateName.UPDATE_MANIFEST_SURROGATE, update_manifest_template
+            TemplateName.UPDATE_MANIFEST_SURROGATE, update_manifest_template
         ),
     )
 

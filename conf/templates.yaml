@@ -1,0 +1,171 @@
+---
+x-defs:
+  images:
+    candidates: &candidates_image
+      image: registry.nebula.lan:5000/lynceus/candidates:0.1.0
+    targets: &targets_image
+      image: registry.nebula.lan:5000/lynceus/targets:0.1.0
+    surrogate: &surrogate_image
+      image: registry.nebula.lan:5000/lynceus/surrogate-model:0.1.0
+    docking: &docking_image
+      image: registry.nebula.lan:5000/lynceus/lynceus-dock:0.1.0
+  resources:
+    low_cpu: &low_cpu
+      requests: &low_cpu_res
+        cpu: "2"
+        memory: 2Gi
+      limits: *low_cpu_res
+    low_cpu_high_ram: &low_cpu_high_ram
+      requests: &low_cpu_high_ram_res
+        cpu: "2"
+        memory: 4Gi
+      limits: *low_cpu_high_ram_res
+    med_cpu: &med_cpu
+      requests: &med_cpu_res
+        cpu: "4"
+        memory: 4Gi
+      limits: *med_cpu_res
+    med_cpu_high_ram: &med_cpu_high_ram
+      requests: &med_cpu_high_ram_res
+        cpu: "4"
+        memory: 6Gi
+      limits: *med_cpu_high_ram_res
+    high_cpu: &high_cpu
+      requests: &high_cpu_res
+        cpu: "8"
+        memory: 8Gi
+      limits: *high_cpu_res
+
+    scratch_50gb: &scratch_50gb
+      mount_path: /scratch
+      size_limit: 50Gi
+
+    scratch_10gb: &scratch_10gb
+      mount_path: /scratch
+      size_limit: 10Gi
+
+volume:
+  name: lynceus
+  claim_name: lynceus-pvc
+  mount_path: /mnt/lynceus
+
+templates:
+  ##### Candidates #####
+  plan_shard_candidates:
+    resources: *low_cpu
+    image: *candidates_image
+
+  verify_shard_layout:
+    resources: *low_cpu
+    image: *candidates_image
+
+  verify_manifest_load_candidates:
+    resources: *low_cpu
+    image: *candidates_image
+
+  update_manifest_load_candidates:
+    resources: *low_cpu
+    image: *candidates_image
+
+  shard_candidates:
+    resources: *med_cpu
+    image: *candidates_image
+    scratch: *scratch_50gb
+
+  merge_shards:
+    resources: *med_cpu_high_ram
+    image: *candidates_image
+    scratch: *scratch_50gb
+
+  subsample_candidates:
+    resources: *high_cpu
+    image: *candidates_image
+
+  plan_preprocess_candidates:
+    resources: *low_cpu
+    image: *candidates_image
+
+  verify_manifest_preprocess_candidates:
+    resources: *low_cpu
+    image: *candidates_image
+
+  update_manifest_preprocess_candidates:
+    resources: *low_cpu
+    image: *candidates_image
+
+  generate_conformers:
+    resources: *med_cpu
+    image: *candidates_image
+    scratch: *scratch_50gb
+
+  generate_features:
+    resources: *med_cpu_high_ram
+    image: *candidates_image
+    scratch: *scratch_50gb
+
+  ##### Targets #####
+  download_pdbs:
+    resources: *low_cpu
+    image: *targets_image
+
+  generate_protein_ensemble_manifest:
+    resources: *low_cpu
+    image: *targets_image
+
+  detect_binding_sites:
+    resources: *low_cpu
+    image: *targets_image
+
+  resolve_binding_sites:
+    resources: *low_cpu
+    image: *targets_image
+
+  ##### Surrogate #####
+  plan_surrogate_sample:
+    resources: *low_cpu
+    image: *surrogate_image
+
+  verify_manifest_surrogate:
+    resources: *low_cpu
+    image: *surrogate_image
+
+  update_manifest_surrogate:
+    resources: *low_cpu
+    image: *surrogate_image
+
+  surrogate_sample:
+    resources: *low_cpu_high_ram
+    image: *surrogate_image
+    scratch: *scratch_10gb
+
+  surrogate_sample_by_prediction:
+    resources: *low_cpu_high_ram
+    image: *surrogate_image
+    scratch: *scratch_10gb
+
+  surrogate_train:
+    resources: *high_cpu
+    image: *surrogate_image
+    scratch: *scratch_10gb
+
+  run_docking:
+    image: *docking_image
+    resources:
+      requests:
+        cpu: "4"
+        memory: 8Gi
+      limits:
+        cpu: "4"
+        memory: 8Gi
+      gpu: 1
+    env:
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+    node_selector:
+      nvidia.com/gpu.present: "true"
+    tolerations:
+      - key: nvidia.com/gpu
+        operator: Exists
+        effect: NoSchedule
+    runtime_class_name: nvidia
+    scratch: *scratch_10gb

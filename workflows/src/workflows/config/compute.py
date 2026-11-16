@@ -39,12 +39,6 @@ class ScratchConfig(StrictModel):
     in_memory: bool = False
 
 
-class VolumeConfig(StrictModel):
-    name: str
-    claim_name: str
-    mount_path: MountPath
-
-
 class ImageConfig(StrictModel):
     image: str
     image_pull_policy: Literal["Always", "IfNotPresent", "Never"] = "Always"

@@ -5,7 +5,7 @@ import re
 from hera.workflows import DAG
 
 from workflows.config import InfraConfig, ScreenConfig
-from workflows.config.infrastructure import ComputeTemplateName
+from workflows.config.infrastructure import TemplateName
 from workflows.templates import (
     TemplateFactory,
     download_pdbs_template,
@@ -39,12 +39,9 @@ def build_load_targets_dag(
     base_path = infra_config.volume.mount_path
     prefixes = infra_config.storage.prefixes.target
 
-    download_pdbs = templates.build(
-        ComputeTemplateName.DOWNLOAD_PDBS, download_pdbs_template
-    )
+    download_pdbs = templates.build(TemplateName.DOWNLOAD_PDBS, download_pdbs_template)
     generate_manifest = templates.build(
-        ComputeTemplateName.GENERATE_PROTEIN_ENSEMBLE_MANIFEST,
-        generate_manifest_template,
+        TemplateName.GENERATE_PROTEIN_ENSEMBLE_MANIFEST, generate_manifest_template
     )
 
     with DAG(name=LOAD_TARGETS_DAG) as load_targets_dag:

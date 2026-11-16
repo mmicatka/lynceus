@@ -6,7 +6,7 @@ import re
 from hera.workflows import DAG
 
 from workflows.config import InfraConfig, ScreenConfig
-from workflows.config.infrastructure import ComputeTemplateName
+from workflows.config.infrastructure import TemplateName
 from workflows.templates import TemplateFactory
 from workflows.templates.targets import (
     detect_binding_sites_template,
@@ -36,7 +36,7 @@ def build_detect_binding_sites_dag(
     prefixes = infra_config.storage.prefixes.target
 
     detect_binding_sites = templates.build(
-        ComputeTemplateName.DETECT_BINDING_SITES, detect_binding_sites_template
+        TemplateName.DETECT_BINDING_SITES, detect_binding_sites_template
     )
 
     with DAG(name=DETECT_BINDING_SITES_DAG) as detect_binding_sites_dag:

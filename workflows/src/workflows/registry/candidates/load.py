@@ -7,7 +7,7 @@ from hera.workflows import DAG, Parameter, Task, Workflow
 from hera.workflows.models import ValueFrom
 
 from workflows.config import InfraConfig, ScreenConfig
-from workflows.config.infrastructure import ComputeTemplateName
+from workflows.config.infrastructure import TemplateName
 from workflows.registry.common.core import (
     ENTRYPOINT_DAG,
     ITEM_PARAM,
@@ -93,7 +93,7 @@ def _clean_staging_task(name: str, infra_config: InfraConfig) -> Task:
 def _plan_shard_task(templates: TemplateFactory, infra_config: InfraConfig) -> Task:
     prefixes = infra_config.storage.prefixes.candidates
     plan = templates.build(
-        ComputeTemplateName.PLAN_SHARD_CANDIDATES,
+        TemplateName.PLAN_SHARD_CANDIDATES,
         plan_shard_candidates_template,
         outputs=[
             Parameter(
@@ -117,9 +117,9 @@ def _plan_shard_task(templates: TemplateFactory, infra_config: InfraConfig) -> T
 
 def _shard_task(templates: TemplateFactory, infra_config: InfraConfig) -> Task:
     prefixes = infra_config.storage.prefixes.candidates
-    template_config = infra_config.templates[ComputeTemplateName.SHARD_CANDIDATES]
+    template_config = infra_config.templates[TemplateName.SHARD_CANDIDATES]
     shard = templates.build(
-        ComputeTemplateName.SHARD_CANDIDATES,
+        TemplateName.SHARD_CANDIDATES,
         shard_candidates_template,
     )
 
@@ -156,11 +156,9 @@ def _merge_and_clean_shard_dag(
     ) as dag:
         shard_param = "{{inputs.parameters.shard_id}}"
         prefixes = infra_config.storage.prefixes.candidates
-        template_config = infra_config.templates[ComputeTemplateName.MERGE_SHARDS]
+        template_config = infra_config.templates[TemplateName.MERGE_SHARDS]
 
-        merge_shards = templates.build(
-            ComputeTemplateName.MERGE_SHARDS, merge_shards_template
-        )
+        merge_shards = templates.build(TemplateName.MERGE_SHARDS, merge_shards_template)
         merge = merge_shards(
             name="merge-shard",
             arguments={
@@ -208,7 +206,7 @@ def build_merge_shards_dag(
 
 def _build_verify_manifest(templates: TemplateFactory):
     return templates.build(
-        ComputeTemplateName.VERIFY_MANIFEST_LOAD_CANDIDATES,
+        TemplateName.VERIFY_MANIFEST_LOAD_CANDIDATES,
         verify_manifest_template,
         outputs=[
             Parameter(name=MATCHES_OUTPUT, value_from=ValueFrom(path=MATCHES_PATH))
@@ -280,11 +278,10 @@ def build_load_candidates_dag(
     with DAG(name=LOAD_CANDIDATES_DAG) as dag:
         verify_manifest = _build_verify_manifest(templates)
         verify_layout = templates.build(
-            ComputeTemplateName.VERIFY_SHARD_LAYOUT, verify_shard_layout_template
+            TemplateName.VERIFY_SHARD_LAYOUT, verify_shard_layout_template
         )
         update_manifest = templates.build(
-            ComputeTemplateName.UPDATE_MANIFEST_LOAD_CANDIDATES,
-            update_manifest_template,
+            TemplateName.UPDATE_MANIFEST_LOAD_CANDIDATES, update_manifest_template
         )
 
         plan_task = _plan_shard_task(templates, infra_config)

@@ -16,11 +16,11 @@ from hera.workflows import (
 from hera.workflows.models import Quantity, Toleration
 
 from workflows.config.infrastructure import (
-    ComputeTemplateName,
     InfraConfig,
     ResourceSpec,
     ScratchConfig,
     TemplateConfig,
+    TemplateName,
     TolerationConfig,
     VolumeConfig,
 )
@@ -78,14 +78,14 @@ def _to_hera_volume(config: VolumeConfig) -> ExistingVolume:
     )
 
 
-def _to_template_name(name: ComputeTemplateName) -> str:
+def _to_template_name(name: TemplateName) -> str:
     return name.value.replace("_", "-")
 
 
 @dataclass(frozen=True)
 class TemplateFactory:
     volume: VolumeConfig
-    templates: dict[ComputeTemplateName, TemplateConfig]
+    templates: dict[TemplateName, TemplateConfig]
     retry_strategy: RetryStrategy | None = None
 
     @classmethod
@@ -110,7 +110,7 @@ class TemplateFactory:
 
     def build(
         self,
-        name: ComputeTemplateName,
+        name: TemplateName,
         func: Callable,
         *,
         retry_strategy: RetryStrategy = RETRY_STRATEGY,
