@@ -4,7 +4,7 @@
 
 Lynceus is orchestrated using [Argo Workflows](https://argoproj.github.io/workflows/) running on kubernetes.
 
-## Workflow
+## High-level Workflow
 
 ```mermaid
 
@@ -50,3 +50,7 @@ flowchart TD
   end
 
 ```
+
+## Components
+
+[surrogate](components/surrogate.md)
