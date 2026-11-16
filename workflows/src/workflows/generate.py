@@ -1,14 +1,52 @@
-# workflows/src/worksflows/generate_workflow.py
+# workflows/src/workflows/generate_workflow.py
 
-import os
+
 from pathlib import Path
 
 import click
+import yaml
+from pydantic import ValidationError
 
-from workflows.config import load_config
-from workflows.config.infrastructure import InfraConfig
-from workflows.config.screen import ScreenConfig
+from workflows.config.common import ConfigError
 from workflows.registry import WORKFLOW_REGISTRY
+
+CONFIG_ERRORS = (ConfigError, ValidationError, yaml.YAMLError)
+
+
+def _load_configs(
+    candidates_path: Path,
+    templates_path: Path,
+    screen_path: Path,
+) -> WorkflowConfigs:
+    try:
+        return WorkflowConfigs.load(
+            candidates_path=candidates_path,
+            templates_path=templates_path,
+            screen_path=screen_path,
+        )
+    except CONFIG_ERRORS as error:
+        raise click.ClickException(str(error)) from error
+
+
+def _render_workflows(
+    names: tuple[str, ...],
+    configs: WorkflowConfigs,
+) -> dict[str, str]:
+    rendered: dict[str, str] = {}
+    for name in names:
+        click.echo(f"Building workflow: {name}...")
+        rendered[name] = WORKFLOW_REGISTRY[name](configs).to_yaml()
+    return rendered
+
+
+def _write_workflows(rendered: dict[str, str], out_dir: Path) -> list[Path]:
+    out_dir.mkdir(parents=True, exist_ok=True)
+    paths = []
+    for name, content in rendered.items():
+        path = out_dir / f"{name}.yaml"
+        path.write_text(content)
+        paths.append(path)
+    return paths
 
 
 @click.command()
@@ -18,56 +56,48 @@ from workflows.registry import WORKFLOW_REGISTRY
     "workflows",
     multiple=True,
     required=True,
-    type=click.Choice(list(WORKFLOW_REGISTRY.keys())),
+    type=click.Choice(list(WORKFLOW_REGISTRY)),
     help="Name of the workflow to generate. Can be passed multiple times.",
 )
 @click.option(
     "-o",
     "--out-dir",
     default=".",
-    type=click.Path(exists=True, path_type=Path),
-    help="Directory to save the generated YAML files.",
+    type=click.Path(file_okay=False, path_type=Path),
+    help="Directory to save the generated YAML files. Created if missing.",
+)
+@click.option(
+    "-c",
+    "--candidates-config",
+    "candidates_path",
+    required=True,
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    help="Candidates YAML defining candidate storage and samples.",
+)
+@click.option(
+    "-t",
+    "--templates-config",
+    "templates_path",
+    required=True,
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    help="Templates YAML defining how and where each template runs.",
 )
 @click.option(
     "-s",
     "--screen-config",
-    "screen_config_path",
+    "screen_path",
     required=True,
-    type=click.Path(exists=True, path_type=Path),
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
     help="Screen YAML defining what to compute.",
 )
-@click.option(
-    "-i",
-    "--infra-config",
-    "infra_config_path",
-    required=True,
-    type=click.Path(exists=True, path_type=Path),
-    help="Infrastructure YAML defining how and where to run.",
-)
 def generate(
-    workflows: list[str],
-    screen_config_path: Path,
-    infra_config_path: Path,
+    workflows: tuple[str, ...],
     out_dir: Path,
-):
-
-    infra_config = load_config(infra_config_path, InfraConfig)
-    screen_config = load_config(screen_config_path, ScreenConfig)
-
-    os.makedirs(out_dir, exist_ok=True)
-
-    generated_files = []
-
-    for wf_name in workflows:
-        click.echo(f"Building workflow: {wf_name}...")
-
-        workflow_obj = WORKFLOW_REGISTRY[wf_name](infra_config, screen_config)
-        file_path = os.path.join(out_dir, f"{wf_name}.yaml")
-
-        with open(file_path, "w") as f:
-            f.write(workflow_obj.to_yaml())
-
-        generated_files.append(file_path)
-
-    for file_path in generated_files:
-        click.secho(f"Successfully generated and formatted: {file_path}", fg="green")
+    candidates_path: Path,
+    templates_path: Path,
+    screen_path: Path,
+) -> None:
+    configs = _load_configs(candidates_path, templates_path, screen_path)
+    rendered = _render_workflows(workflows, configs)
+    for path in _write_workflows(rendered, out_dir):
+        click.secho(f"Generated: {path}", fg="green")

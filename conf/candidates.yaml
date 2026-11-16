@@ -1,30 +1,29 @@
 ---
+storage:
+  base: candidates
+
 candidate_pool:
   storage:
-    prefixes:
-      base: candidates
-      raw:
-        smiles: smiles
-        parquet: parquets
-        shards:
-          staging: staging
-          merged: merged
-          manifests: manifests
+    base: raw
+    smiles: smiles
+    parquet: parquets
+    shards:
+      staging: staging
+      merged: merged
+      manifests: manifests
 
-  shards:
+  sharding:
     max_batch_gib: 10
     num_shards: 512
 
-candidates_samples:
-  100_thousand:
+samples:
+  100k:
     num_samples: 100000
     storage:
-      prefixes:
-        base: 100k
-        shards_sample: raw
-        conformers: conformers
-        features: features
-    feature_list:
+      shards_sample: raw
+      conformers: conformers
+      features: features
+    feature_types:
       - atom_pair
       - autocorr
       - descriptors

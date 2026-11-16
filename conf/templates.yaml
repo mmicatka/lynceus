@@ -2,13 +2,13 @@
 x-defs:
   images:
     candidates: &candidates_image
-      image: registry.nebula.lan:5000/lynceus/candidates:0.1.0
+      reference: registry.nebula.lan:5000/lynceus/candidates:0.1.0
     targets: &targets_image
-      image: registry.nebula.lan:5000/lynceus/targets:0.1.0
+      reference: registry.nebula.lan:5000/lynceus/targets:0.1.0
     surrogate: &surrogate_image
-      image: registry.nebula.lan:5000/lynceus/surrogate-model:0.1.0
+      reference: registry.nebula.lan:5000/lynceus/surrogate-model:0.1.0
     docking: &docking_image
-      image: registry.nebula.lan:5000/lynceus/lynceus-dock:0.1.0
+      reference: registry.nebula.lan:5000/lynceus/lynceus-dock:0.1.0
   resources:
     low_cpu: &low_cpu
       requests: &low_cpu_res

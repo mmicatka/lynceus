@@ -1,7 +1,7 @@
 ---
 name: hsp90_n_terminal
 
-candidates: 100_thousand
+candidates: 100k
 
 targets:
   ensembles:
@@ -16,7 +16,7 @@ targets:
 filter:
   surrogate:
     active_percentile: 1.0
-    feature_list:
+    feature_types:
       - atom_pair
       - autocorr
       - descriptors
@@ -27,7 +27,7 @@ filter:
       - topological_torsion
       - usrcat
       - whim
-    seed: 1000
+    random_seed: 1000
     validation: 1000
     rounds:
       - top: 0
