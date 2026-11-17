@@ -3,7 +3,7 @@
 
 from collections.abc import Callable, Sequence
 
-from hera.workflows import DAG, Parameter, Task
+from hera.workflows import DAG, Parameter, Step, Task
 from hera.workflows.models import ValueFrom
 
 from workflows.config.core import WorkflowConfigs
@@ -77,10 +77,6 @@ def _round_label(index: int) -> str:
     return f"round_{index}"
 
 
-def _round_labels(surrogate: SurrogateConfig) -> list[str]:
-    return [_round_label(index) for index in range(len(surrogate.rounds))]
-
-
 def _validation_spec(surrogate: SurrogateConfig) -> SampleSpec:
     return RandomSampleSpec(
         label=VALIDATION_LABEL,
@@ -102,6 +98,14 @@ def _train_arguments(
     }
 
 
+def _round_labels(surrogate: SurrogateConfig) -> list[str]:
+    return [_round_label(index) for index in range(len(surrogate.rounds))]
+
+
+def _prior_round_labels(index: int) -> list[str]:
+    return [_round_label(prior) for prior in range(index)]
+
+
 def _round_spec(
     index: int,
     round_config: RoundConfig,
@@ -121,6 +125,7 @@ def _round_spec(
         model_path=layout.model_path(_round_label(index - 1)),
         num_top=round_config.top,
         num_random=round_config.random,
+        exclude_inputs=layout.features_path_list(_prior_round_labels(index)),
     )
 
 
@@ -131,15 +136,25 @@ def _round_specs(surrogate: SurrogateConfig, layout: SiteLayout) -> list[SampleS
     ]
 
 
+def _as_task(created: Step | Task | None, name: str) -> Task:
+    if not isinstance(created, Task):
+        raise RuntimeError(f"Expected {name} to create a Task, got {type(created)}")
+    return created
+
+
 def _sample_and_dock(
     spec: SampleSpec,
     layout: SiteLayout,
     sample_dag: DAG,
     dock: TaskFactory,
 ) -> tuple[Task, Task]:
-    sample_task = sample_dag(
-        name=f"sample-{spec.task_suffix}",
-        arguments={name: ref(name) for name in SAMPLE_PARAMETERS},
+    sample_name = f"sample-{spec.task_suffix}"
+    sample_task = _as_task(
+        sample_dag(
+            name=sample_name,
+            arguments={name: ref(name) for name in SAMPLE_PARAMETERS},
+        ),
+        sample_name,
     )
     dock_task = dock(
         name=f"dock-{spec.task_suffix}",

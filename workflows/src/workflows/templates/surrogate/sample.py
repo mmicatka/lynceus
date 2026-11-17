@@ -77,6 +77,7 @@ def surrogate_sample_by_prediction_template(
     model_path: str,
     num_top: int,
     num_random: int,
+    exclude_inputs: list[str] | None = None,
     id_column: str = "id",
     batch_size: int = 50000,
     seed: int | None = None,
@@ -106,6 +107,10 @@ def surrogate_sample_by_prediction_template(
         "--batch-size",
         str(batch_size),
     ]
+
+    if exclude_inputs:
+        for path in exclude_inputs:
+            cmd.extend(["--exclude-input", path])
 
     if seed is not None:
         cmd.extend(["--seed", str(seed)])

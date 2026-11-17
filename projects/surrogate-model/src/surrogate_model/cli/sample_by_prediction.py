@@ -38,7 +38,7 @@ RANDOM_GROUP = "random"
 STAGED_OUTPUT_TRANSFERS = 1
 
 RUN_TIME_KEY = "run_time"
-
+PATH_SEPARATOR = ","
 MANIFEST_FILE_SUFFIX = ".manifest.json"
 
 
@@ -73,24 +73,74 @@ def _valid_columns(file: str) -> list[str]:
     ]
 
 
+def _split_paths(value: str | None) -> list[str]:
+    if value is None:
+        return []
+    return [
+        path for path in (part.strip() for part in value.split(PATH_SEPARATOR)) if path
+    ]
+
+
+def _exclusion_files(exclude_inputs: tuple[str, ...], output_path: str) -> list[str]:
+    output = Path(output_path)
+    return [
+        file
+        for pattern in exclude_inputs
+        for file in resolve_parquet_files(pattern)
+        if Path(file) != output
+    ]
+
+
+def _load_excluded_ids(
+    files: list[str], id_column: str, id_type: pa.DataType
+) -> pa.Array | None:
+    if not files:
+        return None
+    ids = (
+        pa.concat_tables([pq.read_table(file, columns=[id_column]) for file in files])
+        .column(id_column)
+        .combine_chunks()
+    )
+    if ids.type != id_type:
+        raise RuntimeError(
+            f"Excluded id type {ids.type} does not match features id type {id_type}"
+        )
+    return ids
+
+
+def _eligible_mask(
+    chunk: pa.Table,
+    valid_cols: list[str],
+    id_column: str,
+    excluded_ids: pa.Array | None,
+) -> np.ndarray:
+    mask = np.ones(chunk.num_rows, dtype=bool)
+    if valid_cols:
+        mask &= (
+            pl.DataFrame(chunk.select(valid_cols))
+            .select(pl.all_horizontal(valid_cols).fill_null(False))
+            .to_series()
+            .to_numpy()
+        )
+    if excluded_ids is not None:
+        mask &= ~chunk.column(id_column).isin(excluded_ids).to_numpy()
+    return mask
+
+
 def _score_chunk(
     model: ProbabilisticClassifier,
     chunk: pa.Table,
     feature_cols: list[str],
     valid_cols: list[str],
+    id_column: str,
+    excluded_ids: pa.Array | None,
 ) -> np.ndarray:
-    df = pl.DataFrame(chunk)
-    scores = np.full(df.height, np.nan, dtype=np.float32)
-    if valid_cols:
-        eligible = (
-            df.select(pl.all_horizontal(valid_cols).fill_null(False))
-            .to_series()
-            .to_numpy()
-        )
-    else:
-        eligible = np.ones(df.height, dtype=bool)
+    scores = np.full(chunk.num_rows, np.nan, dtype=np.float32)
+    eligible = _eligible_mask(chunk, valid_cols, id_column, excluded_ids)
     if eligible.any():
-        x = flatten_features(df.filter(pl.Series(eligible)), feature_cols)
+        x = flatten_features(
+            pl.DataFrame(chunk).filter(pl.Series(eligible)), feature_cols
+        )
         scores[eligible] = predict_active(model, x)
     return scores
 
@@ -100,15 +150,19 @@ def _score_all(
     features_files: list[str],
     feature_cols: list[str],
     valid_cols: list[str],
+    id_column: str,
+    excluded_ids: pa.Array | None,
     total_rows: int,
     batch_size: int,
 ) -> np.ndarray:
     scores = np.empty(total_rows, dtype=np.float32)
-    columns = [*feature_cols, *valid_cols]
+    columns = [id_column, *feature_cols, *valid_cols]
     offset = 0
     for chunk in stream_tables(features_files, columns, batch_size):
         end = offset + chunk.num_rows
-        scores[offset:end] = _score_chunk(model, chunk, feature_cols, valid_cols)
+        scores[offset:end] = _score_chunk(
+            model, chunk, feature_cols, valid_cols, id_column, excluded_ids
+        )
         offset = end
     return scores
 
@@ -197,6 +251,14 @@ def _write_selection_via_staged_output(
     type=click.IntRange(min=0),
     help="Number of randomly sampled rows to add from the remaining rows.",
 )
+@click.option(
+    "--exclude-input",
+    "exclude_inputs",
+    multiple=True,
+    type=str,
+    help="Parquet file(s) or glob of previously sampled rows to exclude by id."
+    "Repeatable.",
+)
 @click.option("--id-column", "id_column", default="id", show_default=True, type=str)
 @click.option(
     "--batch-size",
@@ -223,6 +285,7 @@ def sample_candidates_by_prediction(
     output_path: str,
     num_top: int,
     num_random: int,
+    exclude_inputs: tuple[str, ...],
     id_column: str,
     batch_size: int,
     seed: int,
@@ -237,6 +300,7 @@ def sample_candidates_by_prediction(
 
     features_files = resolve_parquet_files(features_input)
     conformers_files = resolve_parquet_files(conformers_input)
+    exclude_files = _exclusion_files(exclude_inputs, output_path)
 
     expected_state = {
         "num_top": num_top,
@@ -245,7 +309,7 @@ def sample_candidates_by_prediction(
         "seed": seed,
     }
     manifest = _input_manifest(
-        [*features_files, *conformers_files, model_path],
+        [*features_files, *conformers_files, *exclude_files, model_path],
         output_path,
         source_root,
         expected_state,
@@ -270,6 +334,8 @@ def sample_candidates_by_prediction(
 
     model = _load_model(model_path)
     valid_cols = _valid_columns(features_files[0])
+    id_type = pq.ParquetFile(features_files[0]).schema_arrow.field(id_column).type
+    excluded_ids = _load_excluded_ids(exclude_files, id_column, id_type)
 
     logger.info(
         "Scoring library with surrogate model",
@@ -277,9 +343,17 @@ def sample_candidates_by_prediction(
         model_path=model_path,
         total_rows=total_rows,
         features=feature_cols,
+        excluded_rows=0 if excluded_ids is None else len(excluded_ids),
     )
     scores = _score_all(
-        model, features_files, feature_cols, valid_cols, total_rows, batch_size
+        model,
+        features_files,
+        feature_cols,
+        valid_cols,
+        id_column,
+        excluded_ids,
+        total_rows,
+        batch_size,
     )
 
     rng = np.random.default_rng(seed)

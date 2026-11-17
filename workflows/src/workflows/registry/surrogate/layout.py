@@ -86,6 +86,11 @@ class SiteLayout:
     def manifest_path(self, label: str) -> str:
         return self._absolute(self.manifest_file(label))
 
+    def _each(
+        self, path_for_label: Callable[[str], str], labels: Sequence[str]
+    ) -> tuple[str, ...]:
+        return tuple(path_for_label(label) for label in labels)
+
     def _joined(
         self, path_for_label: Callable[[str], str], labels: Sequence[str]
     ) -> str:
@@ -93,6 +98,9 @@ class SiteLayout:
 
     def features_paths(self, labels: Sequence[str]) -> str:
         return self._joined(self.features_path, labels)
+
+    def features_path_list(self, labels: Sequence[str]) -> tuple[str, ...]:
+        return self._each(self.features_path, labels)
 
     def labels_paths(self, labels: Sequence[str]) -> str:
         return self._joined(self.labels_path, labels)
