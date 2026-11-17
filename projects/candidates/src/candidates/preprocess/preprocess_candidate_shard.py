@@ -218,7 +218,7 @@ def _generate_via_staged_output(
     "(defaults to the system temp directory).",
 )
 @wide_log(logger)
-def generate_conformers(
+def preprocess_candidate_shard(
     source_root: Path,
     input_path: str,
     output_path: str,
@@ -241,7 +241,7 @@ def generate_conformers(
         logger.warning("Failed to load existing manifest, re-generating.", error=str(e))
 
     logger.info(
-        "Generating conformers",
+        "Preprocessing",
         source=input_path,
         output_path=output_path,
         source_root=str(source_root),
@@ -264,9 +264,9 @@ def generate_conformers(
     manifest.data[RUN_TIME_KEY] = str(datetime.timedelta(seconds=elapsed_time))
     manifest.save()
 
-    logger.info("Finished generating conformers", manifest=manifest.data)
+    logger.info("Finished preprocessing", manifest=manifest.data)
     click.echo("Done!")
 
 
 if __name__ == "__main__":
-    generate_conformers()
+    preprocess_candidate_shard()

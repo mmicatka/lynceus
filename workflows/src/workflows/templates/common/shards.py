@@ -1,4 +1,28 @@
-# workflows/src/workflows/templates/common/verify_shard_layout.py
+# workflows/src/workflows/templates/common/shards.py
+
+
+def merge_shards_template(
+    base_path: str,
+    input_path: str,
+    output_path: str,
+):
+    import os
+    import subprocess
+
+    subprocess.run(
+        [
+            "merge-shards",
+            "--source-root",
+            base_path,
+            "--input",
+            os.path.join(base_path, input_path),
+            "--output",
+            os.path.join(base_path, output_path),
+            "--memory-limit",
+            "6GB",
+        ],
+        check=True,
+    )
 
 
 def verify_shard_layout_template(

@@ -1,29 +1,27 @@
-# projects/candidates/src/candidates/preprocess/features/generators/electroshape.py
+# projects/candidates/src/candidates/featurize/generators/rdf.py
 
 
 import numpy as np
 import pyarrow as pa
 from rdkit.Chem import Mol
-from skfp.fingerprints import ElectroShapeFingerprint
+from skfp.fingerprints import RDFFingerprint
 
 from .feature_generator import FeatureGenerator
 
 
-class ElectroShapeFeature(FeatureGenerator):
-    name = "electroshape"
+class RDFFeature(FeatureGenerator):
+    name = "rdf"
 
-    N_FEATURES = 15
+    N_FEATURES = 210
 
-    def __init__(self, partial_charge_model: str = "formal") -> None:
-        self._fp = ElectroShapeFingerprint(
-            partial_charge_model=partial_charge_model, n_jobs=1
-        )
+    def __init__(self) -> None:
+        self._fp = RDFFingerprint(n_jobs=1)
 
     def compute_batch(self, batch: list[Mol]) -> list[list[float] | None]:
         fingerprints = self._fp.transform(batch)
         if not isinstance(fingerprints, np.ndarray):
             raise RuntimeError(
-                "expected dense ndarray from ElectroShapeFingerprint.transform,"
+                "expected dense ndarray from RDFFingerprint.transform,"
                 f" got {type(fingerprints)}"
             )
         return [row.tolist() for row in fingerprints]

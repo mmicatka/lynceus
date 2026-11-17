@@ -40,7 +40,7 @@ from workflows.templates import (
     verify_manifest_template,
 )
 from workflows.templates.builders import TemplateFactory
-from workflows.templates.common.update_manifest import update_manifest_template
+from workflows.templates.common.manifest import update_manifest_template
 from workflows.templates.surrogate.sample import plan_surrogate_sample_template
 
 SURROGATE_SITE_DAG = "surrogate-site-dag"

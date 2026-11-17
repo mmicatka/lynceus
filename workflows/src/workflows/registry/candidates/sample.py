@@ -54,7 +54,7 @@ def _subsample_task(
             "base_path": paths.mount_path,
             "source": shard_filename(ITEM_PARAM),
             "source_prefix": paths.merged,
-            "parquet_prefix": f"{sample_paths.shards_sample}/",
+            "parquet_prefix": f"{sample_paths.raw}/",
             "num_samples": sub_sample // num_shards,
         },
     )

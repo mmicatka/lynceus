@@ -58,10 +58,9 @@ class PoolStorage(BasedPrefixGroup):
 
 
 class SampleStorage(PrefixGroup):
-    shards_sample: StoragePrefix
-    conformers: StoragePrefix
-    features: StoragePrefix
-    manifests: StoragePrefix
+    raw: StoragePrefix
+    preprocessed: StoragePrefix
+    featurized: StoragePrefix
 
 
 class ShardingConfig(StrictModel):
@@ -97,17 +96,14 @@ class CandidateSampleConfig(StrictModel):
     storage: SampleStorage
     feature_types: FeatureTypes
 
-    def shards_sample_prefix(self, sample_root: PurePosixPath) -> PurePosixPath:
-        return sample_root / self.storage.shards_sample
+    def raw_prefix(self, sample_root: PurePosixPath) -> PurePosixPath:
+        return sample_root / self.storage.raw
 
-    def conformers_prefix(self, sample_root: PurePosixPath) -> PurePosixPath:
-        return sample_root / self.storage.conformers
+    def preprocessed_prefix(self, sample_root: PurePosixPath) -> PurePosixPath:
+        return sample_root / self.storage.preprocessed
 
-    def features_prefix(self, sample_root: PurePosixPath) -> PurePosixPath:
-        return sample_root / self.storage.features
-
-    def manifests_prefix(self, sample_root: PurePosixPath) -> PurePosixPath:
-        return sample_root / self.storage.manifests
+    def featurized_prefix(self, sample_root: PurePosixPath) -> PurePosixPath:
+        return sample_root / self.storage.featurized
 
 
 class CandidatesConfig(StrictModel):

@@ -62,8 +62,8 @@ def _source_globs(
     sample_paths: SamplePaths, layout: SiteLayout, spec: SampleSpec
 ) -> list[str]:
     return [
-        f"{sample_paths.features}/{SOURCE_GLOB}",
-        f"{sample_paths.conformers}/{SOURCE_GLOB}",
+        f"{sample_paths.featurized}/{SOURCE_GLOB}",
+        f"{sample_paths.preprocessed}/{SOURCE_GLOB}",
         *_model_globs(layout, spec),
     ]
 
@@ -83,8 +83,8 @@ def _plan_task(
         name="plan-sources",
         arguments={
             "base_path": layout.base_path,
-            "features_prefix": sample_paths.features,
-            "conformers_prefix": sample_paths.conformers,
+            "features_prefix": sample_paths.featurized,
+            "conformers_prefix": sample_paths.preprocessed,
             "persist_file": _plan_path(layout, spec),
             **spec.plan_arguments(),
         },
@@ -151,8 +151,8 @@ def _sample_shards_task(
         arguments={
             "base_path": layout.base_path,
             "source": _shard_filename(ITEM_PARAM),
-            "features_input_prefix": sample_paths.features,
-            "conformers_input_prefix": sample_paths.conformers,
+            "features_input_prefix": sample_paths.featurized,
+            "conformers_input_prefix": sample_paths.preprocessed,
             "output_prefix": layout.staging_prefix(spec.label),
             **spec.shard_arguments(num_shards),
         },

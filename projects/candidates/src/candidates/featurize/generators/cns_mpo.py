@@ -1,4 +1,4 @@
-# projects/candidates/src/candidates/preprocess/features/generators/cns_mpo.py
+# projects/candidates/src/candidates/featurize/generators/cns_mpo.py
 
 
 import pyarrow as pa

@@ -1,22 +1,18 @@
 # projects/candidates/src/candidates/__init__.py
 
 
+from .featurize import featurize_candidate_shard
 from .load import plan_load_candidates, shard_candidates, verify_shard_layout
 from .preprocess import (
-    generate_conformers,
-    generate_features,
-    plan_preprocess_candidates,
+    preprocess_candidate_shard,
 )
-from .sample import sample_candidates
+from .sample_candidate_shard import sample_candidates
 
 __all__ = [
-    # load
     "plan_load_candidates",
     "sample_candidates",
     "shard_candidates",
     "verify_shard_layout",
-    # preprocess
-    "plan_preprocess_candidates",
-    "generate_conformers",
-    "generate_features",
+    "preprocess_candidate_shard",
+    "featurize_candidate_shard",
 ]

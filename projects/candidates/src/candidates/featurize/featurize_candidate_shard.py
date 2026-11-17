@@ -1,4 +1,4 @@
-# projects/candidates/src/candidates/preprocess/features/generate_features.py
+# projects/candidates/src/candidates/featurize/featurize_candidate_shard.py
 
 
 import datetime
@@ -17,8 +17,8 @@ from lynceus_core.manifest.common import Manifest
 from rdkit import rdBase
 from rdkit.Chem import Mol, MolFromMolBlock
 
-from candidates.preprocess.features.generators import FEATURE_GENERATOR_REGISTRY
-from candidates.preprocess.features.generators.feature_generator import (
+from candidates.featurize.generators import FEATURE_GENERATOR_REGISTRY
+from candidates.featurize.generators.feature_generator import (
     FeatureChunk,
     FeatureGenerator,
 )
@@ -275,7 +275,7 @@ def _generate_via_staged_output(
     "(defaults to the system temp directory).",
 )
 @wide_log(logger)
-def generate_features(
+def featurize_candidate_shard(
     source_root: Path,
     input_path: str,
     output_path: str,
@@ -344,4 +344,4 @@ def generate_features(
 
 
 if __name__ == "__main__":
-    generate_features()
+    featurize_candidate_shard()

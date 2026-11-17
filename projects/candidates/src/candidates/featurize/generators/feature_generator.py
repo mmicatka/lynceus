@@ -1,4 +1,4 @@
-# projects/candidates/src/candidates/preprocess/features/generators/feature_generator.py
+# projects/candidates/src/candidates/featurize/generators/feature_generator.py
 
 
 from abc import ABC, abstractmethod

@@ -89,7 +89,7 @@ def _plan_preprocess_task(
         name="plan-preprocess",
         arguments={
             "base_path": sample_paths.mount_path,
-            "input_prefix": sample_paths.shards_sample,
+            "input_prefix": sample_paths.raw,
             "source_glob": SHARD_FILE_GLOB,
             "output_file": MANIFEST_PATH,
             "persist_file": f"{sample_paths.manifests}/{PLAN_FILENAME}",
@@ -119,7 +119,7 @@ def _check_manifest_task(
             "base_path": sample_paths.mount_path,
             "manifest": sample_paths.state_path(MANIFEST_FILENAME),
             "expect": json_arg(expected),
-            "source_globs": [f"{sample_paths.shards_sample}/{SHARD_FILE_GLOB}"],
+            "source_globs": [f"{sample_paths.raw}/{SHARD_FILE_GLOB}"],
             "result_file": MATCHES_PATH,
         },
     )
@@ -165,8 +165,8 @@ def _build_process_shard_dag(
             arguments={
                 "base_path": sample_paths.mount_path,
                 "source": SOURCE_PARAM,
-                "input_prefix": sample_paths.shards_sample,
-                "output_prefix": sample_paths.conformers,
+                "input_prefix": sample_paths.raw,
+                "output_prefix": sample_paths.preprocessed,
             },
         )
         sample = configs.candidates.samples[configs.screen.candidates]
@@ -175,8 +175,8 @@ def _build_process_shard_dag(
             arguments={
                 "base_path": sample_paths.mount_path,
                 "source": SOURCE_PARAM,
-                "input_prefix": sample_paths.conformers,
-                "output_prefix": sample_paths.features,
+                "input_prefix": sample_paths.preprocessed,
+                "output_prefix": sample_paths.featurized,
                 "features": [feature.value for feature in sample.feature_types],
             },
         )

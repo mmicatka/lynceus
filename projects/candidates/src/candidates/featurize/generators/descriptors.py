@@ -1,28 +1,26 @@
-# projects/candidates/src/candidates/preprocess/features/generators/whim.py
+# projects/candidates/src/candidates/featurize/generators/descriptors.py
 
 
 import numpy as np
 import pyarrow as pa
 from rdkit.Chem import Mol
-from skfp.fingerprints import WHIMFingerprint
+from skfp.fingerprints import RDKit2DDescriptorsFingerprint
 
 from .feature_generator import FeatureGenerator
 
 
-class WHIMFeature(FeatureGenerator):
-    name = "whim"
+class DescriptorsFeature(FeatureGenerator):
+    name = "descriptors"
 
-    N_FEATURES = 114
-    DEFAULT_CLIP_VAL = 1e6
-
-    def __init__(self, clip_val: float = DEFAULT_CLIP_VAL) -> None:
-        self._fp = WHIMFingerprint(clip_val=clip_val, n_jobs=1)
+    def __init__(self) -> None:
+        self._fp = RDKit2DDescriptorsFingerprint(n_jobs=1, sparse=False)
+        self._fp_size = self._fp.n_features_out
 
     def compute_batch(self, batch: list[Mol]) -> list[list[float] | None]:
         fingerprints = self._fp.transform(batch)
         if not isinstance(fingerprints, np.ndarray):
             raise RuntimeError(
-                "expected dense ndarray from WHIMFingerprint.transform,"
+                "expected dense ndarray from RDKit2DDescriptorsFingerprint.transform,"
                 f" got {type(fingerprints)}"
             )
         return [row.tolist() for row in fingerprints]
@@ -31,7 +29,7 @@ class WHIMFeature(FeatureGenerator):
         return self.name
 
     def feature_field_type(self) -> pa.DataType:
-        return pa.list_(pa.float32(), self.N_FEATURES)
+        return pa.list_(pa.float32(), self._fp_size)
 
     def placeholder_value(self) -> list[float]:
-        return [0.0] * self.N_FEATURES
+        return [0.0] * self._fp_size

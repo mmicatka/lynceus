@@ -1,33 +1,29 @@
-# projects/candidates/src/candidates/preprocess/features/generators/ecfp.py
-
+# projects/candidates/src/candidates/featurize/generators/pharmacore_3d.py
 
 import numpy as np
 import pyarrow as pa
 from rdkit.Chem import Mol
-from skfp.fingerprints import ECFPFingerprint
+from skfp.fingerprints import PharmacophoreFingerprint
 
 from .feature_generator import FeatureGenerator
 
 
-class ECFPFeature(FeatureGenerator):
-    name = "ecfp"
+class Pharmacophore3dFeature(FeatureGenerator):
+    name = "pharmacophore_3d"
 
     DEFAULT_FP_SIZE = 1024
-    DEFAULT_ECFP_RADIUS = 3
 
-    def __init__(
-        self, fp_size: int = DEFAULT_FP_SIZE, radius: int = DEFAULT_ECFP_RADIUS
-    ) -> None:
+    def __init__(self, fp_size: int = DEFAULT_FP_SIZE) -> None:
         self._fp_size = fp_size
-        self._fp = ECFPFingerprint(
-            fp_size=fp_size, radius=radius, n_jobs=1, sparse=False
+        self._fp = PharmacophoreFingerprint(
+            fp_size=fp_size, use_3D=True, variant="folded", n_jobs=1, sparse=False
         )
 
     def compute_batch(self, batch: list[Mol]) -> list[list[float] | None]:
         fingerprints = self._fp.transform(batch)
         if not isinstance(fingerprints, np.ndarray):
             raise RuntimeError(
-                "expected dense ndarray from ECFPFingerprint.transform,"
+                "expected dense ndarray from PharmacophoreFingerprint.transform,"
                 f" got {type(fingerprints)}"
             )
         return [row.tolist() for row in fingerprints]

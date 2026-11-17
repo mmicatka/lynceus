@@ -17,13 +17,12 @@ candidate_pool:
     num_shards: 512
 
 samples:
-  10m:
-    num_samples: 10000000
+  100k:
+    num_samples: 100000
     storage:
-      shards_sample: shards
-      conformers: conformers
-      features: features
-      manifests: manifests
+      raw: shards
+      preprocessed: preprocessed
+      featurized: featurized
     feature_types:
       - atom_pair
       - autocorr

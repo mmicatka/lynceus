@@ -1,26 +1,27 @@
-# projects/candidates/src/candidates/preprocess/features/generators/descriptors.py
+# projects/candidates/src/candidates/featurize/generators/morse.py
 
 
 import numpy as np
 import pyarrow as pa
 from rdkit.Chem import Mol
-from skfp.fingerprints import RDKit2DDescriptorsFingerprint
+from skfp.fingerprints import MORSEFingerprint
 
 from .feature_generator import FeatureGenerator
 
 
-class DescriptorsFeature(FeatureGenerator):
-    name = "descriptors"
+class MORSEFeature(FeatureGenerator):
+    name = "morse"
+
+    N_FEATURES = 224
 
     def __init__(self) -> None:
-        self._fp = RDKit2DDescriptorsFingerprint(n_jobs=1, sparse=False)
-        self._fp_size = self._fp.n_features_out
+        self._fp = MORSEFingerprint(n_jobs=1)
 
     def compute_batch(self, batch: list[Mol]) -> list[list[float] | None]:
         fingerprints = self._fp.transform(batch)
         if not isinstance(fingerprints, np.ndarray):
             raise RuntimeError(
-                "expected dense ndarray from RDKit2DDescriptorsFingerprint.transform,"
+                "expected dense ndarray from MORSEFingerprint.transform,"
                 f" got {type(fingerprints)}"
             )
         return [row.tolist() for row in fingerprints]
@@ -29,7 +30,7 @@ class DescriptorsFeature(FeatureGenerator):
         return self.name
 
     def feature_field_type(self) -> pa.DataType:
-        return pa.list_(pa.float32(), self._fp_size)
+        return pa.list_(pa.float32(), self.N_FEATURES)
 
     def placeholder_value(self) -> list[float]:
-        return [0.0] * self._fp_size
+        return [0.0] * self.N_FEATURES

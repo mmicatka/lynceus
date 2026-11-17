@@ -1,30 +1,26 @@
-# projects/candidates/src/candidates/preprocess/features/generators/atom_pair.py
+# projects/candidates/src/candidates/featurize/generators/usrcat.py
 
 
 import numpy as np
 import pyarrow as pa
 from rdkit.Chem import Mol
-from skfp.fingerprints import AtomPairFingerprint
+from skfp.fingerprints import USRCATFingerprint
 
 from .feature_generator import FeatureGenerator
 
 
-class AtomPairFeature(FeatureGenerator):
-    name = "atom_pair"
+class USRCATFeature(FeatureGenerator):
+    name = "usrcat"
 
-    DEFAULT_FP_SIZE = 2048
-
-    def __init__(self, fp_size: int = DEFAULT_FP_SIZE) -> None:
-        self._fp_size = fp_size
-        self._fp = AtomPairFingerprint(
-            fp_size=fp_size, count=True, n_jobs=1, sparse=False
-        )
+    def __init__(self) -> None:
+        self._fp = USRCATFingerprint(n_jobs=1)
+        self._fp_size = self._fp.n_features_out
 
     def compute_batch(self, batch: list[Mol]) -> list[list[float] | None]:
         fingerprints = self._fp.transform(batch)
         if not isinstance(fingerprints, np.ndarray):
             raise RuntimeError(
-                "expected dense ndarray from AtomPairFingerprint.transform,"
+                "expected dense ndarray from USRCATFingerprint.transform,"
                 f" got {type(fingerprints)}"
             )
         return [row.tolist() for row in fingerprints]
@@ -33,7 +29,7 @@ class AtomPairFeature(FeatureGenerator):
         return self.name
 
     def feature_field_type(self) -> pa.DataType:
-        return pa.list_(pa.uint16(), self._fp_size)
+        return pa.list_(pa.float32(), self._fp_size)
 
     def placeholder_value(self) -> list[float]:
         return [0] * self._fp_size

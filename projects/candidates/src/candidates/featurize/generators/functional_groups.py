@@ -1,27 +1,27 @@
-# projects/candidates/src/candidates/preprocess/features/generators/rdf.py
+# projects/candidates/src/candidates/featurize/generators/functional_groups.py
 
 
 import numpy as np
 import pyarrow as pa
 from rdkit.Chem import Mol
-from skfp.fingerprints import RDFFingerprint
+from skfp.fingerprints import FunctionalGroupsFingerprint
 
 from .feature_generator import FeatureGenerator
 
 
-class RDFFeature(FeatureGenerator):
-    name = "rdf"
+class FunctionalGroupsFeature(FeatureGenerator):
+    name = "functional_groups"
 
-    N_FEATURES = 210
+    N_FEATURES = 85
 
     def __init__(self) -> None:
-        self._fp = RDFFingerprint(n_jobs=1)
+        self._fp = FunctionalGroupsFingerprint(count=True, n_jobs=1, sparse=False)
 
     def compute_batch(self, batch: list[Mol]) -> list[list[float] | None]:
         fingerprints = self._fp.transform(batch)
         if not isinstance(fingerprints, np.ndarray):
             raise RuntimeError(
-                "expected dense ndarray from RDFFingerprint.transform,"
+                "expected dense ndarray from FunctionalGroupsFingerprint.transform,"
                 f" got {type(fingerprints)}"
             )
         return [row.tolist() for row in fingerprints]
@@ -30,7 +30,7 @@ class RDFFeature(FeatureGenerator):
         return self.name
 
     def feature_field_type(self) -> pa.DataType:
-        return pa.list_(pa.float32(), self.N_FEATURES)
+        return pa.list_(pa.uint8(), self.N_FEATURES)
 
     def placeholder_value(self) -> list[float]:
-        return [0.0] * self.N_FEATURES
+        return [0] * self.N_FEATURES

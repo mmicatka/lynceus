@@ -1,4 +1,4 @@
-# projects/candidates/src/candidates/preprocess/plan.py
+# libs/lynceus-core/src/lynceus_core/plan.py
 
 
 import json
@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 import click
+
 from lynceus_core.manifest.common import (
     PATH_FIELD,
     SOURCE_FILES_KEY,
@@ -59,7 +60,7 @@ def _persist_source_files(files: list[SourceEntry], persist_file: Path) -> None:
     type=click.Path(dir_okay=False, path_type=Path),
     help="File the planned source files and their fingerprints are persisted to.",
 )
-def plan_preprocess_candidates(
+def generate_plan(
     source_root: Path,
     source_glob: str,
     output_file: Path,

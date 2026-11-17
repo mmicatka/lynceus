@@ -1,4 +1,4 @@
-# projects/candidates/src/candidates/preprocess/features/generators/topological_torsion.py # noqa: E501
+# projects/candidates/src/candidates/featurize/generators/topological_torsion.py # noqa: E501
 
 
 import numpy as np

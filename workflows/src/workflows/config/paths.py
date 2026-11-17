@@ -23,13 +23,9 @@ def _join(mount_path: str, relative: str) -> str:
 class SamplePaths:
     mount_path: str
     root: str
-    shards_sample: str
-    conformers: str
-    features: str
-    manifests: str
-
-    def state_path(self, filename: str) -> str:
-        return _join(self.mount_path, f"{self.manifests}/{filename}")
+    raw: str
+    preprocessed: str
+    featurized: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -90,8 +86,7 @@ class WorkflowPaths:
         return SamplePaths(
             mount_path=self.mount_path,
             root=str(sample_root),
-            shards_sample=str(sample.shards_sample_prefix(sample_root)),
-            conformers=str(sample.conformers_prefix(sample_root)),
-            features=str(sample.features_prefix(sample_root)),
-            manifests=str(sample.manifests_prefix(sample_root)),
+            raw=str(sample.raw_prefix(sample_root)),
+            preprocessed=str(sample.preprocessed_prefix(sample_root)),
+            featurized=str(sample.featurized_prefix(sample_root)),
         )
