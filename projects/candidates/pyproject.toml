@@ -19,7 +19,7 @@ dependencies = [
 plan-load-candidates = "candidates:plan_load_candidates"
 shard-candidates = "candidates:shard_candidates"
 verify-shard-layout = "candidates:verify_shard_layout"
-sample-candidates = "candidates:sample_candidates"
+sample-candidate-shard = "candidates:sample_candidate_shard"
 preprocess-candidate-shard = "candidates:preprocess_candidate_shard"
 featurize-candidate-shard = "candidates:featurize_candidate_shard"
 

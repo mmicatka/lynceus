@@ -1,4 +1,4 @@
-# projects/candidates/src/candidates/preprocess/conformer.py
+# projects/candidates/src/candidates/preprocess/preprocess_candidate_shard.py
 
 
 import datetime
@@ -40,14 +40,20 @@ EMBED_PARAMS.numThreads = 1
 
 OPTIMIZE_MAX_ITERS = 50
 
+MANIFEST_FILE_SUFFIX = ".manifest.json"
+NUM_ROWS_KEY = "num_rows"
+
+
+def _manifest_path(manifest_dir: Path, output_path: str) -> Path:
+    return manifest_dir / f"{Path(output_path).stem}{MANIFEST_FILE_SUFFIX}"
+
 
 def _input_manifest(
     input_path: str,
-    output_path: str,
+    manifest_path: Path,
     source_root: Path,
     expected_state: dict,
 ) -> Manifest:
-    manifest_path = Path(output_path).with_suffix(MANIFEST_FILE_SUFFIX)
     return Manifest(filepath=manifest_path, data=expected_state).set_source_files(
         [input_path], source_root
     )
@@ -187,6 +193,13 @@ def _generate_via_staged_output(
     help="Path to the output Parquet file.",
 )
 @click.option(
+    "--manifest-dir",
+    "manifest_dir",
+    required=True,
+    type=click.Path(file_okay=False, path_type=Path),
+    help="Directory the shard manifest is written to, named after the output file.",
+)
+@click.option(
     "--batch-size",
     "batch_size",
     default=10_000,
@@ -222,6 +235,7 @@ def preprocess_candidate_shard(
     source_root: Path,
     input_path: str,
     output_path: str,
+    manifest_dir: str,
     batch_size: int,
     chunk_size: int,
     num_workers: int,
@@ -230,7 +244,12 @@ def preprocess_candidate_shard(
     click.echo(f"Processing {input_path}...")
 
     expected_state = {"batch_size": batch_size, "chunk_size": chunk_size}
-    manifest = _input_manifest(input_path, output_path, source_root, expected_state)
+    manifest = _input_manifest(
+        input_path,
+        _manifest_path(manifest_dir, output_path),
+        source_root,
+        expected_state,
+    )
 
     try:
         if _already_generated(manifest, output_path):
@@ -262,6 +281,7 @@ def preprocess_candidate_shard(
 
     elapsed_time = time.perf_counter() - start_time
     manifest.data[RUN_TIME_KEY] = str(datetime.timedelta(seconds=elapsed_time))
+    manifest.data[NUM_ROWS_KEY] = pq.ParquetFile(input_path).metadata.num_rows
     manifest.save()
 
     logger.info("Finished preprocessing", manifest=manifest.data)

@@ -14,6 +14,10 @@ TARGET_ENSEMBLES_DIR = "ensembles"
 FILTER_DIR = "filter"
 SURROGATE_DIR = "surrogate"
 
+PREPROCESSED_MANIFEST_FILENAME = "plan.manifest.json"
+PREPROCESSED_SHARDS_DIR = "shards"
+PREPROCESSED_MANIFESTS_DIR = "manifests"
+
 
 def _join(mount_path: str, relative: str) -> str:
     return f"{mount_path}/{relative}"
@@ -26,6 +30,18 @@ class SamplePaths:
     raw: str
     preprocessed: str
     featurized: str
+
+    @property
+    def preprocessed_manifest(self) -> str:
+        return f"{self.preprocessed}/{PREPROCESSED_MANIFEST_FILENAME}"
+
+    @property
+    def preprocessed_shards(self) -> str:
+        return f"{self.preprocessed}/{PREPROCESSED_SHARDS_DIR}"
+
+    @property
+    def preprocessed_manifests(self) -> str:
+        return f"{self.preprocessed}/{PREPROCESSED_MANIFESTS_DIR}"
 
 
 @dataclass(frozen=True, slots=True)

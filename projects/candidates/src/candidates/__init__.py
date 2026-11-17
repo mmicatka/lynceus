@@ -6,11 +6,11 @@ from .load import plan_load_candidates, shard_candidates, verify_shard_layout
 from .preprocess import (
     preprocess_candidate_shard,
 )
-from .sample_candidate_shard import sample_candidates
+from .sample import sample_candidate_shard
 
 __all__ = [
     "plan_load_candidates",
-    "sample_candidates",
+    "sample_candidate_shard",
     "shard_candidates",
     "verify_shard_layout",
     "preprocess_candidate_shard",

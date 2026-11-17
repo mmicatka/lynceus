@@ -27,9 +27,8 @@ from workflows.registry.common.manifest_gate import (
     when_unmatched,
 )
 from workflows.templates import (
-    generate_conformers_template,
-    generate_features_template,
-    plan_preprocess_candidates_template,
+    generate_plan_template,
+    preprocess_candidate_shard_template,
     update_manifest_template,
     verify_manifest_template,
 )
@@ -43,10 +42,7 @@ SOURCES_PARAM = "sources"
 SHARD_FILE_GLOB = "*.parquet"
 SHARD_RETRY = RetryStrategy(limit=3, retry_policy="OnFailure")
 
-PLAN_FILENAME = "preprocess_plan.json"
-MANIFEST_FILENAME = "preprocess_candidates.manifest.json"
 PREPROCESSED_KEY = "preprocessed"
-FEATURES_KEY = "features"
 SAMPLE_KEY = "sample"
 
 TaskFactory = Callable[..., Task]
@@ -56,13 +52,8 @@ def _sample_paths(configs: WorkflowConfigs) -> SamplePaths:
     return configs.paths.sample(configs.screen.candidates)
 
 
-def _manifest_fields(configs: WorkflowConfigs) -> dict[str, Any]:
-    sample_name = configs.screen.candidates
-    sample = configs.candidates.samples[sample_name]
-    return {
-        SAMPLE_KEY: sample_name,
-        FEATURES_KEY: [feature.value for feature in sample.feature_types],
-    }
+def _completed_fields(configs: WorkflowConfigs) -> dict[str, Any]:
+    return {SAMPLE_KEY: configs.screen.candidates, PREPROCESSED_KEY: True}
 
 
 def _sources_expression(plan_task: Task) -> str:
@@ -70,30 +61,16 @@ def _sources_expression(plan_task: Task) -> str:
     return f"{{{{=toJson(fromJSON({manifest}).sources)}}}}"
 
 
-def _plan_preprocess_task(
-    templates: TemplateFactory,
-    sample_paths: SamplePaths,
-) -> Task:
-    plan = templates.build(
+def _build_plan(templates: TemplateFactory) -> TaskFactory:
+    return templates.build(
         TemplateName.PLAN_PREPROCESS_CANDIDATES,
-        plan_preprocess_candidates_template,
+        generate_plan_template,
         outputs=[
             Parameter(
                 name=MANIFEST_OUTPUT,
                 value_from=ValueFrom(path=MANIFEST_PATH),
             )
         ],
-    )
-
-    return plan(
-        name="plan-preprocess",
-        arguments={
-            "base_path": sample_paths.mount_path,
-            "input_prefix": sample_paths.raw,
-            "source_glob": SHARD_FILE_GLOB,
-            "output_file": MANIFEST_PATH,
-            "persist_file": f"{sample_paths.manifests}/{PLAN_FILENAME}",
-        },
     )
 
 
@@ -107,18 +84,31 @@ def _build_verify_manifest(templates: TemplateFactory) -> TaskFactory:
     )
 
 
+def _plan_task(plan: TaskFactory, sample_paths: SamplePaths, when: str) -> Task:
+    return plan(
+        name="plan-preprocess",
+        when=when,
+        arguments={
+            "base_path": sample_paths.mount_path,
+            "input_prefix": sample_paths.raw,
+            "source_glob": SHARD_FILE_GLOB,
+            "output_file": MANIFEST_PATH,
+            "persist_file": sample_paths.preprocessed_manifest,
+        },
+    )
+
+
 def _check_manifest_task(
     verify: TaskFactory,
     sample_paths: SamplePaths,
     configs: WorkflowConfigs,
 ) -> Task:
-    expected = {**_manifest_fields(configs), PREPROCESSED_KEY: True}
     return verify(
         name="check-preprocessed",
         arguments={
             "base_path": sample_paths.mount_path,
-            "manifest": sample_paths.state_path(MANIFEST_FILENAME),
-            "expect": json_arg(expected),
+            "manifest": sample_paths.preprocessed_manifest,
+            "expect": json_arg(_completed_fields(configs)),
             "source_globs": [f"{sample_paths.raw}/{SHARD_FILE_GLOB}"],
             "result_file": MATCHES_PATH,
         },
@@ -136,9 +126,9 @@ def _update_manifest_task(
         when=when,
         arguments={
             "base_path": sample_paths.mount_path,
-            "source": sample_paths.state_path(PLAN_FILENAME),
-            "output": sample_paths.state_path(MANIFEST_FILENAME),
-            "fields": json_arg({**_manifest_fields(configs), PREPROCESSED_KEY: True}),
+            "source": sample_paths.preprocessed_manifest,
+            "output": sample_paths.preprocessed_manifest,
+            "fields": json_arg(_completed_fields(configs)),
         },
     )
 
@@ -146,41 +136,24 @@ def _update_manifest_task(
 def _build_process_shard_dag(
     templates: TemplateFactory,
     sample_paths: SamplePaths,
-    configs: WorkflowConfigs,
 ) -> DAG:
-    generate_conformers = templates.build(
-        TemplateName.GENERATE_CONFORMERS,
-        generate_conformers_template,
-        retry_strategy=SHARD_RETRY,
-    )
-    generate_features = templates.build(
-        TemplateName.GENERATE_FEATURES,
-        generate_features_template,
+    preprocess_shard = templates.build(
+        TemplateName.PREPROCESS_CANDIDATE_SHARD,
+        preprocess_candidate_shard_template,
         retry_strategy=SHARD_RETRY,
     )
 
     with DAG(name=PROCESS_SHARD_DAG, inputs=[Parameter(name=SOURCE_INPUT_NAME)]) as dag:
-        conformers_task = generate_conformers(
-            name="generate-conformers",
+        preprocess_shard(
+            name="preprocess-shard",
             arguments={
                 "base_path": sample_paths.mount_path,
                 "source": SOURCE_PARAM,
                 "input_prefix": sample_paths.raw,
-                "output_prefix": sample_paths.preprocessed,
+                "output_prefix": sample_paths.preprocessed_shards,
+                "manifest_prefix": sample_paths.preprocessed_manifests,
             },
         )
-        sample = configs.candidates.samples[configs.screen.candidates]
-        features_task = generate_features(
-            name="generate-features",
-            arguments={
-                "base_path": sample_paths.mount_path,
-                "source": SOURCE_PARAM,
-                "input_prefix": sample_paths.preprocessed,
-                "output_prefix": sample_paths.featurized,
-                "features": [feature.value for feature in sample.feature_types],
-            },
-        )
-        conformers_task >> features_task  # type: ignore
 
     return dag
 
@@ -188,9 +161,8 @@ def _build_process_shard_dag(
 def _build_fanout_dag(
     templates: TemplateFactory,
     sample_paths: SamplePaths,
-    configs: WorkflowConfigs,
 ) -> DAG:
-    process_shard_dag = _build_process_shard_dag(templates, sample_paths, configs)
+    process_shard_dag = _build_process_shard_dag(templates, sample_paths)
 
     with DAG(
         name=PREPROCESS_FANOUT_DAG,
@@ -214,15 +186,17 @@ def build_preprocess_candidates_dag(
 
     with DAG(name=PREPROCESS_CANDIDATES_DAG) as dag:
         verify_manifest = _build_verify_manifest(templates)
+        plan = _build_plan(templates)
         update_manifest = templates.build(
             TemplateName.UPDATE_MANIFEST_PREPROCESS_CANDIDATES, update_manifest_template
         )
 
-        plan_task = _plan_preprocess_task(templates, sample_paths)
         check_task = _check_manifest_task(verify_manifest, sample_paths, configs)
         preprocess_gate = when_unmatched(check_task)
 
-        fanout_dag = _build_fanout_dag(templates, sample_paths, configs)
+        plan_task = _plan_task(plan, sample_paths, preprocess_gate)
+
+        fanout_dag = _build_fanout_dag(templates, sample_paths)
         fanout_task = fanout_dag(
             name="process-shards-fanout",
             when=preprocess_gate,
@@ -232,7 +206,7 @@ def build_preprocess_candidates_dag(
             update_manifest, sample_paths, configs, preprocess_gate
         )
 
-        plan_task >> check_task >> fanout_task >> write_task  # type: ignore
+        check_task >> plan_task >> fanout_task >> write_task  # type: ignore
 
     return dag
 

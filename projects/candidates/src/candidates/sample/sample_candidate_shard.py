@@ -149,7 +149,7 @@ def _sample_via_staged_output(
     "(defaults to the system temp directory).",
 )
 @wide_log(logger)
-def sample_candidates(
+def sample_candidate_shard(
     source_root: Path,
     input_path: str,
     output_path: str,

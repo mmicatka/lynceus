@@ -93,12 +93,12 @@ templates:
     resources: *low_cpu
     image: *candidates_image
 
-  generate_conformers:
+  preprocess_candidate_shard:
     resources: *med_cpu
     image: *candidates_image
     scratch: *scratch_50gb
 
-  generate_features:
+  featurize_candidate_shard:
     resources: *med_cpu_high_ram
     image: *candidates_image
     scratch: *scratch_50gb

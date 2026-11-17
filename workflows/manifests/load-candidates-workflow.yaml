@@ -70,7 +70,7 @@ spec:
           - name: folder_prefix
             value: shard_id=
           - name: shards_dir
-            value: candidates/raw/merged
+            value: candidates/raw/shards/merged
           - name: staging_dir
             value: candidates/raw/staging
       - name: shard-candidates
@@ -98,7 +98,7 @@ spec:
           - name: folder_prefix
             value: shard_id=
           - name: shards_dir
-            value: candidates/raw/merged
+            value: candidates/raw/shards/merged
           - name: staging_dir
             value: candidates/raw/staging
       - name: write-manifest
@@ -136,7 +136,7 @@ spec:
           - name: folder_prefix
             value: shard_id=
           - name: shards_dir
-            value: candidates/raw/merged
+            value: candidates/raw/shards/merged
           - name: staging_dir
             value: candidates/raw/staging
       - name: mark-merged
@@ -489,7 +489,7 @@ spec:
           - name: input_path
             value: candidates/raw/staging/shard_id={{inputs.parameters.shard_id}}
           - name: output_path
-            value: candidates/raw/merged/shard_{{inputs.parameters.shard_id}}.parquet
+            value: candidates/raw/shards/merged/shard_{{inputs.parameters.shard_id}}.parquet
           - name: memory_limit
             value: 6Gi
       - name: clean-shard
