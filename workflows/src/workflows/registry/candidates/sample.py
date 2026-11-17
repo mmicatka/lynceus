@@ -16,7 +16,7 @@ from workflows.registry.common.core import (
 from workflows.templates import sample_candidates_template
 from workflows.templates.builders import TemplateFactory
 
-SAMPLE_SHARDS_PARALLELISM = 5
+SAMPLE_SHARDS_PARALLELISM = 1
 SAMPLE_RETRY = RetryStrategy(limit=3, retry_policy="OnFailure")
 SAMPLE_CANDIDATES_DAG = "sample-candidates-dag"
 

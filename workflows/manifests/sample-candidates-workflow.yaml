@@ -7,7 +7,7 @@ spec:
   serviceAccountName: argo-workflow
   templates:
   - name: sample-candidates-dag
-    parallelism: 5
+    parallelism: 1
     dag:
       tasks:
       - name: subsample-candidates
@@ -532,11 +532,11 @@ spec:
           - name: source
             value: shard_{{item}}.parquet
           - name: source_prefix
-            value: candidates/raw/merged
+            value: candidates/raw/shards/merged
           - name: parquet_prefix
-            value: candidates/10m/shards/
+            value: candidates/1m/raw/
           - name: num_samples
-            value: '19531'
+            value: '1953'
   - name: subsample-candidates
     volumes:
     - name: lynceus

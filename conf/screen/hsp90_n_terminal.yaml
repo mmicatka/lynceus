@@ -1,7 +1,7 @@
 ---
 name: hsp90-n-terminal
 
-candidates: 10m
+candidates: 1m
 
 targets:
   ensembles:
