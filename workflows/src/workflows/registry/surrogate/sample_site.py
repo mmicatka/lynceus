@@ -1,14 +1,14 @@
 # workflows/src/workflows/registry/surrogate/sample_site.py
 
 
-from typing import Sequence
+from collections.abc import Callable, Sequence
 
-from hera.workflows import DAG, Parameter, Task
+from hera.workflows import DAG, Parameter, Step, Task
 from hera.workflows.models import ValueFrom
 
-from workflows.config import InfraConfig, ScreenConfig
-from workflows.config.infrastructure import TemplateName
+from workflows.config.core import WorkflowConfigs
 from workflows.config.screen import RoundConfig, SurrogateConfig
+from workflows.config.templates import TemplateName
 from workflows.registry.common.manifest_gate import (
     MANIFEST_OUTPUT,
     MANIFEST_PATH,
@@ -32,7 +32,6 @@ from workflows.registry.surrogate.sample import (
     build_sample_dag,
 )
 from workflows.templates import (
-    TemplateFactory,
     merge_shards_template,
     run_docking_template,
     surrogate_sample_by_prediction_template,
@@ -40,17 +39,19 @@ from workflows.templates import (
     surrogate_train_template,
     verify_manifest_template,
 )
-from workflows.templates.common.update_manifest import update_manifest_template
+from workflows.templates.builders import TemplateFactory
+from workflows.templates.common.manifest import update_manifest_template
 from workflows.templates.surrogate.sample import plan_surrogate_sample_template
 
 SURROGATE_SITE_DAG = "surrogate-site-dag"
 
-
 STAGING_GLOB = "*.parquet"
 INPUT_PATH_KEY = "input_path"
 
+TaskFactory = Callable[..., Task]
 
-def _build_verify_manifest(templates: TemplateFactory):
+
+def _build_verify_manifest(templates: TemplateFactory) -> TaskFactory:
     return templates.build(
         TemplateName.VERIFY_MANIFEST_SURROGATE,
         verify_manifest_template,
@@ -76,14 +77,10 @@ def _round_label(index: int) -> str:
     return f"round_{index}"
 
 
-def _round_labels(surrogate: SurrogateConfig) -> list[str]:
-    return [_round_label(index) for index in range(len(surrogate.rounds))]
-
-
 def _validation_spec(surrogate: SurrogateConfig) -> SampleSpec:
     return RandomSampleSpec(
         label=VALIDATION_LABEL,
-        seed=surrogate.seed,
+        seed=surrogate.random_seed,
         num_samples=surrogate.validation,
     )
 
@@ -101,13 +98,21 @@ def _train_arguments(
     }
 
 
+def _round_labels(surrogate: SurrogateConfig) -> list[str]:
+    return [_round_label(index) for index in range(len(surrogate.rounds))]
+
+
+def _prior_round_labels(index: int) -> list[str]:
+    return [_round_label(prior) for prior in range(index)]
+
+
 def _round_spec(
     index: int,
     round_config: RoundConfig,
     surrogate: SurrogateConfig,
     layout: SiteLayout,
 ) -> SampleSpec:
-    seed = surrogate.seed + 1 + index
+    seed = surrogate.random_seed + 1 + index
     if index == 0:
         return RandomSampleSpec(
             label=_round_label(index),
@@ -120,6 +125,7 @@ def _round_spec(
         model_path=layout.model_path(_round_label(index - 1)),
         num_top=round_config.top,
         num_random=round_config.random,
+        exclude_inputs=layout.features_path_list(_prior_round_labels(index)),
     )
 
 
@@ -130,15 +136,25 @@ def _round_specs(surrogate: SurrogateConfig, layout: SiteLayout) -> list[SampleS
     ]
 
 
+def _as_task(created: Step | Task | None, name: str) -> Task:
+    if not isinstance(created, Task):
+        raise RuntimeError(f"Expected {name} to create a Task, got {type(created)}")
+    return created
+
+
 def _sample_and_dock(
     spec: SampleSpec,
     layout: SiteLayout,
-    sample_dag,
-    dock,
+    sample_dag: DAG,
+    dock: TaskFactory,
 ) -> tuple[Task, Task]:
-    sample_task = sample_dag(
-        name=f"sample-{spec.task_suffix}",
-        arguments={name: ref(name) for name in SAMPLE_PARAMETERS},
+    sample_name = f"sample-{spec.task_suffix}"
+    sample_task = _as_task(
+        sample_dag(
+            name=sample_name,
+            arguments={name: ref(name) for name in SAMPLE_PARAMETERS},
+        ),
+        sample_name,
     )
     dock_task = dock(
         name=f"dock-{spec.task_suffix}",
@@ -151,7 +167,7 @@ def _sample_and_dock(
 def _train(
     spec: SampleSpec,
     layout: SiteLayout,
-    surrogate_train,
+    surrogate_train: TaskFactory,
     training_labels: Sequence[str],
 ) -> Task:
     return surrogate_train(
@@ -162,17 +178,17 @@ def _train(
 
 def build_surrogate_site_dag(
     templates: TemplateFactory,
-    infra_config: InfraConfig,
-    screen_config: ScreenConfig,
+    configs: WorkflowConfigs,
 ) -> DAG:
+    paths = configs.paths
     layout = SiteLayout(
-        base_path=infra_config.volume.mount_path,
-        surrogate_prefix=infra_config.storage.prefixes.surrogate.root,
-        target_prefix=infra_config.storage.prefixes.target.ensembles,
-        screen_name=screen_config.name,
+        base_path=paths.mount_path,
+        surrogate_prefix=paths.surrogate,
+        target_prefix=paths.target_ensembles,
+        screen_name=configs.screen.name,
     )
 
-    surrogate = screen_config.filter.surrogate
+    surrogate = configs.screen.filter.surrogate
     validation_spec = _validation_spec(surrogate)
     round_specs = _round_specs(surrogate, layout)
 
@@ -208,7 +224,7 @@ def build_surrogate_site_dag(
     )
 
     sample_dags = {
-        spec.label: build_sample_dag(sample_templates, infra_config, layout, spec)
+        spec.label: build_sample_dag(sample_templates, configs, layout, spec)
         for spec in [validation_spec, *round_specs]
     }
 

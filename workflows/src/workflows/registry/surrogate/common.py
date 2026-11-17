@@ -42,9 +42,13 @@ class PredictionSampleSpec(SampleSpec):
     model_path: str
     num_top: int
     num_random: int
+    exclude_inputs: tuple[str, ...] = ()
 
     def plan_arguments(self) -> dict[str, Any]:
-        return {"model_path": self.model_path}
+        return {
+            "model_path": self.model_path,
+            "exclude_inputs": list(self.exclude_inputs),
+        }
 
     def shard_arguments(self, num_shards: int) -> dict[str, Any]:
         return {
@@ -52,6 +56,7 @@ class PredictionSampleSpec(SampleSpec):
             "num_top": self.num_top // num_shards,
             "num_random": self.num_random // num_shards,
             "seed": self.seed,
+            "exclude_inputs": list(self.exclude_inputs),
         }
 
 

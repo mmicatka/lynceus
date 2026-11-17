@@ -1,7 +1,8 @@
 # workflows/src/workflows/templates/builders.py
 
+
 import json
-from collections.abc import Callable
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Self
 
@@ -15,15 +16,13 @@ from hera.workflows import (
 )
 from hera.workflows.models import Quantity, Toleration
 
-from workflows.config.infrastructure import (
-    InfraConfig,
+from workflows.config.k8s import (
     ResourceSpec,
     ScratchConfig,
-    TemplateConfig,
-    TemplateName,
     TolerationConfig,
     VolumeConfig,
 )
+from workflows.config.templates import TemplateName, TemplatesConfig, TemplateSpec
 
 RETRY_STRATEGY = RetryStrategy(limit=3, retry_policy="OnFailure")
 
@@ -32,11 +31,11 @@ MEMORY_MEDIUM = "Memory"
 GPU_RESOURCE_NAME = "nvidia.com/gpu"
 
 
-def _to_hera_env(env: dict[str, str]) -> list[Env] | None:
+def _to_hera_env(env: Mapping[str, str]) -> list[Env] | None:
     return [Env(name=key, value=value) for key, value in env.items()] or None
 
 
-def _to_hera_tolerations(items: list[TolerationConfig]) -> list[Toleration] | None:
+def _to_hera_tolerations(items: Sequence[TolerationConfig]) -> list[Toleration] | None:
     return [Toleration(**item.model_dump(exclude_none=True)) for item in items] or None
 
 
@@ -85,26 +84,25 @@ def _to_template_name(name: TemplateName) -> str:
 @dataclass(frozen=True)
 class TemplateFactory:
     volume: VolumeConfig
-    templates: dict[TemplateName, TemplateConfig]
-    retry_strategy: RetryStrategy | None = None
+    templates: Mapping[TemplateName, TemplateSpec]
+    retry_strategy: RetryStrategy
 
     @classmethod
     def from_config(
         cls,
-        infra_config: InfraConfig,
-        retry_strategy: RetryStrategy | None = None,
+        templates_config: TemplatesConfig,
     ) -> Self:
         return cls(
-            volume=infra_config.volume,
-            templates=infra_config.templates,
-            retry_strategy=retry_strategy,
+            volume=templates_config.volume,
+            templates=templates_config.templates,
+            retry_strategy=RETRY_STRATEGY,
         )
 
     def _volumes_for(
-        self, template: TemplateConfig
+        self, template: TemplateSpec
     ) -> list[ExistingVolume | EmptyDirVolume]:
         volumes: list[ExistingVolume | EmptyDirVolume] = [_to_hera_volume(self.volume)]
-        if template.scratch:
+        if template.scratch is not None:
             volumes.append(_to_hera_scratch_volume(template.scratch))
         return volumes
 
@@ -113,20 +111,20 @@ class TemplateFactory:
         name: TemplateName,
         func: Callable,
         *,
-        retry_strategy: RetryStrategy = RETRY_STRATEGY,
+        retry_strategy: RetryStrategy | None = None,
         **kwargs,
     ) -> Callable:
         template = self.templates[name]
 
         return script(
             name=_to_template_name(name),
-            image=template.image.image,
+            image=template.image.reference,
             image_pull_policy=template.image.image_pull_policy,
             resources=_to_hera_resources(template.resources),
             volumes=self._volumes_for(template),
-            retry_strategy=retry_strategy,
+            retry_strategy=retry_strategy or self.retry_strategy,
             env=_to_hera_env(template.env),
-            node_selector=template.node_selector or None,
+            node_selector=dict(template.node_selector) or None,
             tolerations=_to_hera_tolerations(template.tolerations),
             pod_spec_patch=_to_pod_spec_patch(template.runtime_class_name),
             **kwargs,

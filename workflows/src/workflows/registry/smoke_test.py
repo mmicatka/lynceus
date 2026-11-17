@@ -1,11 +1,11 @@
-# workflows/src/workflows/pipelines/smoke_test.py
+# workflows/src/workflows/registry/smoke_test.py
 
 import os
+from dataclasses import asdict, is_dataclass
 
 from hera.workflows import DAG, Container, Workflow, script
 
-from workflows.config.infrastructure import InfraConfig
-from workflows.config.screen import ScreenConfig
+from workflows.config.core import WorkflowConfigs
 from workflows.resources import LYNCEUS_VOLUME
 
 
@@ -19,20 +19,38 @@ def echo(message: str, base_path: str = ""):
             f.write(f"Latest message:\n{message}\n")
 
 
-def build_smoke_test_workflow(
-    infra_config: InfraConfig, screen_config: ScreenConfig
-) -> Workflow:
-    """Builds and returns the smoke test workflow."""
+def _dump_config(value: object) -> str:
+    if hasattr(value, "model_dump_json"):
+        return value.model_dump_json(indent=2)
+    if is_dataclass(value) and not isinstance(value, type):
+        import json
 
-    infra_json = infra_config.model_dump_json(indent=2)
-    screen_json = screen_config.model_dump_json(indent=2)
+        return json.dumps(asdict(value), indent=2, default=str)
+    return repr(value)
 
-    config_dump = (
+
+def _format_configs(configs: WorkflowConfigs) -> str:
+    if hasattr(configs, "model_dump_json"):
+        return (
+            f"--- WORKFLOW CONFIGURATION ---\n"
+            f"{configs.model_dump_json(indent=2)}\n"
+            f"------------------------------"
+        )
+
+    return (
         f"--- WORKFLOW CONFIGURATION ---\n"
-        f"Infra Config:\n{infra_json}\n\n"
-        f"Screen Config:\n{screen_json}\n"
+        f"Screen Config:\n{_dump_config(configs.screen)}\n\n"
+        f"Candidates Config:\n{_dump_config(configs.candidates)}\n\n"
+        f"Templates Config:\n{_dump_config(configs.templates)}\n\n"
+        f"Paths:\n{_dump_config(configs.paths)}\n"
         f"------------------------------"
     )
+
+
+def build_smoke_test_workflow(configs: WorkflowConfigs) -> Workflow:
+    """Builds and returns the smoke test workflow."""
+    mount_path = configs.paths.mount_path
+    config_dump = _format_configs(configs)
 
     with Workflow(
         generate_name="smoke-test-",
@@ -42,7 +60,7 @@ def build_smoke_test_workflow(
         check_permissions = Container(
             name="check-permissions",
             image="alpine",
-            command=["sh", "-c", "ls -ld /mnt/data && id"],
+            command=["sh", "-c", f"ls -ld {mount_path} && id"],
             volumes=[LYNCEUS_VOLUME],
         )
 
@@ -53,7 +71,7 @@ def build_smoke_test_workflow(
                 name="task-a",
                 arguments={
                     "message": config_dump,
-                    "base_path": LYNCEUS_VOLUME.mount_path,
+                    "base_path": mount_path,
                 },
             )
             task_b = echo(name="task-b", arguments={"message": "Workflow complete!"})

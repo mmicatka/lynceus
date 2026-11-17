@@ -3,8 +3,8 @@
 
 from hera.workflows import DAG, Workflow
 
-from workflows.config import InfraConfig, ScreenConfig
-from workflows.config.infrastructure import TemplateName
+from workflows.config.core import WorkflowConfigs
+from workflows.config.templates import TemplateName
 from workflows.registry.common.core import (
     ENTRYPOINT_DAG,
     get_template_factory,
@@ -16,26 +16,23 @@ from workflows.templates.targets.resolve_binding_sites import (
 )
 
 
-def build_surrogate_workflow(
-    infra_config: InfraConfig, screen_config: ScreenConfig
-) -> Workflow:
-    templates = get_template_factory(infra_config)
+def build_surrogate_workflow(configs: WorkflowConfigs) -> Workflow:
+    templates = get_template_factory(configs.templates)
+    paths = configs.paths
 
-    with new_workflow(screen_config.name, "surrogate") as w:
+    with new_workflow(configs.screen.name, "surrogate") as w:
         resolve_sites = templates.build(
             TemplateName.RESOLVE_BINDING_SITES, resolve_binding_sites_template
         )
-        surrogate_site_dag = build_surrogate_site_dag(
-            templates, infra_config, screen_config
-        )
+        surrogate_site_dag = build_surrogate_site_dag(templates, configs)
 
         with DAG(name=ENTRYPOINT_DAG):
             resolve_task = resolve_sites(
                 name="resolve-sites",
                 arguments={
-                    "base_path": infra_config.volume.mount_path,
-                    "ensembles_prefix": infra_config.storage.prefixes.target.ensembles,
-                    "ensemble_ids": [e.id for e in screen_config.targets.ensembles],
+                    "base_path": paths.mount_path,
+                    "ensembles_prefix": paths.target_ensembles,
+                    "ensemble_ids": [e.id for e in configs.screen.targets.ensembles],
                 },
             )
             site_task = surrogate_site_dag(

@@ -3,15 +3,15 @@
 
 from .builders import TemplateFactory
 from .candidates import (
-    generate_conformers_template,
-    generate_features_template,
-    plan_preprocess_candidates_template,
+    featurize_candidate_shard_template,
     plan_shard_candidates_template,
+    preprocess_candidate_shard_template,
     sample_candidates_template,
     shard_candidates_template,
 )
 from .common import (
     build_clean_prefix_template,
+    generate_plan_template,
     merge_shards_template,
     update_manifest_template,
     verify_manifest_template,
@@ -31,15 +31,15 @@ __all__ = [
     "TemplateFactory",
     # common
     "build_clean_prefix_template",
+    "generate_plan_template",
     "merge_shards_template",
     "update_manifest_template",
     "verify_manifest_template",
     "verify_shard_layout_template",
     # candidates
-    "generate_conformers_template",
-    "generate_features_template",
+    "preprocess_candidate_shard_template",
+    "featurize_candidate_shard_template",
     "plan_shard_candidates_template",
-    "plan_preprocess_candidates_template",
     "shard_candidates_template",
     "sample_candidates_template",
     # docking

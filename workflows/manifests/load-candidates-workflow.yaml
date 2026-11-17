@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Workflow
 metadata:
-  generateName: 10m-poc-candidates-
+  generateName: hsp90-n-terminal-candidates-
 spec:
   entrypoint: main-dag
   serviceAccountName: argo-workflow
@@ -22,7 +22,7 @@ spec:
           - name: max_batch_gib
             value: '10'
           - name: persist_file
-            value: /mnt/lynceus/candidates/raw/shards/manifests/load_plan.json
+            value: /mnt/lynceus/candidates/raw/manifests/load_plan.json
       - name: check-sharded
         depends: plan-shard
         template: verify-manifest-load-candidates
@@ -31,7 +31,7 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: manifest
-            value: /mnt/lynceus/candidates/raw/shards/manifests/candidate_shards.manifest.json
+            value: /mnt/lynceus/candidates/raw/manifests/candidate_shards.manifest.json
           - name: expect
             value: '{"num_shards":512,"scheme":"zinc22-id-hash-mod-v1","sharded":true}'
           - name: source_globs
@@ -46,7 +46,7 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: manifest
-            value: /mnt/lynceus/candidates/raw/shards/manifests/candidate_shards.manifest.json
+            value: /mnt/lynceus/candidates/raw/manifests/candidate_shards.manifest.json
           - name: expect
             value: '{"merged":true,"num_shards":512,"scheme":"zinc22-id-hash-mod-v1"}'
           - name: source_globs
@@ -72,7 +72,7 @@ spec:
           - name: shards_dir
             value: candidates/raw/shards/merged
           - name: staging_dir
-            value: candidates/raw/shards/staging
+            value: candidates/raw/staging
       - name: shard-candidates
         depends: verify-final-shards
         template: shard-candidates-dag
@@ -100,7 +100,7 @@ spec:
           - name: shards_dir
             value: candidates/raw/shards/merged
           - name: staging_dir
-            value: candidates/raw/shards/staging
+            value: candidates/raw/staging
       - name: write-manifest
         depends: verify-staging
         template: update-manifest-load-candidates
@@ -110,9 +110,9 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: source
-            value: /mnt/lynceus/candidates/raw/shards/manifests/load_plan.json
+            value: /mnt/lynceus/candidates/raw/manifests/load_plan.json
           - name: output
-            value: /mnt/lynceus/candidates/raw/shards/manifests/candidate_shards.manifest.json
+            value: /mnt/lynceus/candidates/raw/manifests/candidate_shards.manifest.json
           - name: fields
             value: '{"num_shards":512,"scheme":"zinc22-id-hash-mod-v1","sharded":true}'
       - name: merge-shards
@@ -138,7 +138,7 @@ spec:
           - name: shards_dir
             value: candidates/raw/shards/merged
           - name: staging_dir
-            value: candidates/raw/shards/staging
+            value: candidates/raw/staging
       - name: mark-merged
         depends: verify-merged
         template: update-manifest-load-candidates
@@ -148,9 +148,9 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: source
-            value: /mnt/lynceus/candidates/raw/shards/manifests/candidate_shards.manifest.json
+            value: /mnt/lynceus/candidates/raw/manifests/candidate_shards.manifest.json
           - name: output
-            value: /mnt/lynceus/candidates/raw/shards/manifests/candidate_shards.manifest.json
+            value: /mnt/lynceus/candidates/raw/manifests/candidate_shards.manifest.json
           - name: fields
             value: '{"merged":true}'
       - name: clean-staging-end
@@ -161,7 +161,7 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: prefix
-            value: candidates/raw/shards/staging
+            value: candidates/raw/staging
   - name: verify-manifest-load-candidates
     volumes:
     - name: lynceus
@@ -391,7 +391,7 @@ spec:
           - name: batch
             value: '{{item}}'
           - name: output_prefix
-            value: candidates/raw/shards/staging
+            value: candidates/raw/staging
           - name: num_shards
             value: '512'
           - name: scratch_dir
@@ -487,7 +487,7 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: input_path
-            value: candidates/raw/shards/staging/shard_id={{inputs.parameters.shard_id}}
+            value: candidates/raw/staging/shard_id={{inputs.parameters.shard_id}}
           - name: output_path
             value: candidates/raw/shards/merged/shard_{{inputs.parameters.shard_id}}.parquet
           - name: memory_limit
@@ -500,7 +500,7 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: prefix
-            value: candidates/raw/shards/staging/shard_id={{inputs.parameters.shard_id}}
+            value: candidates/raw/staging/shard_id={{inputs.parameters.shard_id}}
     inputs:
       parameters:
       - name: shard_id

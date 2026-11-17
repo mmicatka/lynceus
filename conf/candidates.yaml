@@ -1,0 +1,53 @@
+---
+storage:
+  base: candidates
+
+candidate_pool:
+  storage:
+    base: raw
+    smiles: smiles
+    parquet: parquets
+    shards:
+      staging: staging
+      merged: shards/merged
+      manifests: manifests
+
+  sharding:
+    max_batch_gib: 10
+    num_shards: 512
+
+samples:
+  1m:
+    num_samples: 1000000
+    storage:
+      raw: raw
+      preprocessed: preprocessed
+      featurized: featurized
+    feature_types:
+      - atom_pair
+      - autocorr
+      - descriptors
+      - ecfp
+      - functional_groups
+      - morse
+      - rdf
+      - topological_torsion
+      - usrcat
+      - whim
+  100k:
+    num_samples: 100000
+    storage:
+      raw: shards
+      preprocessed: preprocessed
+      featurized: featurized
+    feature_types:
+      - atom_pair
+      - autocorr
+      - descriptors
+      - ecfp
+      - functional_groups
+      - morse
+      - rdf
+      - topological_torsion
+      - usrcat
+      - whim

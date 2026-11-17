@@ -1,8 +1,9 @@
 # workflows/src/workflows/registry/target/core.py
 
+
 from hera.workflows import DAG, Workflow
 
-from workflows.config import InfraConfig, ScreenConfig
+from workflows.config.core import WorkflowConfigs
 from workflows.registry.common.core import (
     ENTRYPOINT_DAG,
     get_template_factory,
@@ -14,16 +15,12 @@ from workflows.registry.targets.detect_binding_sites import (
 from workflows.registry.targets.load import build_load_targets_dag
 
 
-def build_targets_workflow(
-    infra_config: InfraConfig, screen_config: ScreenConfig
-) -> Workflow:
-    templates = get_template_factory(infra_config)
+def build_targets_workflow(configs: WorkflowConfigs) -> Workflow:
+    templates = get_template_factory(configs.templates)
 
-    with new_workflow(screen_config.name, "targets") as w:
-        download_dag = build_load_targets_dag(templates, infra_config, screen_config)
-        detect_dag = build_detect_binding_sites_dag(
-            templates, infra_config, screen_config
-        )
+    with new_workflow(configs.screen.name, "targets") as workflow:
+        download_dag = build_load_targets_dag(templates, configs)
+        detect_dag = build_detect_binding_sites_dag(templates, configs)
 
         with DAG(name=ENTRYPOINT_DAG):
             load_targets_task = download_dag(name="load-targets")
@@ -31,4 +28,4 @@ def build_targets_workflow(
 
             load_targets_task >> detect_sites_task  # type: ignore
 
-    return w
+    return workflow

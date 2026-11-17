@@ -8,7 +8,8 @@ from typing import Any
 
 from hera.workflows import DAG, Parameter, Task
 
-from workflows.config import InfraConfig
+from workflows.config.core import WorkflowConfigs
+from workflows.config.paths import SamplePaths
 from workflows.registry.common.core import ITEM_PARAM, shard_ids
 from workflows.registry.common.manifest_gate import (
     MATCHES_PATH,
@@ -28,6 +29,14 @@ STATE_SUFFIX = ".state.json"
 NUM_SHARDS_KEY = "num_shards"
 SAMPLED_KEY = "sampled"
 MERGED_KEY = "merged"
+
+
+def _sample_paths(configs: WorkflowConfigs) -> SamplePaths:
+    return configs.paths.sample(configs.screen.candidates)
+
+
+def _num_shards(configs: WorkflowConfigs) -> int:
+    return configs.candidates.candidate_pool.sharding.num_shards
 
 
 def _shard_filename(shard: str) -> str:
@@ -50,34 +59,32 @@ def _model_globs(layout: SiteLayout, spec: SampleSpec) -> list[str]:
 
 
 def _source_globs(
-    infra_config: InfraConfig, layout: SiteLayout, spec: SampleSpec
+    sample_paths: SamplePaths, layout: SiteLayout, spec: SampleSpec
 ) -> list[str]:
-    prefixes = infra_config.storage.prefixes.candidates
     return [
-        f"{prefixes.features}/{SOURCE_GLOB}",
-        f"{prefixes.conformers}/{SOURCE_GLOB}",
+        f"{sample_paths.featurized}/{SOURCE_GLOB}",
+        f"{sample_paths.preprocessed}/{SOURCE_GLOB}",
         *_model_globs(layout, spec),
     ]
 
 
-def _manifest_fields(infra_config: InfraConfig, spec: SampleSpec) -> dict[str, Any]:
-    num_shards = infra_config.candidates.num_shards
+def _manifest_fields(configs: WorkflowConfigs, spec: SampleSpec) -> dict[str, Any]:
+    num_shards = _num_shards(configs)
     return {NUM_SHARDS_KEY: num_shards, **spec.shard_arguments(num_shards)}
 
 
 def _plan_task(
     templates: SampleTemplates,
-    infra_config: InfraConfig,
+    sample_paths: SamplePaths,
     layout: SiteLayout,
     spec: SampleSpec,
 ) -> Task:
-    prefixes = infra_config.storage.prefixes.candidates
     return templates.plan(
         name="plan-sources",
         arguments={
             "base_path": layout.base_path,
-            "features_prefix": prefixes.features,
-            "conformers_prefix": prefixes.conformers,
+            "features_prefix": sample_paths.featurized,
+            "conformers_prefix": sample_paths.preprocessed,
             "persist_file": _plan_path(layout, spec),
             **spec.plan_arguments(),
         },
@@ -86,20 +93,21 @@ def _plan_task(
 
 def _check_task(
     templates: SampleTemplates,
-    infra_config: InfraConfig,
+    configs: WorkflowConfigs,
+    sample_paths: SamplePaths,
     layout: SiteLayout,
     spec: SampleSpec,
     name: str,
     completion_key: str,
 ) -> Task:
-    expected = {**_manifest_fields(infra_config, spec), completion_key: True}
+    expected = {**_manifest_fields(configs, spec), completion_key: True}
     return templates.verify_manifest(
         name=name,
         arguments={
             "base_path": layout.base_path,
             "manifest": _state_path(layout, spec),
             "expect": json_arg(expected),
-            "source_globs": _source_globs(infra_config, layout, spec),
+            "source_globs": _source_globs(sample_paths, layout, spec),
             "result_file": MATCHES_PATH,
         },
     )
@@ -128,13 +136,13 @@ def _update_manifest_task(
 
 def _sample_shards_task(
     templates: SampleTemplates,
-    infra_config: InfraConfig,
+    configs: WorkflowConfigs,
+    sample_paths: SamplePaths,
     layout: SiteLayout,
     spec: SampleSpec,
     when: str,
 ) -> Task:
-    candidate_prefixes = infra_config.storage.prefixes.candidates
-    num_shards = infra_config.candidates.num_shards
+    num_shards = _num_shards(configs)
 
     return templates.sample_for(spec)(
         name="sample-shards",
@@ -143,8 +151,8 @@ def _sample_shards_task(
         arguments={
             "base_path": layout.base_path,
             "source": _shard_filename(ITEM_PARAM),
-            "features_input_prefix": candidate_prefixes.features,
-            "conformers_input_prefix": candidate_prefixes.conformers,
+            "features_input_prefix": sample_paths.featurized,
+            "conformers_input_prefix": sample_paths.preprocessed,
             "output_prefix": layout.staging_prefix(spec.label),
             **spec.shard_arguments(num_shards),
         },
@@ -170,28 +178,29 @@ def _merge_samples_task(
 
 def build_sample_dag(
     templates: SampleTemplates,
-    infra_config: InfraConfig,
+    configs: WorkflowConfigs,
     layout: SiteLayout,
     spec: SampleSpec,
 ) -> DAG:
-    fields = _manifest_fields(infra_config, spec)
+    sample_paths = _sample_paths(configs)
+    fields = _manifest_fields(configs, spec)
 
     with DAG(
         name=spec.dag_name,
         inputs=[Parameter(name=name) for name in SAMPLE_PARAMETERS],
     ) as dag:
-        plan_task = _plan_task(templates, infra_config, layout, spec)
+        plan_task = _plan_task(templates, sample_paths, layout, spec)
         check_sampled = _check_task(
-            templates, infra_config, layout, spec, "check-sampled", SAMPLED_KEY
+            templates, configs, sample_paths, layout, spec, "check-sampled", SAMPLED_KEY
         )
         check_merged = _check_task(
-            templates, infra_config, layout, spec, "check-merged", MERGED_KEY
+            templates, configs, sample_paths, layout, spec, "check-merged", MERGED_KEY
         )
         sample_gate = when_unmatched(check_sampled)
         merge_gate = when_unmatched(check_merged)
 
         sample_task = _sample_shards_task(
-            templates, infra_config, layout, spec, sample_gate
+            templates, configs, sample_paths, layout, spec, sample_gate
         )
         write_task = _update_manifest_task(
             templates,
