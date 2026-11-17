@@ -36,7 +36,7 @@ from workflows.templates.builders import TemplateFactory
 
 PREPROCESS_CANDIDATES_DAG = "preprocess-candidates-dag"
 PREPROCESS_FANOUT_DAG = "preprocess-shards-fanout-dag"
-PROCESS_SHARD_DAG = "process-shard-dag"
+PREPROCESS_SHARD_DAG = "preprocess-shard-dag"
 
 SOURCES_PARAM = "sources"
 SHARD_FILE_GLOB = "*.parquet"
@@ -133,7 +133,7 @@ def _update_manifest_task(
     )
 
 
-def _build_process_shard_dag(
+def _build_preprocess_shard_dag(
     templates: TemplateFactory,
     sample_paths: SamplePaths,
 ) -> DAG:
@@ -143,7 +143,9 @@ def _build_process_shard_dag(
         retry_strategy=SHARD_RETRY,
     )
 
-    with DAG(name=PROCESS_SHARD_DAG, inputs=[Parameter(name=SOURCE_INPUT_NAME)]) as dag:
+    with DAG(
+        name=PREPROCESS_SHARD_DAG, inputs=[Parameter(name=SOURCE_INPUT_NAME)]
+    ) as dag:
         preprocess_shard(
             name="preprocess-shard",
             arguments={
@@ -162,15 +164,15 @@ def _build_fanout_dag(
     templates: TemplateFactory,
     sample_paths: SamplePaths,
 ) -> DAG:
-    process_shard_dag = _build_process_shard_dag(templates, sample_paths)
+    preprocess_shard_dag = _build_preprocess_shard_dag(templates, sample_paths)
 
     with DAG(
         name=PREPROCESS_FANOUT_DAG,
         inputs=[Parameter(name=SOURCES_PARAM)],
     ) as dag:
         Task(
-            name="process-shards",
-            template=process_shard_dag,
+            name="preprocess-shards",
+            template=preprocess_shard_dag,
             with_param=f"{{{{inputs.parameters.{SOURCES_PARAM}}}}}",
             arguments={SOURCE_INPUT_NAME: ITEM_PARAM},
         )
@@ -198,7 +200,7 @@ def build_preprocess_candidates_dag(
 
         fanout_dag = _build_fanout_dag(templates, sample_paths)
         fanout_task = fanout_dag(
-            name="process-shards-fanout",
+            name="preprocess-shards-fanout",
             when=preprocess_gate,
             arguments={SOURCES_PARAM: _sources_expression(plan_task)},
         )

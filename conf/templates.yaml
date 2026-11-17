@@ -98,6 +98,18 @@ templates:
     image: *candidates_image
     scratch: *scratch_50gb
 
+  plan_featurize_candidates:
+    resources: *low_cpu
+    image: *candidates_image
+
+  verify_manifest_featurize_candidates:
+    resources: *low_cpu
+    image: *candidates_image
+
+  update_manifest_featurize_candidates:
+    resources: *low_cpu
+    image: *candidates_image
+
   featurize_candidate_shard:
     resources: *med_cpu_high_ram
     image: *candidates_image

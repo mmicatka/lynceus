@@ -39,7 +39,7 @@ spec:
             value: /tmp/manifest.json
           - name: persist_file
             value: candidates/1m/preprocessed/plan.manifest.json
-      - name: process-shards-fanout
+      - name: preprocess-shards-fanout
         depends: plan-preprocess
         template: preprocess-shards-fanout-dag
         when: '{{tasks.check-preprocessed.outputs.parameters.matches}} == false'
@@ -48,7 +48,7 @@ spec:
           - name: sources
             value: '{{=toJson(fromJSON(tasks[''plan-preprocess''].outputs.parameters.manifest).sources)}}'
       - name: write-manifest
-        depends: process-shards-fanout
+        depends: preprocess-shards-fanout
         template: update-manifest-preprocess-candidates
         when: '{{tasks.check-preprocessed.outputs.parameters.matches}} == false'
         arguments:
@@ -288,7 +288,7 @@ spec:
         requests:
           cpu: '4'
           memory: 4Gi
-  - name: process-shard-dag
+  - name: preprocess-shard-dag
     dag:
       tasks:
       - name: preprocess-shard
@@ -311,8 +311,8 @@ spec:
   - name: preprocess-shards-fanout-dag
     dag:
       tasks:
-      - name: process-shards
-        template: process-shard-dag
+      - name: preprocess-shards
+        template: preprocess-shard-dag
         withParam: '{{inputs.parameters.sources}}'
         arguments:
           parameters:
