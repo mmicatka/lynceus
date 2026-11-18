@@ -13,10 +13,10 @@ from workflows.registry.common.core import (
     shard_filename,
     shard_ids,
 )
-from workflows.templates import sample_candidates_template
+from workflows.templates import sample_candidate_shard_template
 from workflows.templates.builders import TemplateFactory
 
-SAMPLE_SHARDS_PARALLELISM = 1
+SAMPLE_SHARDS_PARALLELISM = 10
 SAMPLE_RETRY = RetryStrategy(limit=3, retry_policy="OnFailure")
 SAMPLE_CANDIDATES_DAG = "sample-candidates-dag"
 
@@ -43,7 +43,7 @@ def _subsample_task(
 
     subsample_candidates = templates.build(
         TemplateName.SUBSAMPLE_CANDIDATES,
-        sample_candidates_template,
+        sample_candidate_shard_template,
         retry_strategy=SAMPLE_RETRY,
     )
 

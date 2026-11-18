@@ -1,7 +1,7 @@
 # workflows/src/workflows/templates/candidates/sample.py
 
 
-def sample_candidates_template(
+def sample_candidate_shard_template(
     base_path: str,
     source: str,
     source_prefix: str,
@@ -15,7 +15,7 @@ def sample_candidates_template(
 
     subprocess.run(
         [
-            "sample-candidates",
+            "sample-candidate-shard",
             "--input",
             os.path.join(source_root, source),
             "--source-root",
