@@ -61,8 +61,8 @@ def _select_positions(
 
 
 def _write_sample(
-    features_files: list[str],
-    conformers_files: list[str],
+    featurized_files: list[str],
+    preprocessed_files: list[str],
     positions: np.ndarray,
     output_file: str,
     id_column: str,
@@ -71,13 +71,13 @@ def _write_sample(
     writer: pq.ParquetWriter | None = None
     offset = 0
     try:
-        for features, conformers in aligned_chunks(
-            features_files, conformers_files, id_column, batch_size
+        for featurized, preprocessed in aligned_chunks(
+            featurized_files, preprocessed_files, id_column, batch_size
         ):
-            end = offset + features.num_rows
+            end = offset + featurized.num_rows
             lo, hi = np.searchsorted(positions, [offset, end])
             selected = select_aligned(
-                features, conformers, positions[lo:hi] - offset, id_column
+                featurized, preprocessed, positions[lo:hi] - offset, id_column
             )
             if writer is None:
                 writer = pq.ParquetWriter(
@@ -91,16 +91,16 @@ def _write_sample(
 
 
 def _sample_via_staged_io(
-    features_files: list[str],
-    conformers_files: list[str],
+    featurized_files: list[str],
+    preprocessed_files: list[str],
     positions: np.ndarray,
     output_path: Path,
     id_column: str,
     batch_size: int,
     scratch_dir: str | None,
 ) -> None:
-    all_inputs = [Path(f) for f in (*features_files, *conformers_files)]
-    split_idx = len(features_files)
+    all_inputs = [Path(f) for f in (*featurized_files, *preprocessed_files)]
+    split_idx = len(featurized_files)
 
     with staged_io(
         all_inputs,
@@ -108,13 +108,13 @@ def _sample_via_staged_io(
         transfers=STAGED_IO_TRANSFERS,
         scratch_dir=scratch_dir,
     ) as (local_inputs, local_output):
-        local_features = [str(p) for p in local_inputs[:split_idx]]
-        local_conformers = [str(p) for p in local_inputs[split_idx:]]
+        local_featurized = [str(p) for p in local_inputs[:split_idx]]
+        local_preprocessed = [str(p) for p in local_inputs[split_idx:]]
         local_file = local_output / output_path.name
 
         _write_sample(
-            local_features,
-            local_conformers,
+            local_featurized,
+            local_preprocessed,
             positions,
             str(local_file),
             id_column,
@@ -131,15 +131,15 @@ def _sample_via_staged_io(
     help="Directory to base the relative paths on in the manifest.",
 )
 @click.option(
-    "--features-input",
-    "features_input",
+    "--featurized-input",
+    "featurized_input",
     required=True,
     type=str,
-    help="Features parquet file, glob pattern, or folder of parquet files.",
+    help="featurized parquet file, glob pattern, or folder of parquet files.",
 )
 @click.option(
-    "--conformers-input",
-    "conformers_input",
+    "--preprocessed-input",
+    "preprocessed_input",
     required=True,
     type=str,
     help="Conformer parquet file, glob pattern, or folder of parquet files.",
@@ -191,8 +191,8 @@ def _sample_via_staged_io(
 @wide_log(logger)
 def sample_surrogate_candidates(
     source_root: Path,
-    features_input: str,
-    conformers_input: str,
+    featurized_input: str,
+    preprocessed_input: str,
     output_path: str,
     num_samples: int,
     id_column: str,
@@ -201,17 +201,18 @@ def sample_surrogate_candidates(
     scratch_dir: str | None,
 ) -> None:
     click.echo(
-        f"Processing aligned samples from {features_input} and {conformers_input}..."
+        f"Processing aligned samples from {featurized_input}"
+        f" and {preprocessed_input}..."
     )
 
     identifier = Path(output_path).stem
 
-    features_files = resolve_parquet_files(features_input)
-    conformers_files = resolve_parquet_files(conformers_input)
+    featurized_files = resolve_parquet_files(featurized_input)
+    preprocessed = resolve_parquet_files(preprocessed_input)
 
     expected_state = {"num_samples": num_samples, "seed": seed}
     manifest = _input_manifest(
-        [*features_files, *conformers_files],
+        [*featurized_files, *preprocessed],
         output_path,
         source_root,
         expected_state,
@@ -225,11 +226,12 @@ def sample_surrogate_candidates(
     except Exception as e:
         logger.warning("Failed to load existing manifest, re-generating.", error=str(e))
 
-    total_rows = count_rows(features_files)
-    conformer_rows = count_rows(conformers_files)
-    if total_rows != conformer_rows:
+    total_rows = count_rows(featurized_files)
+    preprocessed_rows = count_rows(preprocessed)
+    if total_rows != preprocessed_rows:
         raise RuntimeError(
-            f"Row count mismatch: {total_rows} features vs {conformer_rows} conformers"
+            f"Row count mismatch: {total_rows} featurized vs"
+            f" {preprocessed_rows} preprocessed"
         )
 
     effective_samples = min(num_samples, total_rows)
@@ -243,10 +245,10 @@ def sample_surrogate_candidates(
 
     logger.info(
         "Executing aligned position sampling",
-        features_source=features_input,
-        conformers_source=conformers_input,
-        num_features_files=len(features_files),
-        num_conformers_files=len(conformers_files),
+        featurized_source=featurized_input,
+        preprocessed_source=preprocessed_input,
+        num_featurized_files=len(featurized_files),
+        num_preprocessed_files=len(preprocessed),
         identifier=identifier,
         total_rows=total_rows,
         num_samples=effective_samples,
@@ -260,8 +262,8 @@ def sample_surrogate_candidates(
     positions = _select_positions(total_rows, effective_samples, seed)
 
     _sample_via_staged_io(
-        features_files,
-        conformers_files,
+        featurized_files,
+        preprocessed,
         positions,
         Path(output_path),
         id_column,

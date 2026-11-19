@@ -15,8 +15,8 @@ from lynceus_core.io.staged_io import staged_output
 from lynceus_core.logging import get_lynceus_logger, wide_log
 from lynceus_core.manifest.common import Manifest
 
-from surrogate_model.common.cli import features_option
-from surrogate_model.common.data import flatten_features
+from surrogate_model.common.cli import featurized_option
+from surrogate_model.common.data import flatten_featurized
 from surrogate_model.common.io import (
     DEFAULT_BATCH_SIZE,
     count_rows,
@@ -103,7 +103,7 @@ def _load_excluded_ids(
     )
     if ids.type != id_type:
         raise RuntimeError(
-            f"Excluded id type {ids.type} does not match features id type {id_type}"
+            f"Excluded id type {ids.type} does not match featurized id type {id_type}"
         )
     return ids
 
@@ -138,7 +138,7 @@ def _score_chunk(
     scores = np.full(chunk.num_rows, np.nan, dtype=np.float32)
     eligible = _eligible_mask(chunk, valid_cols, id_column, excluded_ids)
     if eligible.any():
-        x = flatten_features(
+        x = flatten_featurized(
             pl.DataFrame(chunk).filter(pl.Series(eligible)), feature_cols
         )
         scores[eligible] = predict_active(model, x)
@@ -147,7 +147,7 @@ def _score_chunk(
 
 def _score_all(
     model: ProbabilisticClassifier,
-    features_files: list[str],
+    featurized_files: list[str],
     feature_cols: list[str],
     valid_cols: list[str],
     id_column: str,
@@ -158,7 +158,7 @@ def _score_all(
     scores = np.empty(total_rows, dtype=np.float32)
     columns = [id_column, *feature_cols, *valid_cols]
     offset = 0
-    for chunk in stream_tables(features_files, columns, batch_size):
+    for chunk in stream_tables(featurized_files, columns, batch_size):
         end = offset + chunk.num_rows
         scores[offset:end] = _score_chunk(
             model, chunk, feature_cols, valid_cols, id_column, excluded_ids
@@ -194,8 +194,8 @@ def _select_random(
 
 
 def _write_selection_via_staged_output(
-    features_files: list[str],
-    conformers_files: list[str],
+    featurized_files: list[str],
+    preprocessed_files: list[str],
     positions: np.ndarray,
     output_path: Path,
     id_column: str,
@@ -209,8 +209,8 @@ def _write_selection_via_staged_output(
     ) as local_output:
         local_file = local_output / output_path.name
         write_aligned_selection(
-            features_files=features_files,
-            conformers_files=conformers_files,
+            featurized_files=featurized_files,
+            preprocessed_files=preprocessed_files,
             positions=positions,
             output_file=str(local_file),
             id_column=id_column,
@@ -226,8 +226,8 @@ def _write_selection_via_staged_output(
     type=click.Path(file_okay=False, path_type=Path),
     help="Directory to base the relative paths on in the manifest.",
 )
-@click.option("--features-input", "features_input", required=True, type=str)
-@click.option("--conformers-input", "conformers_input", required=True, type=str)
+@click.option("--featurized-input", "featurized_input", required=True, type=str)
+@click.option("--preprocessed-input", "preprocessed_input", required=True, type=str)
 @click.option(
     "--model",
     "model_path",
@@ -235,7 +235,7 @@ def _write_selection_via_staged_output(
     type=click.Path(exists=True, dir_okay=False),
     help="Saved LightGBM model (.joblib).",
 )
-@features_option
+@featurized_option
 @click.option("--output", "output_path", required=True, type=click.Path(dir_okay=False))
 @click.option(
     "--num-top",
@@ -278,10 +278,10 @@ def _write_selection_via_staged_output(
 @wide_log(logger)
 def sample_candidates_by_prediction(
     source_root: Path,
-    features_input: str,
-    conformers_input: str,
+    featurized_input: str,
+    preprocessed_input: str,
     model_path: str,
-    features: tuple[str, ...],
+    featurized: tuple[str, ...],
     output_path: str,
     num_top: int,
     num_random: int,
@@ -292,14 +292,14 @@ def sample_candidates_by_prediction(
     scratch_dir: str | None,
 ) -> None:
     click.echo(
-        f"Sampling by prediction from {features_input} and {conformers_input}..."
+        f"Sampling by prediction from {featurized_input} and {preprocessed_input}..."
     )
 
     identifier = Path(output_path).stem
-    feature_cols = list(features)
+    feature_cols = list(featurized)
 
-    features_files = resolve_parquet_files(features_input)
-    conformers_files = resolve_parquet_files(conformers_input)
+    featurized_files = resolve_parquet_files(featurized_input)
+    preprocessed_files = resolve_parquet_files(preprocessed_input)
     exclude_files = _exclusion_files(exclude_inputs, output_path)
 
     expected_state = {
@@ -309,7 +309,7 @@ def sample_candidates_by_prediction(
         "seed": seed,
     }
     manifest = _input_manifest(
-        [*features_files, *conformers_files, *exclude_files, model_path],
+        [*featurized_files, *preprocessed_files, *exclude_files, model_path],
         output_path,
         source_root,
         expected_state,
@@ -323,18 +323,19 @@ def sample_candidates_by_prediction(
     except Exception as e:
         logger.warning("Failed to load existing manifest, re-generating.", error=str(e))
 
-    total_rows = count_rows(features_files)
-    conformer_rows = count_rows(conformers_files)
-    if total_rows != conformer_rows:
+    total_rows = count_rows(featurized_files)
+    preprocessed_rows = count_rows(preprocessed_files)
+    if total_rows != preprocessed_rows:
         raise RuntimeError(
-            f"Row count mismatch: {total_rows} features vs {conformer_rows} conformers"
+            f"Row count mismatch: {total_rows} featurized vs"
+            f" {preprocessed_rows} preprocessed"
         )
 
     start_time = time.perf_counter()
 
     model = _load_model(model_path)
-    valid_cols = _valid_columns(features_files[0])
-    id_type = pq.ParquetFile(features_files[0]).schema_arrow.field(id_column).type
+    valid_cols = _valid_columns(featurized_files[0])
+    id_type = pq.ParquetFile(featurized_files[0]).schema_arrow.field(id_column).type
     excluded_ids = _load_excluded_ids(exclude_files, id_column, id_type)
 
     logger.info(
@@ -342,12 +343,12 @@ def sample_candidates_by_prediction(
         identifier=identifier,
         model_path=model_path,
         total_rows=total_rows,
-        features=feature_cols,
+        featurized=feature_cols,
         excluded_rows=0 if excluded_ids is None else len(excluded_ids),
     )
     scores = _score_all(
         model,
-        features_files,
+        featurized_files,
         feature_cols,
         valid_cols,
         id_column,
@@ -390,8 +391,8 @@ def sample_candidates_by_prediction(
     )
 
     _write_selection_via_staged_output(
-        features_files,
-        conformers_files,
+        featurized_files,
+        preprocessed_files,
         positions,
         Path(output_path),
         id_column,

@@ -83,8 +83,8 @@ def _plan_task(
         name="plan-sources",
         arguments={
             "base_path": layout.base_path,
-            "features_prefix": sample_paths.featurized,
-            "conformers_prefix": sample_paths.preprocessed,
+            "featurized_prefix": sample_paths.featurized_shards,
+            "preprocessed_prefix": sample_paths.preprocessed_shards,
             "persist_file": _plan_path(layout, spec),
             **spec.plan_arguments(),
         },
@@ -151,8 +151,8 @@ def _sample_shards_task(
         arguments={
             "base_path": layout.base_path,
             "source": _shard_filename(ITEM_PARAM),
-            "features_input_prefix": sample_paths.featurized,
-            "conformers_input_prefix": sample_paths.preprocessed,
+            "featurized_input_prefix": sample_paths.featurized,
+            "preprocessed_input_prefix": sample_paths.preprocessed,
             "output_prefix": layout.staging_prefix(spec.label),
             **spec.shard_arguments(num_shards),
         },

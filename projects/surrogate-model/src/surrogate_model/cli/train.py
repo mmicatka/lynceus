@@ -17,11 +17,11 @@ from lynceus_core.manifest.common import Manifest
 from sklearn.model_selection import train_test_split
 
 from surrogate_model.common.cli import (
-    features_option,
+    featurized_option,
 )
 from surrogate_model.common.data import (
     compute_labels,
-    flatten_features,
+    flatten_featurized,
     load_and_clean_data,
 )
 from surrogate_model.common.metrics import evaluation_metrics, predict_active
@@ -54,26 +54,26 @@ def _already_trained(manifest: Manifest, model_path: str) -> bool:
     return Path(model_path).is_file() and manifest.exists_superset()
 
 
-def _expected_state(features: list[str], threshold: float) -> dict:
+def _expected_state(featurized: list[str], threshold: float) -> dict:
     return {
-        "features": list(features),
+        "featurized": list(featurized),
         "threshold": threshold,
         "seed": RANDOM_SEED,
     }
 
 
 def _prepare_dataset(
-    features_paths: list[str],
+    featurized_paths: list[str],
     labels_paths: list[str],
-    features: list[str],
+    featurized: list[str],
     threshold: float,
 ) -> tuple[np.ndarray, np.ndarray]:
-    raw_features = pl.read_parquet(features_paths)
+    raw_featurized = pl.read_parquet(featurized_paths)
     raw_labels = pl.read_parquet(labels_paths)
 
-    df_cleaned = load_and_clean_data(raw_features, raw_labels)
+    df_cleaned = load_and_clean_data(raw_featurized, raw_labels)
 
-    x = flatten_features(df_cleaned, features)
+    x = flatten_featurized(df_cleaned, featurized)
     y_raw = df_cleaned["affinity_kcal_mol"]
 
     y_label = compute_labels(y_raw, threshold=threshold)
@@ -95,17 +95,17 @@ def _metrics_records(metrics: pl.DataFrame | list[dict]) -> list[dict]:
 
 
 def _train_and_evaluate(
-    train_features_paths: list[str],
+    train_featurized_paths: list[str],
     train_labels_paths: list[str],
-    validation_features_path: str,
+    validation_featurized_path: str,
     validation_labels_path: str,
-    features: list[str],
+    featurized: list[str],
     threshold: float,
 ) -> tuple[lgb.LGBMClassifier, dict]:
     x_initial, y_initial_label = _prepare_dataset(
-        train_features_paths,
+        train_featurized_paths,
         train_labels_paths,
-        features,
+        featurized,
         threshold=threshold,
     )
 
@@ -140,9 +140,9 @@ def _train_and_evaluate(
     )
 
     x_validation, y_validation_label = _prepare_dataset(
-        [validation_features_path],
+        [validation_featurized_path],
         [validation_labels_path],
-        features,
+        featurized,
         threshold=threshold,
     )
 
@@ -181,12 +181,12 @@ def _save_via_staged_output(model, model_path: Path, scratch_dir: str | None) ->
     help="Directory to base the relative paths on in the manifest.",
 )
 @click.option(
-    "--train-features",
-    "train_features_paths",
+    "--train-featurized",
+    "train_featurized_paths",
     type=str,
     required=True,
     callback=split_paths,
-    help=f"{PATH_SEPARATOR}-separated paths to the input features files.",
+    help=f"{PATH_SEPARATOR}-separated paths to the input featurized files.",
 )
 @click.option(
     "--train-labels",
@@ -197,11 +197,11 @@ def _save_via_staged_output(model, model_path: Path, scratch_dir: str | None) ->
     help=f"{PATH_SEPARATOR}-separated paths to the input label files.",
 )
 @click.option(
-    "--validation-features",
-    "validation_features_path",
+    "--validation-featurized",
+    "validation_featurized_path",
     type=str,
     required=True,
-    help="Path to the input features file.",
+    help="Path to the input featurized file.",
 )
 @click.option(
     "--validation-labels",
@@ -217,7 +217,7 @@ def _save_via_staged_output(model, model_path: Path, scratch_dir: str | None) ->
     required=True,
     help="Output path to save the model.",
 )
-@features_option
+@featurized_option
 @click.option(
     "--scratch-dir",
     type=str,
@@ -228,16 +228,16 @@ def _save_via_staged_output(model, model_path: Path, scratch_dir: str | None) ->
 @wide_log(logger)
 def train_model(
     source_root: Path,
-    train_features_paths: list[str],
+    train_featurized_paths: list[str],
     train_labels_paths: list[str],
-    validation_features_path: str,
+    validation_featurized_path: str,
     validation_labels_path: str,
-    features: list[str],
+    featurized: list[str],
     model_path: str,
     scratch_dir: str | None,
 ) -> None:
     click.echo(
-        f"Training surrogate model using {len(train_features_paths)} feature files..."
+        f"Training surrogate model using {len(train_featurized_paths)} feature files..."
     )
 
     threshold = get_validation_threshold(validation_labels_path)
@@ -246,14 +246,14 @@ def train_model(
 
     manifest = _input_manifest(
         [
-            *train_features_paths,
+            *train_featurized_paths,
             *train_labels_paths,
-            validation_features_path,
+            validation_featurized_path,
             validation_labels_path,
         ],
         model_path,
         source_root,
-        _expected_state(features, threshold),
+        _expected_state(featurized, threshold),
     )
 
     try:
@@ -274,11 +274,11 @@ def train_model(
     start_time = time.perf_counter()
 
     model, results = _train_and_evaluate(
-        train_features_paths,
+        train_featurized_paths,
         train_labels_paths,
-        validation_features_path,
+        validation_featurized_path,
         validation_labels_path,
-        features,
+        featurized,
         threshold,
     )
 

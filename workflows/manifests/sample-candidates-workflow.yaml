@@ -582,11 +582,11 @@ spec:
         mountPath: /mnt/lynceus
       resources:
         limits:
-          cpu: '2'
-          memory: 2Gi
+          cpu: '8'
+          memory: 8Gi
         requests:
-          cpu: '2'
-          memory: 2Gi
+          cpu: '8'
+          memory: 8Gi
   - name: main-dag
     dag:
       tasks:
