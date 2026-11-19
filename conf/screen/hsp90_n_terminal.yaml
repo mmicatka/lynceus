@@ -8,14 +8,14 @@ targets:
     - id: "HSP90_N_Terminal"
       members:
         - pdb_id: 1UYM
-          weight: 0.5
-        - pdb_id: 1YET
-          weight: 0.5
+          weight: 1.0
+        # - pdb_id: 1YET
+        #   weight: 0.5
   min_pocket_score: 15.0
 
 filter:
   surrogate:
-    active_percentile: 5.0
+    active_percentile: 10.0
     feature_types:
       - atom_pair
       - autocorr
@@ -28,19 +28,15 @@ filter:
       - usrcat
       - whim
     random_seed: 1000
-    validation: 20000
+    validation: 1000
     rounds:
       - top: 0
-        random: 10000
-      - top: 5000
-        random: 5000
-      - top: 5000
-        random: 5000
-      - top: 5000
-        random: 5000
-      - top: 5000
-        random: 5000
-      - top: 5000
-        random: 5000
-      - top: 5000
-        random: 5000
+        random: 1000
+      - top: 500
+        random: 500
+      - top: 500
+        random: 500
+      - top: 500
+        random: 500
+      - top: 500
+        random: 500

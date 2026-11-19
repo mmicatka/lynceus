@@ -151,8 +151,8 @@ def _sample_shards_task(
         arguments={
             "base_path": layout.base_path,
             "source": _shard_filename(ITEM_PARAM),
-            "featurized_input_prefix": sample_paths.featurized,
-            "preprocessed_input_prefix": sample_paths.preprocessed,
+            "featurized_input_prefix": sample_paths.featurized_shards,
+            "preprocessed_input_prefix": sample_paths.preprocessed_shards,
             "output_prefix": layout.staging_prefix(spec.label),
             **spec.shard_arguments(num_shards),
         },

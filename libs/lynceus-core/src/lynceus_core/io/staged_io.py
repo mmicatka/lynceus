@@ -9,11 +9,16 @@ from pathlib import Path
 from lynceus_core.io.transfer import DEFAULT_RETRY_POLICY, RetryPolicy, copy_pairs
 
 
-def _ensure_unique_names(paths: Sequence[Path]) -> None:
-    names = [path.name for path in paths]
-    duplicates = sorted({name for name in names if names.count(name) > 1})
-    if duplicates:
-        raise ValueError(f"Input files share basenames: {duplicates}")
+def _allocate_local_paths(input_files: Sequence[Path], scratch: Path) -> list[Path]:
+    return [
+        scratch / f"input_{index:04d}" / path.name
+        for index, path in enumerate(input_files)
+    ]
+
+
+def _prepare_parents(paths: Sequence[Path]) -> None:
+    for path in paths:
+        path.parent.mkdir(parents=True, exist_ok=True)
 
 
 def _list_files(root: Path) -> list[Path]:
@@ -27,9 +32,9 @@ def staged_input(
     scratch_dir: str | None = None,
     retry_policy: RetryPolicy = DEFAULT_RETRY_POLICY,
 ) -> Generator[list[Path]]:
-    _ensure_unique_names(input_files)
     with tempfile.TemporaryDirectory(dir=scratch_dir) as scratch:
-        local_files = [Path(scratch) / path.name for path in input_files]
+        local_files = _allocate_local_paths(input_files, Path(scratch))
+        _prepare_parents(local_files)
         copy_pairs(list(zip(input_files, local_files)), transfers, retry_policy)
         yield local_files
 

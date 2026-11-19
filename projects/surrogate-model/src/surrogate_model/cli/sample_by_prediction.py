@@ -15,8 +15,8 @@ from lynceus_core.io.staged_io import staged_output
 from lynceus_core.logging import get_lynceus_logger, wide_log
 from lynceus_core.manifest.common import Manifest
 
-from surrogate_model.common.cli import featurized_option
-from surrogate_model.common.data import flatten_featurized
+from surrogate_model.common.cli import features_option
+from surrogate_model.common.data import flatten_features
 from surrogate_model.common.io import (
     DEFAULT_BATCH_SIZE,
     count_rows,
@@ -138,7 +138,7 @@ def _score_chunk(
     scores = np.full(chunk.num_rows, np.nan, dtype=np.float32)
     eligible = _eligible_mask(chunk, valid_cols, id_column, excluded_ids)
     if eligible.any():
-        x = flatten_featurized(
+        x = flatten_features(
             pl.DataFrame(chunk).filter(pl.Series(eligible)), feature_cols
         )
         scores[eligible] = predict_active(model, x)
@@ -235,7 +235,7 @@ def _write_selection_via_staged_output(
     type=click.Path(exists=True, dir_okay=False),
     help="Saved LightGBM model (.joblib).",
 )
-@featurized_option
+@features_option
 @click.option("--output", "output_path", required=True, type=click.Path(dir_okay=False))
 @click.option(
     "--num-top",

@@ -16,12 +16,10 @@ from lynceus_core.logging import get_lynceus_logger, wide_log
 from lynceus_core.manifest.common import Manifest
 from sklearn.model_selection import train_test_split
 
-from surrogate_model.common.cli import (
-    featurized_option,
-)
+from surrogate_model.common.cli import features_option
 from surrogate_model.common.data import (
     compute_labels,
-    flatten_featurized,
+    flatten_features,
     load_and_clean_data,
 )
 from surrogate_model.common.metrics import evaluation_metrics, predict_active
@@ -73,7 +71,7 @@ def _prepare_dataset(
 
     df_cleaned = load_and_clean_data(raw_featurized, raw_labels)
 
-    x = flatten_featurized(df_cleaned, featurized)
+    x = flatten_features(df_cleaned, featurized)
     y_raw = df_cleaned["affinity_kcal_mol"]
 
     y_label = compute_labels(y_raw, threshold=threshold)
@@ -217,7 +215,7 @@ def _save_via_staged_output(model, model_path: Path, scratch_dir: str | None) ->
     required=True,
     help="Output path to save the model.",
 )
-@featurized_option
+@features_option
 @click.option(
     "--scratch-dir",
     type=str,
