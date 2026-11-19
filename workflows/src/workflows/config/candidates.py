@@ -96,6 +96,10 @@ class CandidateSampleConfig(StrictModel):
     storage: SampleStorage
     feature_types: FeatureTypes
 
+    @property
+    def feature_names(self) -> list[str]:
+        return sorted(feature.value for feature in self.feature_types)
+
     def raw_prefix(self, sample_root: PurePosixPath) -> PurePosixPath:
         return sample_root / self.storage.raw
 

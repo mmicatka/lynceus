@@ -20,7 +20,7 @@ spec:
           - name: expect
             value: '{"featurized":true,"sample":"1m"}'
           - name: source_globs
-            value: '["candidates/1m/raw/*.parquet"]'
+            value: '["candidates/1m/preprocessed/shards/*.parquet"]'
           - name: result_file
             value: /tmp/manifest_matches.txt
       - name: plan-featurize
@@ -32,7 +32,7 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: input_prefix
-            value: candidates/1m/raw
+            value: candidates/1m/preprocessed/shards
           - name: source_glob
             value: '*.parquet'
           - name: output_file
@@ -236,6 +236,7 @@ spec:
       - name: source
       - name: input_prefix
       - name: output_prefix
+      - name: manifest_prefix
       - name: features
       - name: num_workers
         default: auto
@@ -256,6 +257,8 @@ spec:
         except: features = r'''{{inputs.parameters.features}}'''
         try: input_prefix = json.loads(r'''{{inputs.parameters.input_prefix}}''')
         except: input_prefix = r'''{{inputs.parameters.input_prefix}}'''
+        try: manifest_prefix = json.loads(r'''{{inputs.parameters.manifest_prefix}}''')
+        except: manifest_prefix = r'''{{inputs.parameters.manifest_prefix}}'''
         try: num_workers = json.loads(r'''{{inputs.parameters.num_workers}}''')
         except: num_workers = r'''{{inputs.parameters.num_workers}}'''
         try: output_prefix = json.loads(r'''{{inputs.parameters.output_prefix}}''')
@@ -265,7 +268,7 @@ spec:
 
         import os
         import subprocess
-        cmd = ['featurize-candidate-shard', '--source-root', base_path, '--input', os.path.join(base_path, input_prefix, source), '--output', os.path.join(base_path, output_prefix, source), '--num-workers', str(num_workers)]
+        cmd = ['featurize-candidate-shard', '--source-root', base_path, '--input', os.path.join(base_path, input_prefix, source), '--output', os.path.join(base_path, output_prefix, source), '--manifest-dir', os.path.join(base_path, manifest_prefix), '--num-workers', str(num_workers)]
         for feature in features:
             cmd.extend(['--features', feature])
         subprocess.run(cmd, check=True)
@@ -295,11 +298,14 @@ spec:
           - name: source
             value: '{{inputs.parameters.source}}'
           - name: input_prefix
-            value: candidates/1m/raw
+            value: candidates/1m/preprocessed/shards
           - name: output_prefix
             value: candidates/1m/featurized/shards
           - name: manifest_prefix
             value: candidates/1m/featurized/manifests
+          - name: features
+            value: '["atom_pair", "autocorr", "descriptors", "ecfp", "functional_groups",
+              "morse", "rdf", "topological_torsion", "usrcat", "whim"]'
     inputs:
       parameters:
       - name: source
