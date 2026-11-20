@@ -2,13 +2,65 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: workflow-controller-configmap
+  name: argo-workflows-workflow-controller-configmap
   namespace: argo
+  annotations:
+    meta.helm.sh/release-name: argo-workflows
+    meta.helm.sh/release-namespace: argo
+  labels:
+    app: workflow-controller
+    app.kubernetes.io/component: workflow-controller
+    app.kubernetes.io/instance: argo-workflows
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: argo-workflows-cm
+    app.kubernetes.io/part-of: argo-workflows
 data:
-  podGC: |
-    strategy: OnPodSuccess
-    deleteDelayDuration: 10s
-  ttlStrategy: |
-    secondsAfterCompletion: 300
-    secondsAfterSuccess: 180
-    secondsAfterFailure: 1800
+  config: |
+    artifactRepository:
+      s3:
+        accessKeySecret:
+          key: accessKey
+          name: argo-artifacts-s3
+        secretKeySecret:
+          key: secretKey
+          name: argo-artifacts-s3
+        bucket: lynceus
+        endpoint: 192.168.1.4:3900
+        insecure: true
+        region: us-east-1
+    workflowDefaults:
+      spec:
+        serviceAccountName: argo-workflow
+        podGC:
+          strategy: OnPodSuccess
+          deleteDelayDuration: 10s
+        ttlStrategy:
+          secondsAfterCompletion: 300
+          secondsAfterSuccess: 180
+          secondsAfterFailure: 1800
+    nodeEvents:
+      enabled: true
+    workflowEvents:
+      enabled: true
+    failedPodRestart:
+      enabled: false
+      maxRestarts: 3
+    persistence:
+      connectionPool:
+        maxIdleConns: 100
+        maxOpenConns: 0
+        connMaxLifetime: 0s
+      nodeStatusOffLoad: true
+      archive: true
+      postgresql:
+        host: 192.168.1.25
+        port: 5432
+        database: argo_workflows
+        tableName: argo_workflows
+        ssl: false
+        userNameSecret:
+          name: argo-postgres-config
+          key: username
+        passwordSecret:
+          name: argo-postgres-config
+          key: password

@@ -281,7 +281,7 @@ def sample_candidates_by_prediction(
     featurized_input: str,
     preprocessed_input: str,
     model_path: str,
-    featurized: tuple[str, ...],
+    features: tuple[str, ...],
     output_path: str,
     num_top: int,
     num_random: int,
@@ -296,7 +296,7 @@ def sample_candidates_by_prediction(
     )
 
     identifier = Path(output_path).stem
-    feature_cols = list(featurized)
+    feature_cols = list(features)
 
     featurized_files = resolve_parquet_files(featurized_input)
     preprocessed_files = resolve_parquet_files(preprocessed_input)

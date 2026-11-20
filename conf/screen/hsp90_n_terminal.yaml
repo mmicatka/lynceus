@@ -15,7 +15,7 @@ targets:
 
 filter:
   surrogate:
-    active_percentile: 10.0
+    active_percentile: 5.0
     feature_types:
       - atom_pair
       - autocorr
@@ -28,15 +28,15 @@ filter:
       - usrcat
       - whim
     random_seed: 1000
-    validation: 1000
+    validation: 50000
     rounds:
       - top: 0
-        random: 1000
-      - top: 500
-        random: 500
-      - top: 500
-        random: 500
-      - top: 500
-        random: 500
-      - top: 500
-        random: 500
+        random: 10000
+      - top: 5000
+        random: 5000
+      - top: 5000
+        random: 5000
+      - top: 5000
+        random: 5000
+      - top: 5000
+        random: 5000

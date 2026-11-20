@@ -20,7 +20,6 @@ from .common import (
 from .docking import run_docking_template
 from .surrogate import (
     plan_surrogate_sample_template,
-    surrogate_sample_by_prediction_template,
     surrogate_sample_template,
     surrogate_train_template,
 )
@@ -49,6 +48,5 @@ __all__ = [
     # surrogate
     "plan_surrogate_sample_template",
     "surrogate_sample_template",
-    "surrogate_sample_by_prediction_template",
     "surrogate_train_template",
 ]

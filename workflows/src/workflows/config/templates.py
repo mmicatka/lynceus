@@ -40,7 +40,6 @@ class TemplateName(StrEnum):
     RESOLVE_BINDING_SITES = "resolve_binding_sites"
     RUN_DOCKING = "run_docking"
     PLAN_SURROGATE_SAMPLE = "plan_surrogate_sample"
-    SURROGATE_SAMPLE = "surrogate_sample"
     SURROGATE_SAMPLE_BY_PREDICTION = "surrogate_sample_by_prediction"
     SURROGATE_TRAIN = "surrogate_train"
     UPDATE_MANIFEST_SURROGATE = "update_manifest_surrogate"

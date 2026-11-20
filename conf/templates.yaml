@@ -145,11 +145,6 @@ templates:
     resources: *low_cpu
     image: *surrogate_image
 
-  surrogate_sample:
-    resources: *low_cpu_high_ram
-    image: *surrogate_image
-    scratch: *scratch_10gb
-
   surrogate_sample_by_prediction:
     resources: *low_cpu_high_ram
     image: *surrogate_image

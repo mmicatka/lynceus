@@ -58,6 +58,12 @@ def _model_globs(layout: SiteLayout, spec: SampleSpec) -> list[str]:
     return [glob.escape(os.path.relpath(model_path, layout.base_path))]
 
 
+def _exclusion_globs(layout: SiteLayout, spec: SampleSpec) -> list[str]:
+    return [
+        os.path.relpath(pattern, layout.base_path) for pattern in spec.exclude_inputs
+    ]
+
+
 def _source_globs(
     sample_paths: SamplePaths, layout: SiteLayout, spec: SampleSpec
 ) -> list[str]:
@@ -65,6 +71,7 @@ def _source_globs(
         f"{sample_paths.featurized}/{SOURCE_GLOB}",
         f"{sample_paths.preprocessed}/{SOURCE_GLOB}",
         *_model_globs(layout, spec),
+        *_exclusion_globs(layout, spec),
     ]
 
 
@@ -144,7 +151,7 @@ def _sample_shards_task(
 ) -> Task:
     num_shards = _num_shards(configs)
 
-    return templates.sample_for(spec)(
+    return templates.sample(
         name="sample-shards",
         when=when,
         with_items=shard_ids(num_shards),
