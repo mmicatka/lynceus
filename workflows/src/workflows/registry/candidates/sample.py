@@ -72,7 +72,12 @@ def build_sample_candidates_dag(
 def build_sample_candidates_workflow(configs: WorkflowConfigs) -> Workflow:
     templates = get_template_factory(configs.templates)
 
-    with new_workflow(configs.screen.name, "candidates-sample") as workflow:
+    with new_workflow(
+        configs.screen.name,
+        "candidates-sample",
+        priority=configs.priority,
+        pod_priority_class_name=configs.pod_priority_class_name,
+    ) as workflow:
         sample_dag = build_sample_candidates_dag(templates, configs)
 
         with DAG(name=ENTRYPOINT_DAG):

@@ -18,12 +18,16 @@ def _load_configs(
     candidates_path: Path,
     templates_path: Path,
     screen_path: Path,
+    priority: int | None = None,
+    pod_priority_class_name: str | None = None,
 ) -> WorkflowConfigs:
     try:
         return WorkflowConfigs.load(
             candidates_path=candidates_path,
             templates_path=templates_path,
             screen_path=screen_path,
+            priority=priority,
+            pod_priority_class_name=pod_priority_class_name,
         )
     except CONFIG_ERRORS as error:
         raise click.ClickException(str(error)) from error
@@ -91,14 +95,35 @@ def _write_workflows(rendered: dict[str, str], out_dir: Path) -> list[Path]:
     type=click.Path(exists=True, dir_okay=False, path_type=Path),
     help="Screen YAML defining what to compute.",
 )
+@click.option(
+    "--priority",
+    type=int,
+    default=None,
+    help="Argo controller queue priority (higher values run first).",
+)
+@click.option(
+    "--pod-priority-class",
+    "pod_priority_class_name",
+    type=str,
+    default=None,
+    help="Pod priority class name for workflow pods.",
+)
 def generate(
     workflows: tuple[str, ...],
     out_dir: Path,
     candidates_path: Path,
     templates_path: Path,
     screen_path: Path,
+    priority: int | None,
+    pod_priority_class_name: str | None,
 ) -> None:
-    configs = _load_configs(candidates_path, templates_path, screen_path)
+    configs = _load_configs(
+        candidates_path,
+        templates_path,
+        screen_path,
+        priority=priority,
+        pod_priority_class_name=pod_priority_class_name,
+    )
     rendered = _render_workflows(workflows, configs)
     for path in _write_workflows(rendered, out_dir):
         click.secho(f"Generated: {path}", fg="green")

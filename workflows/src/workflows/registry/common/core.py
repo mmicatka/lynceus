@@ -30,9 +30,17 @@ def get_template_factory(templates_config: TemplatesConfig) -> TemplateFactory:
     return TemplateFactory.from_config(templates_config)
 
 
-def new_workflow(name_prefix: str, suffix: str) -> Workflow:
+def new_workflow(
+    name_prefix: str,
+    suffix: str,
+    *,
+    priority: int | None = None,
+    pod_priority_class_name: str | None = None,
+) -> Workflow:
     return Workflow(
         generate_name=f"{name_prefix}-{suffix}-",
         entrypoint=ENTRYPOINT_DAG,
         service_account_name=SERVICE_ACCOUNT_NAME,
+        priority=priority,
+        pod_priority_class_name=pod_priority_class_name,
     )

@@ -223,7 +223,12 @@ def build_featurize_candidates_dag(
 def build_featurize_candidates_workflow(configs: WorkflowConfigs) -> Workflow:
     templates = get_template_factory(configs.templates)
 
-    with new_workflow(configs.screen.name, "featurize-candidates") as workflow:
+    with new_workflow(
+        configs.screen.name,
+        "featurize-candidates",
+        priority=configs.priority,
+        pod_priority_class_name=configs.pod_priority_class_name,
+    ) as workflow:
         featurize_dag = build_featurize_candidates_dag(templates, configs)
 
         with DAG(name=ENTRYPOINT_DAG):

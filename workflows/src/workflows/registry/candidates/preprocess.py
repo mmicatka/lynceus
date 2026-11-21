@@ -214,7 +214,12 @@ def build_preprocess_candidates_dag(
 def build_preprocess_candidates_workflow(configs: WorkflowConfigs) -> Workflow:
     templates = get_template_factory(configs.templates)
 
-    with new_workflow(configs.screen.name, "preprocess-candidates") as workflow:
+    with new_workflow(
+        configs.screen.name,
+        "preprocess-candidates",
+        priority=configs.priority,
+        pod_priority_class_name=configs.pod_priority_class_name,
+    ) as workflow:
         preprocess_dag = build_preprocess_candidates_dag(templates, configs)
 
         with DAG(name=ENTRYPOINT_DAG):
