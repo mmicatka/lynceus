@@ -4,6 +4,7 @@ metadata:
   generateName: hsp90-n-terminal-candidates-sample-
 spec:
   entrypoint: main-dag
+  podPriorityClassName: low-priority
   serviceAccountName: argo-workflow
   templates:
   - name: sample-candidates-dag
