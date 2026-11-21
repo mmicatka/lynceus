@@ -18,7 +18,7 @@ spec:
       - name: output_prefix
     retryStrategy:
       limit: 3
-      retryPolicy: OnFailure
+      retryPolicy: Always
     script:
       image: registry.nebula.lan:5000/lynceus/targets:0.1.0
       imagePullPolicy: Always
@@ -63,7 +63,7 @@ spec:
       - name: structure_glob
     retryStrategy:
       limit: 3
-      retryPolicy: OnFailure
+      retryPolicy: Always
     script:
       image: registry.nebula.lan:5000/lynceus/targets:0.1.0
       imagePullPolicy: Always
@@ -140,7 +140,7 @@ spec:
         default: auto
     retryStrategy:
       limit: 3
-      retryPolicy: OnFailure
+      retryPolicy: Always
     script:
       image: registry.nebula.lan:5000/lynceus/targets:0.1.0
       imagePullPolicy: Always

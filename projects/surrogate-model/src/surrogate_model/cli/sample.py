@@ -1,8 +1,6 @@
 # projects/surrogate-model/src/surrogate_model/cli/sample.py
 
 
-# projects/surrogate-model/src/surrogate_model/cli/sample.py
-
 import datetime
 import time
 from collections.abc import Callable

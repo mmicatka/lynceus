@@ -2,11 +2,11 @@
 
 
 from .plan import plan_surrogate_sample
-from .sample_by_prediction import sample_candidates_by_prediction
+from .sample import sample_candidates
 from .train import train_model
 
 __all__ = [
     "plan_surrogate_sample",
-    "sample_candidates_by_prediction",
+    "sample_candidates",
     "train_model",
 ]

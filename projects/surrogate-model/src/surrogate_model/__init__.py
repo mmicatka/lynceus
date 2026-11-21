@@ -2,12 +2,12 @@
 
 from .cli import (
     plan_surrogate_sample,
-    sample_candidates_by_prediction,
+    sample_candidates,
     train_model,
 )
 
 __all__ = [
     "plan_surrogate_sample",
-    "sample_candidates_by_prediction",
+    "sample_candidates",
     "train_model",
 ]

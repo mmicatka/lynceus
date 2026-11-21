@@ -1,7 +1,7 @@
 # workflows/src/workflows/registry/candidates/sample.py
 
 
-from hera.workflows import DAG, RetryStrategy, Task, Workflow
+from hera.workflows import DAG, Task, Workflow
 
 from workflows.config.core import WorkflowConfigs
 from workflows.config.templates import TemplateName
@@ -17,7 +17,6 @@ from workflows.templates import sample_candidate_shard_template
 from workflows.templates.builders import TemplateFactory
 
 SAMPLE_SHARDS_PARALLELISM = 10
-SAMPLE_RETRY = RetryStrategy(limit=3, retry_policy="OnFailure")
 SAMPLE_CANDIDATES_DAG = "sample-candidates-dag"
 
 
@@ -44,7 +43,6 @@ def _subsample_task(
     subsample_candidates = templates.build(
         TemplateName.SUBSAMPLE_CANDIDATES,
         sample_candidate_shard_template,
-        retry_strategy=SAMPLE_RETRY,
     )
 
     return subsample_candidates(

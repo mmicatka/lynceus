@@ -18,7 +18,7 @@ spec:
       - name: ensemble_ids
     retryStrategy:
       limit: 3
-      retryPolicy: OnFailure
+      retryPolicy: Always
     script:
       image: registry.nebula.lan:5000/lynceus/targets:0.1.0
       imagePullPolicy: Always
@@ -92,7 +92,7 @@ spec:
       nvidia.com/gpu.present: 'true'
     retryStrategy:
       limit: 3
-      retryPolicy: OnFailure
+      retryPolicy: Always
     script:
       image: registry.nebula.lan:5000/lynceus/lynceus-dock:0.1.0
       imagePullPolicy: Always
@@ -180,7 +180,7 @@ spec:
         default: 'null'
     retryStrategy:
       limit: 3
-      retryPolicy: OnFailure
+      retryPolicy: Always
     script:
       image: registry.nebula.lan:5000/lynceus/surrogate-model:0.1.0
       imagePullPolicy: Always
@@ -246,7 +246,7 @@ spec:
       - name: exclude_inputs
     retryStrategy:
       limit: 3
-      retryPolicy: OnFailure
+      retryPolicy: Always
     script:
       image: registry.nebula.lan:5000/lynceus/surrogate-model:0.1.0
       imagePullPolicy: Always
@@ -276,13 +276,12 @@ spec:
         try: source = json.loads(r'''{{inputs.parameters.source}}''')
         except: source = r'''{{inputs.parameters.source}}'''
 
-        import json
         import os
         import subprocess
-        command = ['sample', '--source-root', base_path, '--featurized-input', os.path.join(base_path, featurized_input_prefix, source), '--preprocessed-input', os.path.join(base_path, preprocessed_input_prefix, source), '--output', os.path.join(base_path, output_prefix, source), '--num-random', str(num_random), '--num-top', str(num_top), '--seed', str(seed)]
+        command = ['surrogate-sample', '--source-root', base_path, '--featurized-input', os.path.join(base_path, featurized_input_prefix, source), '--preprocessed-input', os.path.join(base_path, preprocessed_input_prefix, source), '--output', os.path.join(base_path, output_prefix, source), '--num-random', str(num_random), '--num-top', str(num_top), '--seed', str(seed)]
         if model_path:
             command += ['--model', os.path.join(base_path, model_path)]
-        for pattern in json.loads(exclude_inputs):
+        for pattern in exclude_inputs:
             command += ['--exclude-input', os.path.join(base_path, pattern)]
         subprocess.run(command, check=True)
       command:
@@ -314,7 +313,7 @@ spec:
       - name: output_path
     retryStrategy:
       limit: 3
-      retryPolicy: OnFailure
+      retryPolicy: Always
     script:
       image: registry.nebula.lan:5000/lynceus/candidates:0.1.0
       imagePullPolicy: Always
@@ -371,7 +370,7 @@ spec:
           path: /tmp/manifest.json
     retryStrategy:
       limit: 3
-      retryPolicy: OnFailure
+      retryPolicy: Always
     script:
       image: registry.nebula.lan:5000/lynceus/surrogate-model:0.1.0
       imagePullPolicy: Always
@@ -432,7 +431,7 @@ spec:
           path: /tmp/manifest_matches.txt
     retryStrategy:
       limit: 3
-      retryPolicy: OnFailure
+      retryPolicy: Always
     script:
       image: registry.nebula.lan:5000/lynceus/surrogate-model:0.1.0
       imagePullPolicy: Always
@@ -484,7 +483,7 @@ spec:
       - name: fields
     retryStrategy:
       limit: 3
-      retryPolicy: OnFailure
+      retryPolicy: Always
     script:
       image: registry.nebula.lan:5000/lynceus/surrogate-model:0.1.0
       imagePullPolicy: Always

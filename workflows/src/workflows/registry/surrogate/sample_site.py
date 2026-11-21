@@ -3,7 +3,7 @@
 
 from collections.abc import Sequence
 
-from hera.workflows import DAG, Parameter, RetryStrategy, Step, Task
+from hera.workflows import DAG, Parameter, Step, Task
 from hera.workflows.models import ValueFrom
 
 from workflows.config.core import WorkflowConfigs
@@ -45,8 +45,6 @@ SURROGATE_SITE_DAG = "surrogate-site-dag"
 
 STAGING_GLOB = "*.parquet"
 INPUT_PATH_KEY = "input_path"
-
-SHARD_RETRY = RetryStrategy(limit=3, retry_policy="OnFailure")
 
 
 def _build_verify_manifest(templates: TemplateFactory) -> TaskFactory:
@@ -185,7 +183,6 @@ def _build_sample_templates(templates: TemplateFactory) -> SampleTemplates:
         sample=templates.build(
             TemplateName.SURROGATE_SAMPLE_BY_PREDICTION,
             surrogate_sample_template,
-            retry_strategy=SHARD_RETRY,
         ),
         merge_shards=templates.build(TemplateName.MERGE_SHARDS, merge_shards_template),
         plan=templates.build(

@@ -181,7 +181,7 @@ spec:
           path: /tmp/manifest_matches.txt
     retryStrategy:
       limit: 3
-      retryPolicy: OnFailure
+      retryPolicy: Always
     script:
       image: registry.nebula.lan:5000/lynceus/candidates:0.1.0
       imagePullPolicy: Always
@@ -236,7 +236,7 @@ spec:
       - name: staging_dir
     retryStrategy:
       limit: 3
-      retryPolicy: OnFailure
+      retryPolicy: Always
     script:
       image: registry.nebula.lan:5000/lynceus/candidates:0.1.0
       imagePullPolicy: Always
@@ -288,7 +288,7 @@ spec:
       - name: fields
     retryStrategy:
       limit: 3
-      retryPolicy: OnFailure
+      retryPolicy: Always
     script:
       image: registry.nebula.lan:5000/lynceus/candidates:0.1.0
       imagePullPolicy: Always
@@ -341,7 +341,7 @@ spec:
           path: /tmp/manifest.json
     retryStrategy:
       limit: 3
-      retryPolicy: OnFailure
+      retryPolicy: Always
     script:
       image: registry.nebula.lan:5000/lynceus/candidates:0.1.0
       imagePullPolicy: Always
@@ -425,7 +425,7 @@ spec:
         default: ''
     retryStrategy:
       limit: 3
-      retryPolicy: OnFailure
+      retryPolicy: Always
     script:
       image: registry.nebula.lan:5000/lynceus/candidates:0.1.0
       imagePullPolicy: Always
@@ -519,7 +519,7 @@ spec:
       - name: output_path
     retryStrategy:
       limit: 3
-      retryPolicy: OnFailure
+      retryPolicy: Always
     script:
       image: registry.nebula.lan:5000/lynceus/candidates:0.1.0
       imagePullPolicy: Always

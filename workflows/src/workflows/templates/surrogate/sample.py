@@ -46,14 +46,13 @@ def surrogate_sample_template(
     num_random: int,
     num_top: int,
     model_path: str,
-    exclude_inputs: str,
+    exclude_inputs: list[str],
 ) -> None:
-    import json
     import os
     import subprocess
 
     command = [
-        "sample",
+        "surrogate-sample",
         "--source-root",
         base_path,
         "--featurized-input",
@@ -71,6 +70,6 @@ def surrogate_sample_template(
     ]
     if model_path:
         command += ["--model", os.path.join(base_path, model_path)]
-    for pattern in json.loads(exclude_inputs):
+    for pattern in exclude_inputs:
         command += ["--exclude-input", os.path.join(base_path, pattern)]
     subprocess.run(command, check=True)

@@ -6,6 +6,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Self
 
+from hera.workflows import RetryStrategy
 from pydantic import Field, model_validator
 
 from workflows.config.common import StrictModel, load_config
@@ -16,6 +17,8 @@ from workflows.config.k8s import (
     TolerationConfig,
     VolumeConfig,
 )
+
+RETRY_STRATEGY = RetryStrategy(limit=3, retry_policy="Always")
 
 
 class TemplateName(StrEnum):
@@ -54,6 +57,7 @@ class TemplateSpec(StrictModel):
     node_selector: Mapping[str, str] = Field(default_factory=dict)
     tolerations: tuple[TolerationConfig, ...] = ()
     runtime_class_name: str | None = None
+    retry_strategy: RetryStrategy = RETRY_STRATEGY
 
     @property
     def scratch_path(self) -> str:
