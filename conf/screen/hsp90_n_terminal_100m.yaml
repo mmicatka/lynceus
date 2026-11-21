@@ -28,11 +28,7 @@ filter:
       - usrcat
       - whim
     random_seed: 1000
-    validation: 1000
-    rounds:
-      - top: 0
-        random: 1000
-      - top: 500
-        random: 500
-      - top: 500
-        random: 500
+    validation: 50000
+    samples_per_round: 10000
+    num_rounds: 4
+    top_fraction: 0.5
