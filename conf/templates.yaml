@@ -78,7 +78,7 @@ templates:
     scratch: *scratch_50gb
 
   subsample_candidates:
-    resources: *high_cpu
+    resources: *low_cpu
     image: *candidates_image
 
   plan_preprocess_candidates:
@@ -111,7 +111,7 @@ templates:
     image: *candidates_image
 
   featurize_candidate_shard:
-    resources: *med_cpu_high_ram
+    resources: *med_cpu
     image: *candidates_image
     scratch: *scratch_50gb
 

@@ -30,15 +30,10 @@ os.environ["NUMEXPR_NUM_THREADS"] = "1"
 os.environ["VECLIB_MAXIMUM_THREADS"] = "1"
 
 STAGED_OUTPUT_TRANSFERS = 1
-
 RUN_TIME_KEY = "run_time"
-
 NUM_ROWS_KEY = "num_rows"
-
 MANIFEST_FILE_SUFFIX = ".manifest.json"
-
 MAX_TASKS_PER_CHILD = 100
-
 DROPPED_COLUMNS = ["conformer", "smiles"]
 
 logger = get_lynceus_logger()
@@ -235,7 +230,7 @@ def _generate_via_staged_output(
     "--output",
     "output_path",
     required=True,
-    type=click.Path(file_okay=False, path_type=Path),
+    type=click.Path(dir_okay=False, path_type=Path),
     help="Path to the output Parquet file.",
 )
 @click.option(

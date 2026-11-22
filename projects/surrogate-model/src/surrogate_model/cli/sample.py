@@ -32,7 +32,6 @@ from surrogate_model.common.selection import (
 )
 
 DEFAULT_RANDOM_SEED = 1000
-
 STAGED_IO_TRANSFERS = 4
 
 RUN_TIME_KEY = "run_time"

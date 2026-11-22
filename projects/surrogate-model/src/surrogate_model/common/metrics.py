@@ -1,10 +1,14 @@
 # projects/surrogate-model/src/surrogate_model/common/metrics.py
 
 
+from collections.abc import Sequence
+
 import numpy as np
 import polars as pl
 
 from surrogate_model.common.model import ProbabilisticClassifier
+
+DEFAULT_EVAL_PERCENTS: tuple[float, ...] = (0.01, 0.05, 0.10, 0.25)
 
 
 def predict_active(model: ProbabilisticClassifier, x) -> np.ndarray:
@@ -13,8 +17,10 @@ def predict_active(model: ProbabilisticClassifier, x) -> np.ndarray:
 
 
 def evaluation_metrics(
-    y_true, y_prob, percents: list[float] = [0.01, 0.05, 0.10, 0.15]
-):
+    y_true,
+    y_prob,
+    percents: Sequence[float] = DEFAULT_EVAL_PERCENTS,
+) -> pl.DataFrame:
     sorted_indices = np.argsort(y_prob)[::-1]
     total_actives = int(y_true.sum())
 

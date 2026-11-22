@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Workflow
 metadata:
-  generateName: hsp90-n-terminal-surrogate-
+  generateName: ptprb-10m-surrogate-
 spec:
   entrypoint: main-dag
   serviceAccountName: argo-workflow
@@ -178,6 +178,8 @@ spec:
       - name: model_path
       - name: features
         default: 'null'
+      - name: eval_percents
+        default: 'null'
     retryStrategy:
       limit: 3
       retryPolicy: Always
@@ -191,6 +193,8 @@ spec:
         import json
         try: base_path = json.loads(r'''{{inputs.parameters.base_path}}''')
         except: base_path = r'''{{inputs.parameters.base_path}}'''
+        try: eval_percents = json.loads(r'''{{inputs.parameters.eval_percents}}''')
+        except: eval_percents = r'''{{inputs.parameters.eval_percents}}'''
         try: features = json.loads(r'''{{inputs.parameters.features}}''')
         except: features = r'''{{inputs.parameters.features}}'''
         try: model_path = json.loads(r'''{{inputs.parameters.model_path}}''')
@@ -209,6 +213,9 @@ spec:
         if features:
             for feature in features:
                 cmd.extend(['--features', feature])
+        if eval_percents:
+            for pct in eval_percents:
+                cmd.extend(['--eval-percents', str(pct)])
         subprocess.run(cmd, check=True)
       command:
       - python
@@ -527,11 +534,11 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: featurized_prefix
-            value: candidates/1m/featurized/shards
+            value: candidates/10m/featurized/shards
           - name: preprocessed_prefix
-            value: candidates/1m/preprocessed/shards
+            value: candidates/10m/preprocessed/shards
           - name: persist_file
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet.manifest.plan.json
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet.manifest.plan.json
       - name: check-sampled
         depends: plan-sources
         template: verify-manifest-surrogate
@@ -540,11 +547,11 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: manifest
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet.manifest.state.json
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet.manifest.state.json
           - name: expect
-            value: '{"exclude_inputs":[],"model_path":"","num_random":98,"num_shards":512,"num_top":0,"sampled":true,"seed":1000}'
+            value: '{"exclude_inputs":[],"model_path":"","num_random":40,"num_shards":512,"num_top":0,"sampled":true,"seed":1000}'
           - name: source_globs
-            value: '["candidates/1m/featurized/*.parquet", "candidates/1m/preprocessed/*.parquet"]'
+            value: '["candidates/10m/featurized/*.parquet", "candidates/10m/preprocessed/*.parquet"]'
           - name: result_file
             value: /tmp/manifest_matches.txt
       - name: check-merged
@@ -555,11 +562,11 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: manifest
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet.manifest.state.json
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet.manifest.state.json
           - name: expect
-            value: '{"exclude_inputs":[],"merged":true,"model_path":"","num_random":98,"num_shards":512,"num_top":0,"seed":1000}'
+            value: '{"exclude_inputs":[],"merged":true,"model_path":"","num_random":40,"num_shards":512,"num_top":0,"seed":1000}'
           - name: source_globs
-            value: '["candidates/1m/featurized/*.parquet", "candidates/1m/preprocessed/*.parquet"]'
+            value: '["candidates/10m/featurized/*.parquet", "candidates/10m/preprocessed/*.parquet"]'
           - name: result_file
             value: /tmp/manifest_matches.txt
       - name: sample-shards
@@ -1086,15 +1093,15 @@ spec:
           - name: source
             value: shard_{{item}}.parquet
           - name: featurized_input_prefix
-            value: candidates/1m/featurized/shards
+            value: candidates/10m/featurized/shards
           - name: preprocessed_input_prefix
-            value: candidates/1m/preprocessed/shards
+            value: candidates/10m/preprocessed/shards
           - name: output_prefix
-            value: screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/staging
+            value: screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/staging
           - name: seed
             value: '1000'
           - name: num_random
-            value: '98'
+            value: '40'
           - name: num_top
             value: '0'
           - name: model_path
@@ -1110,11 +1117,11 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: source
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet.manifest.plan.json
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet.manifest.plan.json
           - name: output
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet.manifest.state.json
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet.manifest.state.json
           - name: fields
-            value: '{"exclude_inputs":[],"model_path":"","num_random":98,"num_shards":512,"num_top":0,"sampled":true,"seed":1000}'
+            value: '{"exclude_inputs":[],"model_path":"","num_random":40,"num_shards":512,"num_top":0,"sampled":true,"seed":1000}'
       - name: merge-samples
         depends: write-manifest && check-merged
         template: merge-shards
@@ -1124,9 +1131,9 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: input_path
-            value: screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/staging
+            value: screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/staging
           - name: output_path
-            value: screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet
+            value: screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet
       - name: mark-merged
         depends: merge-samples
         template: update-manifest-surrogate
@@ -1136,9 +1143,9 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: source
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet.manifest.state.json
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet.manifest.state.json
           - name: output
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet.manifest.state.json
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet.manifest.state.json
           - name: fields
             value: '{"merged":true}'
     inputs:
@@ -1155,11 +1162,11 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: featurized_prefix
-            value: candidates/1m/featurized/shards
+            value: candidates/10m/featurized/shards
           - name: preprocessed_prefix
-            value: candidates/1m/preprocessed/shards
+            value: candidates/10m/preprocessed/shards
           - name: persist_file
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet.manifest.plan.json
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet.manifest.plan.json
       - name: check-sampled
         depends: plan-sources
         template: verify-manifest-surrogate
@@ -1168,12 +1175,12 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: manifest
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet.manifest.state.json
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet.manifest.state.json
           - name: expect
-            value: '{"exclude_inputs":["/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet"],"model_path":"","num_random":20,"num_shards":512,"num_top":0,"sampled":true,"seed":1001}'
+            value: '{"exclude_inputs":["/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet"],"model_path":"","num_random":40,"num_shards":512,"num_top":0,"sampled":true,"seed":1001}'
           - name: source_globs
-            value: '["candidates/1m/featurized/*.parquet", "candidates/1m/preprocessed/*.parquet",
-              "screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet"]'
+            value: '["candidates/10m/featurized/*.parquet", "candidates/10m/preprocessed/*.parquet",
+              "screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet"]'
           - name: result_file
             value: /tmp/manifest_matches.txt
       - name: check-merged
@@ -1184,12 +1191,12 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: manifest
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet.manifest.state.json
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet.manifest.state.json
           - name: expect
-            value: '{"exclude_inputs":["/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet"],"merged":true,"model_path":"","num_random":20,"num_shards":512,"num_top":0,"seed":1001}'
+            value: '{"exclude_inputs":["/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet"],"merged":true,"model_path":"","num_random":40,"num_shards":512,"num_top":0,"seed":1001}'
           - name: source_globs
-            value: '["candidates/1m/featurized/*.parquet", "candidates/1m/preprocessed/*.parquet",
-              "screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet"]'
+            value: '["candidates/10m/featurized/*.parquet", "candidates/10m/preprocessed/*.parquet",
+              "screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet"]'
           - name: result_file
             value: /tmp/manifest_matches.txt
       - name: sample-shards
@@ -1716,21 +1723,21 @@ spec:
           - name: source
             value: shard_{{item}}.parquet
           - name: featurized_input_prefix
-            value: candidates/1m/featurized/shards
+            value: candidates/10m/featurized/shards
           - name: preprocessed_input_prefix
-            value: candidates/1m/preprocessed/shards
+            value: candidates/10m/preprocessed/shards
           - name: output_prefix
-            value: screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/staging
+            value: screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/staging
           - name: seed
             value: '1001'
           - name: num_random
-            value: '20'
+            value: '40'
           - name: num_top
             value: '0'
           - name: model_path
             value: ''
           - name: exclude_inputs
-            value: '["/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet"]'
+            value: '["/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet"]'
       - name: write-manifest
         depends: sample-shards
         template: update-manifest-surrogate
@@ -1740,11 +1747,11 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: source
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet.manifest.plan.json
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet.manifest.plan.json
           - name: output
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet.manifest.state.json
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet.manifest.state.json
           - name: fields
-            value: '{"exclude_inputs":["/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet"],"model_path":"","num_random":20,"num_shards":512,"num_top":0,"sampled":true,"seed":1001}'
+            value: '{"exclude_inputs":["/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet"],"model_path":"","num_random":40,"num_shards":512,"num_top":0,"sampled":true,"seed":1001}'
       - name: merge-samples
         depends: write-manifest && check-merged
         template: merge-shards
@@ -1754,9 +1761,9 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: input_path
-            value: screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/staging
+            value: screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/staging
           - name: output_path
-            value: screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet
+            value: screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet
       - name: mark-merged
         depends: merge-samples
         template: update-manifest-surrogate
@@ -1766,9 +1773,9 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: source
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet.manifest.state.json
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet.manifest.state.json
           - name: output
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet.manifest.state.json
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet.manifest.state.json
           - name: fields
             value: '{"merged":true}'
     inputs:
@@ -1785,13 +1792,13 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: featurized_prefix
-            value: candidates/1m/featurized/shards
+            value: candidates/10m/featurized/shards
           - name: preprocessed_prefix
-            value: candidates/1m/preprocessed/shards
+            value: candidates/10m/preprocessed/shards
           - name: persist_file
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet.manifest.plan.json
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet.manifest.plan.json
           - name: model_path
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/model.joblib
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/model.joblib
       - name: check-sampled
         depends: plan-sources
         template: verify-manifest-surrogate
@@ -1800,14 +1807,14 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: manifest
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet.manifest.state.json
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet.manifest.state.json
           - name: expect
-            value: '{"exclude_inputs":["/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet","/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet"],"model_path":"/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/model.joblib","num_random":10,"num_shards":512,"num_top":10,"sampled":true,"seed":1002}'
+            value: '{"exclude_inputs":["/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet","/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet"],"model_path":"/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/model.joblib","num_random":20,"num_shards":512,"num_top":20,"sampled":true,"seed":1002}'
           - name: source_globs
-            value: '["candidates/1m/featurized/*.parquet", "candidates/1m/preprocessed/*.parquet",
-              "screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/model.joblib",
-              "screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet",
-              "screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet"]'
+            value: '["candidates/10m/featurized/*.parquet", "candidates/10m/preprocessed/*.parquet",
+              "screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/model.joblib",
+              "screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet",
+              "screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet"]'
           - name: result_file
             value: /tmp/manifest_matches.txt
       - name: check-merged
@@ -1818,14 +1825,14 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: manifest
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet.manifest.state.json
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet.manifest.state.json
           - name: expect
-            value: '{"exclude_inputs":["/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet","/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet"],"merged":true,"model_path":"/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/model.joblib","num_random":10,"num_shards":512,"num_top":10,"seed":1002}'
+            value: '{"exclude_inputs":["/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet","/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet"],"merged":true,"model_path":"/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/model.joblib","num_random":20,"num_shards":512,"num_top":20,"seed":1002}'
           - name: source_globs
-            value: '["candidates/1m/featurized/*.parquet", "candidates/1m/preprocessed/*.parquet",
-              "screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/model.joblib",
-              "screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet",
-              "screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet"]'
+            value: '["candidates/10m/featurized/*.parquet", "candidates/10m/preprocessed/*.parquet",
+              "screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/model.joblib",
+              "screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet",
+              "screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet"]'
           - name: result_file
             value: /tmp/manifest_matches.txt
       - name: sample-shards
@@ -2352,22 +2359,22 @@ spec:
           - name: source
             value: shard_{{item}}.parquet
           - name: featurized_input_prefix
-            value: candidates/1m/featurized/shards
+            value: candidates/10m/featurized/shards
           - name: preprocessed_input_prefix
-            value: candidates/1m/preprocessed/shards
+            value: candidates/10m/preprocessed/shards
           - name: output_prefix
-            value: screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/staging
+            value: screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/staging
           - name: seed
             value: '1002'
           - name: num_random
-            value: '10'
+            value: '20'
           - name: num_top
-            value: '10'
+            value: '20'
           - name: model_path
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/model.joblib
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/model.joblib
           - name: exclude_inputs
-            value: '["/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet",
-              "/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet"]'
+            value: '["/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet",
+              "/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet"]'
       - name: write-manifest
         depends: sample-shards
         template: update-manifest-surrogate
@@ -2377,11 +2384,11 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: source
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet.manifest.plan.json
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet.manifest.plan.json
           - name: output
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet.manifest.state.json
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet.manifest.state.json
           - name: fields
-            value: '{"exclude_inputs":["/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet","/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet"],"model_path":"/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/model.joblib","num_random":10,"num_shards":512,"num_top":10,"sampled":true,"seed":1002}'
+            value: '{"exclude_inputs":["/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet","/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet"],"model_path":"/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/model.joblib","num_random":20,"num_shards":512,"num_top":20,"sampled":true,"seed":1002}'
       - name: merge-samples
         depends: write-manifest && check-merged
         template: merge-shards
@@ -2391,9 +2398,9 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: input_path
-            value: screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/staging
+            value: screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/staging
           - name: output_path
-            value: screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet
+            value: screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet
       - name: mark-merged
         depends: merge-samples
         template: update-manifest-surrogate
@@ -2403,9 +2410,9 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: source
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet.manifest.state.json
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet.manifest.state.json
           - name: output
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet.manifest.state.json
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet.manifest.state.json
           - name: fields
             value: '{"merged":true}'
     inputs:
@@ -2422,13 +2429,13 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: featurized_prefix
-            value: candidates/1m/featurized/shards
+            value: candidates/10m/featurized/shards
           - name: preprocessed_prefix
-            value: candidates/1m/preprocessed/shards
+            value: candidates/10m/preprocessed/shards
           - name: persist_file
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet.manifest.plan.json
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet.manifest.plan.json
           - name: model_path
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/model.joblib
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/model.joblib
       - name: check-sampled
         depends: plan-sources
         template: verify-manifest-surrogate
@@ -2437,15 +2444,15 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: manifest
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet.manifest.state.json
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet.manifest.state.json
           - name: expect
-            value: '{"exclude_inputs":["/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet","/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet","/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet"],"model_path":"/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/model.joblib","num_random":10,"num_shards":512,"num_top":10,"sampled":true,"seed":1003}'
+            value: '{"exclude_inputs":["/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet","/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet","/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet"],"model_path":"/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/model.joblib","num_random":20,"num_shards":512,"num_top":20,"sampled":true,"seed":1003}'
           - name: source_globs
-            value: '["candidates/1m/featurized/*.parquet", "candidates/1m/preprocessed/*.parquet",
-              "screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/model.joblib",
-              "screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet",
-              "screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet",
-              "screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet"]'
+            value: '["candidates/10m/featurized/*.parquet", "candidates/10m/preprocessed/*.parquet",
+              "screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/model.joblib",
+              "screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet",
+              "screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet",
+              "screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet"]'
           - name: result_file
             value: /tmp/manifest_matches.txt
       - name: check-merged
@@ -2456,15 +2463,15 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: manifest
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet.manifest.state.json
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet.manifest.state.json
           - name: expect
-            value: '{"exclude_inputs":["/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet","/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet","/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet"],"merged":true,"model_path":"/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/model.joblib","num_random":10,"num_shards":512,"num_top":10,"seed":1003}'
+            value: '{"exclude_inputs":["/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet","/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet","/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet"],"merged":true,"model_path":"/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/model.joblib","num_random":20,"num_shards":512,"num_top":20,"seed":1003}'
           - name: source_globs
-            value: '["candidates/1m/featurized/*.parquet", "candidates/1m/preprocessed/*.parquet",
-              "screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/model.joblib",
-              "screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet",
-              "screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet",
-              "screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet"]'
+            value: '["candidates/10m/featurized/*.parquet", "candidates/10m/preprocessed/*.parquet",
+              "screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/model.joblib",
+              "screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet",
+              "screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet",
+              "screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet"]'
           - name: result_file
             value: /tmp/manifest_matches.txt
       - name: sample-shards
@@ -2991,23 +2998,23 @@ spec:
           - name: source
             value: shard_{{item}}.parquet
           - name: featurized_input_prefix
-            value: candidates/1m/featurized/shards
+            value: candidates/10m/featurized/shards
           - name: preprocessed_input_prefix
-            value: candidates/1m/preprocessed/shards
+            value: candidates/10m/preprocessed/shards
           - name: output_prefix
-            value: screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/staging
+            value: screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/staging
           - name: seed
             value: '1003'
           - name: num_random
-            value: '10'
+            value: '20'
           - name: num_top
-            value: '10'
+            value: '20'
           - name: model_path
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/model.joblib
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/model.joblib
           - name: exclude_inputs
-            value: '["/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet",
-              "/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet",
-              "/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet"]'
+            value: '["/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet",
+              "/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet",
+              "/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet"]'
       - name: write-manifest
         depends: sample-shards
         template: update-manifest-surrogate
@@ -3017,11 +3024,11 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: source
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet.manifest.plan.json
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet.manifest.plan.json
           - name: output
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet.manifest.state.json
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet.manifest.state.json
           - name: fields
-            value: '{"exclude_inputs":["/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet","/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet","/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet"],"model_path":"/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/model.joblib","num_random":10,"num_shards":512,"num_top":10,"sampled":true,"seed":1003}'
+            value: '{"exclude_inputs":["/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet","/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet","/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet"],"model_path":"/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/model.joblib","num_random":20,"num_shards":512,"num_top":20,"sampled":true,"seed":1003}'
       - name: merge-samples
         depends: write-manifest && check-merged
         template: merge-shards
@@ -3031,9 +3038,9 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: input_path
-            value: screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/staging
+            value: screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/staging
           - name: output_path
-            value: screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet
+            value: screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet
       - name: mark-merged
         depends: merge-samples
         template: update-manifest-surrogate
@@ -3043,9 +3050,9 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: source
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet.manifest.state.json
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet.manifest.state.json
           - name: output
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet.manifest.state.json
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet.manifest.state.json
           - name: fields
             value: '{"merged":true}'
     inputs:
@@ -3062,13 +3069,13 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: featurized_prefix
-            value: candidates/1m/featurized/shards
+            value: candidates/10m/featurized/shards
           - name: preprocessed_prefix
-            value: candidates/1m/preprocessed/shards
+            value: candidates/10m/preprocessed/shards
           - name: persist_file
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/features.parquet.manifest.plan.json
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/features.parquet.manifest.plan.json
           - name: model_path
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/model.joblib
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/model.joblib
       - name: check-sampled
         depends: plan-sources
         template: verify-manifest-surrogate
@@ -3077,16 +3084,16 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: manifest
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/features.parquet.manifest.state.json
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/features.parquet.manifest.state.json
           - name: expect
-            value: '{"exclude_inputs":["/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet","/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet","/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet","/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet"],"model_path":"/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/model.joblib","num_random":10,"num_shards":512,"num_top":10,"sampled":true,"seed":1004}'
+            value: '{"exclude_inputs":["/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet","/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet","/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet","/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet"],"model_path":"/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/model.joblib","num_random":20,"num_shards":512,"num_top":20,"sampled":true,"seed":1004}'
           - name: source_globs
-            value: '["candidates/1m/featurized/*.parquet", "candidates/1m/preprocessed/*.parquet",
-              "screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/model.joblib",
-              "screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet",
-              "screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet",
-              "screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet",
-              "screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet"]'
+            value: '["candidates/10m/featurized/*.parquet", "candidates/10m/preprocessed/*.parquet",
+              "screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/model.joblib",
+              "screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet",
+              "screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet",
+              "screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet",
+              "screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet"]'
           - name: result_file
             value: /tmp/manifest_matches.txt
       - name: check-merged
@@ -3097,16 +3104,16 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: manifest
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/features.parquet.manifest.state.json
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/features.parquet.manifest.state.json
           - name: expect
-            value: '{"exclude_inputs":["/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet","/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet","/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet","/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet"],"merged":true,"model_path":"/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/model.joblib","num_random":10,"num_shards":512,"num_top":10,"seed":1004}'
+            value: '{"exclude_inputs":["/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet","/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet","/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet","/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet"],"merged":true,"model_path":"/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/model.joblib","num_random":20,"num_shards":512,"num_top":20,"seed":1004}'
           - name: source_globs
-            value: '["candidates/1m/featurized/*.parquet", "candidates/1m/preprocessed/*.parquet",
-              "screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/model.joblib",
-              "screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet",
-              "screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet",
-              "screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet",
-              "screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet"]'
+            value: '["candidates/10m/featurized/*.parquet", "candidates/10m/preprocessed/*.parquet",
+              "screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/model.joblib",
+              "screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet",
+              "screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet",
+              "screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet",
+              "screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet"]'
           - name: result_file
             value: /tmp/manifest_matches.txt
       - name: sample-shards
@@ -3633,24 +3640,24 @@ spec:
           - name: source
             value: shard_{{item}}.parquet
           - name: featurized_input_prefix
-            value: candidates/1m/featurized/shards
+            value: candidates/10m/featurized/shards
           - name: preprocessed_input_prefix
-            value: candidates/1m/preprocessed/shards
+            value: candidates/10m/preprocessed/shards
           - name: output_prefix
-            value: screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/staging
+            value: screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/staging
           - name: seed
             value: '1004'
           - name: num_random
-            value: '10'
+            value: '20'
           - name: num_top
-            value: '10'
+            value: '20'
           - name: model_path
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/model.joblib
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/model.joblib
           - name: exclude_inputs
-            value: '["/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet",
-              "/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet",
-              "/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet",
-              "/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet"]'
+            value: '["/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet",
+              "/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet",
+              "/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet",
+              "/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet"]'
       - name: write-manifest
         depends: sample-shards
         template: update-manifest-surrogate
@@ -3660,11 +3667,11 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: source
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/features.parquet.manifest.plan.json
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/features.parquet.manifest.plan.json
           - name: output
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/features.parquet.manifest.state.json
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/features.parquet.manifest.state.json
           - name: fields
-            value: '{"exclude_inputs":["/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet","/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet","/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet","/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet"],"model_path":"/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/model.joblib","num_random":10,"num_shards":512,"num_top":10,"sampled":true,"seed":1004}'
+            value: '{"exclude_inputs":["/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet","/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet","/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet","/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet"],"model_path":"/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/model.joblib","num_random":20,"num_shards":512,"num_top":20,"sampled":true,"seed":1004}'
       - name: merge-samples
         depends: write-manifest && check-merged
         template: merge-shards
@@ -3674,9 +3681,9 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: input_path
-            value: screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/staging
+            value: screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/staging
           - name: output_path
-            value: screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/features.parquet
+            value: screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/features.parquet
       - name: mark-merged
         depends: merge-samples
         template: update-manifest-surrogate
@@ -3686,9 +3693,9 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: source
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/features.parquet.manifest.state.json
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/features.parquet.manifest.state.json
           - name: output
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/features.parquet.manifest.state.json
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/features.parquet.manifest.state.json
           - name: fields
             value: '{"merged":true}'
     inputs:
@@ -3705,13 +3712,13 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: featurized_prefix
-            value: candidates/1m/featurized/shards
+            value: candidates/10m/featurized/shards
           - name: preprocessed_prefix
-            value: candidates/1m/preprocessed/shards
+            value: candidates/10m/preprocessed/shards
           - name: persist_file
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/features.parquet.manifest.plan.json
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/features.parquet.manifest.plan.json
           - name: model_path
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/model.joblib
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/model.joblib
       - name: check-sampled
         depends: plan-sources
         template: verify-manifest-surrogate
@@ -3720,17 +3727,17 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: manifest
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/features.parquet.manifest.state.json
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/features.parquet.manifest.state.json
           - name: expect
-            value: '{"exclude_inputs":["/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet","/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet","/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet","/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet","/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/features.parquet"],"model_path":"/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/model.joblib","num_random":10,"num_shards":512,"num_top":10,"sampled":true,"seed":1005}'
+            value: '{"exclude_inputs":["/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet","/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet","/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet","/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet","/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/features.parquet"],"model_path":"/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/model.joblib","num_random":20,"num_shards":512,"num_top":20,"sampled":true,"seed":1005}'
           - name: source_globs
-            value: '["candidates/1m/featurized/*.parquet", "candidates/1m/preprocessed/*.parquet",
-              "screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/model.joblib",
-              "screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet",
-              "screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet",
-              "screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet",
-              "screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet",
-              "screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/features.parquet"]'
+            value: '["candidates/10m/featurized/*.parquet", "candidates/10m/preprocessed/*.parquet",
+              "screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/model.joblib",
+              "screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet",
+              "screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet",
+              "screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet",
+              "screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet",
+              "screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/features.parquet"]'
           - name: result_file
             value: /tmp/manifest_matches.txt
       - name: check-merged
@@ -3741,17 +3748,17 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: manifest
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/features.parquet.manifest.state.json
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/features.parquet.manifest.state.json
           - name: expect
-            value: '{"exclude_inputs":["/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet","/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet","/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet","/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet","/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/features.parquet"],"merged":true,"model_path":"/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/model.joblib","num_random":10,"num_shards":512,"num_top":10,"seed":1005}'
+            value: '{"exclude_inputs":["/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet","/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet","/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet","/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet","/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/features.parquet"],"merged":true,"model_path":"/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/model.joblib","num_random":20,"num_shards":512,"num_top":20,"seed":1005}'
           - name: source_globs
-            value: '["candidates/1m/featurized/*.parquet", "candidates/1m/preprocessed/*.parquet",
-              "screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/model.joblib",
-              "screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet",
-              "screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet",
-              "screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet",
-              "screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet",
-              "screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/features.parquet"]'
+            value: '["candidates/10m/featurized/*.parquet", "candidates/10m/preprocessed/*.parquet",
+              "screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/model.joblib",
+              "screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet",
+              "screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet",
+              "screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet",
+              "screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet",
+              "screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/features.parquet"]'
           - name: result_file
             value: /tmp/manifest_matches.txt
       - name: sample-shards
@@ -4278,25 +4285,25 @@ spec:
           - name: source
             value: shard_{{item}}.parquet
           - name: featurized_input_prefix
-            value: candidates/1m/featurized/shards
+            value: candidates/10m/featurized/shards
           - name: preprocessed_input_prefix
-            value: candidates/1m/preprocessed/shards
+            value: candidates/10m/preprocessed/shards
           - name: output_prefix
-            value: screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/staging
+            value: screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/staging
           - name: seed
             value: '1005'
           - name: num_random
-            value: '10'
+            value: '20'
           - name: num_top
-            value: '10'
+            value: '20'
           - name: model_path
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/model.joblib
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/model.joblib
           - name: exclude_inputs
-            value: '["/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet",
-              "/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet",
-              "/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet",
-              "/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet",
-              "/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/features.parquet"]'
+            value: '["/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet",
+              "/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet",
+              "/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet",
+              "/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet",
+              "/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/features.parquet"]'
       - name: write-manifest
         depends: sample-shards
         template: update-manifest-surrogate
@@ -4306,11 +4313,11 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: source
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/features.parquet.manifest.plan.json
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/features.parquet.manifest.plan.json
           - name: output
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/features.parquet.manifest.state.json
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/features.parquet.manifest.state.json
           - name: fields
-            value: '{"exclude_inputs":["/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet","/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet","/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet","/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet","/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/features.parquet"],"model_path":"/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/model.joblib","num_random":10,"num_shards":512,"num_top":10,"sampled":true,"seed":1005}'
+            value: '{"exclude_inputs":["/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet","/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet","/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet","/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet","/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/features.parquet"],"model_path":"/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/model.joblib","num_random":20,"num_shards":512,"num_top":20,"sampled":true,"seed":1005}'
       - name: merge-samples
         depends: write-manifest && check-merged
         template: merge-shards
@@ -4320,9 +4327,9 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: input_path
-            value: screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/staging
+            value: screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/staging
           - name: output_path
-            value: screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/features.parquet
+            value: screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/features.parquet
       - name: mark-merged
         depends: merge-samples
         template: update-manifest-surrogate
@@ -4332,9 +4339,9 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: source
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/features.parquet.manifest.state.json
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/features.parquet.manifest.state.json
           - name: output
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/features.parquet.manifest.state.json
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/features.parquet.manifest.state.json
           - name: fields
             value: '{"merged":true}'
     inputs:
@@ -4360,17 +4367,17 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: ensemble
-            value: /mnt/lynceus/screens/hsp90-n-terminal/targets/ensembles/{{inputs.parameters.ensemble}}
+            value: /mnt/lynceus/screens/ptprb-10m/targets/ensembles/{{inputs.parameters.ensemble}}
           - name: member_id
             value: '{{inputs.parameters.member_id}}'
           - name: ligands_path
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet
           - name: center
             value: '{{inputs.parameters.center}}'
           - name: site_id
             value: '{{inputs.parameters.site_id}}'
           - name: output_path
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation
       - name: sample-round-0
         depends: dock-validation
         template: sample-dag-round-0
@@ -4388,17 +4395,17 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: ensemble
-            value: /mnt/lynceus/screens/hsp90-n-terminal/targets/ensembles/{{inputs.parameters.ensemble}}
+            value: /mnt/lynceus/screens/ptprb-10m/targets/ensembles/{{inputs.parameters.ensemble}}
           - name: member_id
             value: '{{inputs.parameters.member_id}}'
           - name: ligands_path
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet
           - name: center
             value: '{{inputs.parameters.center}}'
           - name: site_id
             value: '{{inputs.parameters.site_id}}'
           - name: output_path
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0
       - name: train-round-0
         depends: dock-round-0
         template: surrogate-train
@@ -4407,15 +4414,15 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: train_features
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet
           - name: train_labels
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/docking.results.parquet
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/docking.results.parquet
           - name: validation_features
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet
           - name: validation_labels
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/docking.results.parquet
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/docking.results.parquet
           - name: model_path
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/model.joblib
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/model.joblib
       - name: sample-round-1
         depends: train-round-0
         template: sample-dag-round-1
@@ -4433,17 +4440,17 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: ensemble
-            value: /mnt/lynceus/screens/hsp90-n-terminal/targets/ensembles/{{inputs.parameters.ensemble}}
+            value: /mnt/lynceus/screens/ptprb-10m/targets/ensembles/{{inputs.parameters.ensemble}}
           - name: member_id
             value: '{{inputs.parameters.member_id}}'
           - name: ligands_path
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet
           - name: center
             value: '{{inputs.parameters.center}}'
           - name: site_id
             value: '{{inputs.parameters.site_id}}'
           - name: output_path
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1
       - name: train-round-1
         depends: dock-round-1
         template: surrogate-train
@@ -4452,15 +4459,15 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: train_features
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet,/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet,/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet
           - name: train_labels
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/docking.results.parquet,/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/docking.results.parquet
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/docking.results.parquet,/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/docking.results.parquet
           - name: validation_features
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet
           - name: validation_labels
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/docking.results.parquet
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/docking.results.parquet
           - name: model_path
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/model.joblib
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/model.joblib
       - name: sample-round-2
         depends: train-round-1
         template: sample-dag-round-2
@@ -4478,17 +4485,17 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: ensemble
-            value: /mnt/lynceus/screens/hsp90-n-terminal/targets/ensembles/{{inputs.parameters.ensemble}}
+            value: /mnt/lynceus/screens/ptprb-10m/targets/ensembles/{{inputs.parameters.ensemble}}
           - name: member_id
             value: '{{inputs.parameters.member_id}}'
           - name: ligands_path
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet
           - name: center
             value: '{{inputs.parameters.center}}'
           - name: site_id
             value: '{{inputs.parameters.site_id}}'
           - name: output_path
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2
       - name: train-round-2
         depends: dock-round-2
         template: surrogate-train
@@ -4497,15 +4504,15 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: train_features
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet,/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet,/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet,/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet,/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet
           - name: train_labels
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/docking.results.parquet,/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/docking.results.parquet,/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/docking.results.parquet
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/docking.results.parquet,/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/docking.results.parquet,/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/docking.results.parquet
           - name: validation_features
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet
           - name: validation_labels
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/docking.results.parquet
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/docking.results.parquet
           - name: model_path
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/model.joblib
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/model.joblib
       - name: sample-round-3
         depends: train-round-2
         template: sample-dag-round-3
@@ -4523,17 +4530,17 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: ensemble
-            value: /mnt/lynceus/screens/hsp90-n-terminal/targets/ensembles/{{inputs.parameters.ensemble}}
+            value: /mnt/lynceus/screens/ptprb-10m/targets/ensembles/{{inputs.parameters.ensemble}}
           - name: member_id
             value: '{{inputs.parameters.member_id}}'
           - name: ligands_path
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/features.parquet
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/features.parquet
           - name: center
             value: '{{inputs.parameters.center}}'
           - name: site_id
             value: '{{inputs.parameters.site_id}}'
           - name: output_path
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3
       - name: train-round-3
         depends: dock-round-3
         template: surrogate-train
@@ -4542,15 +4549,15 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: train_features
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet,/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet,/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet,/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/features.parquet
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet,/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet,/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet,/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/features.parquet
           - name: train_labels
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/docking.results.parquet,/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/docking.results.parquet,/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/docking.results.parquet,/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/docking.results.parquet
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/docking.results.parquet,/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/docking.results.parquet,/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/docking.results.parquet,/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/docking.results.parquet
           - name: validation_features
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet
           - name: validation_labels
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/docking.results.parquet
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/docking.results.parquet
           - name: model_path
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/model.joblib
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/model.joblib
       - name: sample-round-4
         depends: train-round-3
         template: sample-dag-round-4
@@ -4568,17 +4575,17 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: ensemble
-            value: /mnt/lynceus/screens/hsp90-n-terminal/targets/ensembles/{{inputs.parameters.ensemble}}
+            value: /mnt/lynceus/screens/ptprb-10m/targets/ensembles/{{inputs.parameters.ensemble}}
           - name: member_id
             value: '{{inputs.parameters.member_id}}'
           - name: ligands_path
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/features.parquet
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/features.parquet
           - name: center
             value: '{{inputs.parameters.center}}'
           - name: site_id
             value: '{{inputs.parameters.site_id}}'
           - name: output_path
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4
       - name: train-round-4
         depends: dock-round-4
         template: surrogate-train
@@ -4587,15 +4594,15 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: train_features
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet,/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet,/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet,/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/features.parquet,/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/features.parquet
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet,/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet,/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet,/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/features.parquet,/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/features.parquet
           - name: train_labels
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/docking.results.parquet,/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/docking.results.parquet,/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/docking.results.parquet,/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/docking.results.parquet,/mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/docking.results.parquet
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/docking.results.parquet,/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/docking.results.parquet,/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/docking.results.parquet,/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/docking.results.parquet,/mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/docking.results.parquet
           - name: validation_features
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet
           - name: validation_labels
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/docking.results.parquet
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/docking.results.parquet
           - name: model_path
-            value: /mnt/lynceus/screens/hsp90-n-terminal/filter/surrogate/hsp90-n-terminal/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/model.joblib
+            value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/model.joblib
     inputs:
       parameters:
       - name: ensemble
@@ -4612,9 +4619,9 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: ensembles_prefix
-            value: screens/hsp90-n-terminal/targets/ensembles
+            value: screens/ptprb-10m/targets/ensembles
           - name: ensemble_ids
-            value: '["HSP90_N_Terminal"]'
+            value: '["PTPRB_Single"]'
       - name: surrogate-site
         depends: resolve-sites
         template: surrogate-site-dag

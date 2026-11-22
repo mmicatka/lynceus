@@ -1,21 +1,21 @@
 ---
 name: hsp90-n-terminal
 
-candidates: 1m
+candidates: 10m
 
 targets:
   ensembles:
     - id: "HSP90_N_Terminal"
       members:
         - pdb_id: 1UYM
-          weight: 1.0
-        # - pdb_id: 1YET
-        #   weight: 0.5
+          weight: 0.5
+        - pdb_id: 1YET
+          weight: 0.5
   min_pocket_score: 15.0
 
 filter:
   surrogate:
-    active_percentile: 5.0
+    active_percentile: 1.0
     feature_types:
       - atom_pair
       - autocorr
@@ -29,14 +29,6 @@ filter:
       - whim
     random_seed: 1000
     validation: 50000
-    rounds:
-      - top: 0
-        random: 10000
-      - top: 5000
-        random: 5000
-      - top: 5000
-        random: 5000
-      - top: 5000
-        random: 5000
-      - top: 5000
-        random: 5000
+    samples_per_round: 10000
+    num_rounds: 4
+    top_fraction: 0.5

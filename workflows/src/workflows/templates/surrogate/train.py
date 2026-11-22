@@ -12,6 +12,7 @@ def surrogate_train_template(
     validation_labels: str,
     model_path: str,
     features: Optional[List[str]] = None,
+    eval_percents: Optional[List[float]] = None,
 ):
     import subprocess
 
@@ -34,5 +35,9 @@ def surrogate_train_template(
     if features:
         for feature in features:
             cmd.extend(["--features", feature])
+
+    if eval_percents:
+        for pct in eval_percents:
+            cmd.extend(["--eval-percents", str(pct)])
 
     subprocess.run(cmd, check=True)

@@ -4,7 +4,7 @@
 from collections.abc import Callable
 from typing import Any
 
-from hera.workflows import DAG, Parameter, RetryStrategy, Task, Workflow
+from hera.workflows import DAG, Parameter, Task, Workflow
 from hera.workflows.models import ValueFrom
 
 from workflows.config.core import WorkflowConfigs
@@ -40,7 +40,6 @@ FEATURIZE_SHARD_DAG = "featurize-shard-dag"
 
 SOURCES_PARAM = "sources"
 SHARD_FILE_GLOB = "*.parquet"
-SHARD_RETRY = RetryStrategy(limit=3, retry_policy="OnFailure")
 
 FEATURIZED_KEY = "featurized"
 SAMPLE_KEY = "sample"
@@ -145,7 +144,6 @@ def _build_featurize_shard_dag(
     featurize_shard = templates.build(
         TemplateName.FEATURIZE_CANDIDATE_SHARD,
         featurize_candidate_shard_template,
-        retry_strategy=SHARD_RETRY,
     )
 
     with DAG(

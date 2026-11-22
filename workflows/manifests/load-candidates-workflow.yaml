@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Workflow
 metadata:
-  generateName: hsp90-n-terminal-candidates-
+  generateName: ptprb-10m-candidates-
 spec:
   entrypoint: main-dag
   serviceAccountName: argo-workflow

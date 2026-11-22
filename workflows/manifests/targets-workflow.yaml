@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Workflow
 metadata:
-  generateName: hsp90-n-terminal-targets-
+  generateName: ptprb-10m-targets-
 spec:
   entrypoint: main-dag
   serviceAccountName: argo-workflow
@@ -101,29 +101,29 @@ spec:
   - name: load-targets
     dag:
       tasks:
-      - name: download-pdbs-hsp90-n-terminal
+      - name: download-pdbs-ptprb-single
         template: download-pdbs
         arguments:
           parameters:
           - name: pdb_ids
-            value: 1UYM
+            value: 2AHS
           - name: base_path
             value: /mnt/lynceus
           - name: output_prefix
-            value: screens/hsp90-n-terminal/targets/pdbs/HSP90_N_Terminal
-      - name: generate-manifest-hsp90-n-terminal
-        depends: download-pdbs-hsp90-n-terminal
+            value: screens/ptprb-10m/targets/pdbs/PTPRB_Single
+      - name: generate-manifest-ptprb-single
+        depends: download-pdbs-ptprb-single
         template: generate-protein-ensemble-manifest
         arguments:
           parameters:
           - name: base_path
             value: /mnt/lynceus
           - name: input_path
-            value: screens/hsp90-n-terminal/targets/pdbs/HSP90_N_Terminal
+            value: screens/ptprb-10m/targets/pdbs/PTPRB_Single
           - name: output_path
-            value: screens/hsp90-n-terminal/targets/ensembles/HSP90_N_Terminal
+            value: screens/ptprb-10m/targets/ensembles/PTPRB_Single
           - name: ensemble_id
-            value: HSP90_N_Terminal
+            value: PTPRB_Single
           - name: structure_glob
             value: '*'
   - name: detect-binding-sites
@@ -173,12 +173,12 @@ spec:
   - name: detect-binding-sites-dag
     dag:
       tasks:
-      - name: detect-binding-sites-hsp90-n-terminal
+      - name: detect-binding-sites-ptprb-single
         template: detect-binding-sites
         arguments:
           parameters:
           - name: ensemble_path
-            value: /mnt/lynceus/screens/hsp90-n-terminal/targets/ensembles/HSP90_N_Terminal
+            value: /mnt/lynceus/screens/ptprb-10m/targets/ensembles/PTPRB_Single
           - name: min_pocket_score
             value: '15.0'
   - name: main-dag

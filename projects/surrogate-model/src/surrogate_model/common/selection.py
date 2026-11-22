@@ -7,6 +7,7 @@ from pathlib import Path
 import numpy as np
 import polars as pl
 import pyarrow as pa
+import pyarrow.compute as pc
 import pyarrow.parquet as pq
 
 from surrogate_model.common.data import flatten_features
@@ -78,6 +79,14 @@ def _valid_columns(file: str) -> list[str]:
     ]
 
 
+def _excluded_mask(
+    chunk: pa.Table, id_column: str, excluded_ids: pa.Array
+) -> np.ndarray:
+    ids = chunk.column(id_column).combine_chunks()
+    lookup = pc.SetLookupOptions(value_set=excluded_ids)
+    return pc.call_function("is_in", [ids], lookup).to_numpy(zero_copy_only=False)
+
+
 def _eligible_mask(
     chunk: pa.Table,
     valid_cols: list[str],
@@ -93,7 +102,7 @@ def _eligible_mask(
             .to_numpy()
         )
     if excluded_ids is not None:
-        mask &= ~chunk.column(id_column).isin(excluded_ids).to_numpy()
+        mask &= ~_excluded_mask(chunk, id_column, excluded_ids)
     return mask
 
 
