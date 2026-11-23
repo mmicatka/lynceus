@@ -11,7 +11,7 @@ targets:
           weight: 1.0
         # - pdb_id: 1YET
         #   weight: 0.5
-  min_pocket_score: 15.0
+  min_pocket_score: 10.0
 
 filter:
   surrogate:

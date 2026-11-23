@@ -35,6 +35,11 @@ x-defs:
         cpu: "8"
         memory: 8Gi
       limits: *high_cpu_res
+    high_cpu_high_ram: &high_cpu_high_ram
+      requests: &high_cpu_high_ram_res
+        cpu: "8"
+        memory: 16Gi
+      limits: *high_cpu_high_ram_res
 
     scratch_50gb: &scratch_50gb
       mount_path: /scratch
@@ -151,7 +156,7 @@ templates:
     scratch: *scratch_10gb
 
   surrogate_train:
-    resources: *high_cpu
+    resources: *high_cpu_high_ram
     image: *surrogate_image
     scratch: *scratch_10gb
 

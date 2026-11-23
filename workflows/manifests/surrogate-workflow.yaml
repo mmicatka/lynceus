@@ -227,10 +227,10 @@ spec:
       resources:
         limits:
           cpu: '8'
-          memory: 8Gi
+          memory: 16Gi
         requests:
           cpu: '8'
-          memory: 8Gi
+          memory: 16Gi
   - name: surrogate-sample-by-prediction
     volumes:
     - name: lynceus
@@ -549,7 +549,7 @@ spec:
           - name: manifest
             value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet.manifest.state.json
           - name: expect
-            value: '{"exclude_inputs":[],"model_path":"","num_random":40,"num_shards":512,"num_top":0,"sampled":true,"seed":1000}'
+            value: '{"exclude_inputs":[],"model_path":"","num_random":196,"num_shards":512,"num_top":0,"sampled":true,"seed":1000}'
           - name: source_globs
             value: '["candidates/10m/featurized/*.parquet", "candidates/10m/preprocessed/*.parquet"]'
           - name: result_file
@@ -564,7 +564,7 @@ spec:
           - name: manifest
             value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet.manifest.state.json
           - name: expect
-            value: '{"exclude_inputs":[],"merged":true,"model_path":"","num_random":40,"num_shards":512,"num_top":0,"seed":1000}'
+            value: '{"exclude_inputs":[],"merged":true,"model_path":"","num_random":196,"num_shards":512,"num_top":0,"seed":1000}'
           - name: source_globs
             value: '["candidates/10m/featurized/*.parquet", "candidates/10m/preprocessed/*.parquet"]'
           - name: result_file
@@ -1101,7 +1101,7 @@ spec:
           - name: seed
             value: '1000'
           - name: num_random
-            value: '40'
+            value: '196'
           - name: num_top
             value: '0'
           - name: model_path
@@ -1121,7 +1121,7 @@ spec:
           - name: output
             value: /mnt/lynceus/screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/validation/features.parquet.manifest.state.json
           - name: fields
-            value: '{"exclude_inputs":[],"model_path":"","num_random":40,"num_shards":512,"num_top":0,"sampled":true,"seed":1000}'
+            value: '{"exclude_inputs":[],"model_path":"","num_random":196,"num_shards":512,"num_top":0,"sampled":true,"seed":1000}'
       - name: merge-samples
         depends: write-manifest && check-merged
         template: merge-shards

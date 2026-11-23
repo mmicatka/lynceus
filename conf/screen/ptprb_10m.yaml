@@ -9,7 +9,7 @@ targets:
       members:
         - pdb_id: 2AHS
           weight: 1.0
-  min_pocket_score: 15.0
+  min_pocket_score: 10.0
 
 filter:
   surrogate:

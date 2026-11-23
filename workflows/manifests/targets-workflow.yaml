@@ -135,7 +135,7 @@ spec:
       parameters:
       - name: ensemble_path
       - name: min_pocket_score
-        default: '20.0'
+        default: '10.0'
       - name: num_workers
         default: auto
     retryStrategy:
@@ -180,7 +180,7 @@ spec:
           - name: ensemble_path
             value: /mnt/lynceus/screens/ptprb-10m/targets/ensembles/PTPRB_Single
           - name: min_pocket_score
-            value: '15.0'
+            value: '10.0'
   - name: main-dag
     dag:
       tasks:

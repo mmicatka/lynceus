@@ -3,7 +3,7 @@
 
 def detect_binding_sites_template(
     ensemble_path: str,
-    min_pocket_score: float = 20.0,
+    min_pocket_score: float = 10.0,
     num_workers: str = "auto",
 ):
     import subprocess
