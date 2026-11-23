@@ -6,13 +6,16 @@ IMAGE_PREFIX := $(REGISTRY)/lynceus
 TEMPLATES_CONFIG ?= conf/templates.yaml
 CANDIDATES_CONFIG ?= conf/candidates.yaml
 
-SCREEN_CONFIG ?= conf/screen/hsp90_n_terminal.yaml
+SCREEN_CONFIG ?= conf/screen/ptprb_10m.yaml
 
 NAMESPACE ?= workflows
 VERSION ?= 0.1.0
 
 WORKFLOWS ?= load-candidates-workflow sample-candidates-workflow preprocess-candidates-workflow targets-workflow surrogate-workflow
 OUT_DIR ?= workflows/manifests
+
+PRIORITY ?=
+POD_PRIORITY_CLASS ?=
 
 .PHONY: build push build-* clean lint lint-python lint-argo generate generate-workflows submit-workflows run logs
 
@@ -38,9 +41,11 @@ generate-workflows:
 		-o $(OUT_DIR) \
 		-t $(TEMPLATES_CONFIG) \
 		-c $(CANDIDATES_CONFIG) \
-		-s $(SCREEN_CONFIG)
+		-s $(SCREEN_CONFIG) \
+		$(if $(PRIORITY),--priority $(PRIORITY)) \
+		$(if $(POD_PRIORITY_CLASS),--pod-priority-class $(POD_PRIORITY_CLASS))
 
-submit-workflows: generate
+submit-workflows: generate-workflows
 	@echo "Submitting workflows: $(WORKFLOWS) to namespace $(NAMESPACE)..."
 	@for wf in $(WORKFLOWS); do \
 		argo submit -n $(NAMESPACE) $(OUT_DIR)/$$wf.yaml; \

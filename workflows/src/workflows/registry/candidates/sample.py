@@ -1,7 +1,7 @@
 # workflows/src/workflows/registry/candidates/sample.py
 
 
-from hera.workflows import DAG, RetryStrategy, Task, Workflow
+from hera.workflows import DAG, Task, Workflow
 
 from workflows.config.core import WorkflowConfigs
 from workflows.config.templates import TemplateName
@@ -13,11 +13,10 @@ from workflows.registry.common.core import (
     shard_filename,
     shard_ids,
 )
-from workflows.templates import sample_candidates_template
+from workflows.templates import sample_candidate_shard_template
 from workflows.templates.builders import TemplateFactory
 
-SAMPLE_SHARDS_PARALLELISM = 1
-SAMPLE_RETRY = RetryStrategy(limit=3, retry_policy="OnFailure")
+SAMPLE_SHARDS_PARALLELISM = 10
 SAMPLE_CANDIDATES_DAG = "sample-candidates-dag"
 
 
@@ -43,8 +42,7 @@ def _subsample_task(
 
     subsample_candidates = templates.build(
         TemplateName.SUBSAMPLE_CANDIDATES,
-        sample_candidates_template,
-        retry_strategy=SAMPLE_RETRY,
+        sample_candidate_shard_template,
     )
 
     return subsample_candidates(
@@ -74,7 +72,12 @@ def build_sample_candidates_dag(
 def build_sample_candidates_workflow(configs: WorkflowConfigs) -> Workflow:
     templates = get_template_factory(configs.templates)
 
-    with new_workflow(configs.screen.name, "candidates-sample") as workflow:
+    with new_workflow(
+        configs.screen.name,
+        "candidates-sample",
+        priority=configs.priority,
+        pod_priority_class_name=configs.pod_priority_class_name,
+    ) as workflow:
         sample_dag = build_sample_candidates_dag(templates, configs)
 
         with DAG(name=ENTRYPOINT_DAG):

@@ -14,8 +14,8 @@ from lynceus_core.manifest.common import (
 
 SourceEntry = dict[str, Any]
 
-FEATURES_KEY = "features"
-CONFORMERS_KEY = "conformers"
+featurized_KEY = "featurized"
+preprocessed_KEY = "preprocessed"
 MODELS_KEY = "models"
 
 
@@ -46,13 +46,13 @@ def _extract_names(files: list[SourceEntry]) -> list[str]:
 
 
 def _check_aligned(feature_names: list[str], conformer_names: list[str]) -> None:
-    missing_conformers = sorted(set(feature_names) - set(conformer_names))
-    missing_features = sorted(set(conformer_names) - set(feature_names))
-    if missing_conformers or missing_features:
+    missing_preprocessed = sorted(set(feature_names) - set(conformer_names))
+    missing_featurized = sorted(set(conformer_names) - set(feature_names))
+    if missing_preprocessed or missing_featurized:
         raise click.ClickException(
             "Feature and conformer shards do not match: "
-            f"missing conformers {missing_conformers}, "
-            f"missing features {missing_features}"
+            f"missing preprocessed {missing_preprocessed}, "
+            f"missing featurized {missing_featurized}"
         )
 
 
@@ -73,12 +73,12 @@ def _persist_source_files(files: list[SourceEntry], persist_file: Path) -> None:
     help="Directory the globs and model file are relative to in the plan.",
 )
 @click.option(
-    "--features-glob",
+    "--featurized-glob",
     required=True,
-    help="Glob, relative to --source-root, selecting the features files.",
+    help="Glob, relative to --source-root, selecting the featurized files.",
 )
 @click.option(
-    "--conformers-glob",
+    "--preprocessed-glob",
     required=True,
     help="Glob, relative to --source-root, selecting the conformer files.",
 )
@@ -103,30 +103,30 @@ def _persist_source_files(files: list[SourceEntry], persist_file: Path) -> None:
 )
 def plan_surrogate_sample(
     source_root: Path,
-    features_glob: str,
-    conformers_glob: str,
+    featurized_glob: str,
+    preprocessed_glob: str,
     model_file: Path | None,
     output_file: Path,
     persist_file: Path,
 ) -> None:
-    features = _require_files(source_root, features_glob, FEATURES_KEY)
-    conformers = _require_files(source_root, conformers_glob, CONFORMERS_KEY)
+    featurized = _require_files(source_root, featurized_glob, featurized_KEY)
+    preprocessed = _require_files(source_root, preprocessed_glob, preprocessed_KEY)
     models = _describe_model(model_file, source_root)
 
-    feature_names = _extract_names(features)
-    conformer_names = _extract_names(conformers)
+    feature_names = _extract_names(featurized)
+    conformer_names = _extract_names(preprocessed)
     _check_aligned(feature_names, conformer_names)
 
-    _persist_source_files([*features, *conformers, *models], persist_file)
+    _persist_source_files([*featurized, *preprocessed, *models], persist_file)
     _write_plan(
         {
-            FEATURES_KEY: feature_names,
-            CONFORMERS_KEY: conformer_names,
+            featurized_KEY: feature_names,
+            preprocessed_KEY: conformer_names,
             MODELS_KEY: _extract_names(models),
         },
         output_file,
     )
     click.echo(
-        f"Planned {len(features)} feature, {len(conformers)} conformer "
+        f"Planned {len(featurized)} feature, {len(preprocessed)} conformer "
         f"and {len(models)} model files for sampling"
     )

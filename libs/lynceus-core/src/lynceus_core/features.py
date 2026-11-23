@@ -1,6 +1,6 @@
 # libs/lynceus-core/src/lynceus_core/__init__.py
 
-# TODO: Use this in the feature generator
+
 FEATURE_COLS = [
     "atom_pair",
     "autocorr",

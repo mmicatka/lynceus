@@ -4,7 +4,7 @@
 from collections.abc import Callable
 from typing import Any
 
-from hera.workflows import DAG, Parameter, RetryStrategy, Task, Workflow
+from hera.workflows import DAG, Parameter, Task, Workflow
 from hera.workflows.models import ValueFrom
 
 from workflows.config.core import WorkflowConfigs
@@ -40,7 +40,6 @@ PREPROCESS_SHARD_DAG = "preprocess-shard-dag"
 
 SOURCES_PARAM = "sources"
 SHARD_FILE_GLOB = "*.parquet"
-SHARD_RETRY = RetryStrategy(limit=3, retry_policy="OnFailure")
 
 PREPROCESSED_KEY = "preprocessed"
 SAMPLE_KEY = "sample"
@@ -140,7 +139,6 @@ def _build_preprocess_shard_dag(
     preprocess_shard = templates.build(
         TemplateName.PREPROCESS_CANDIDATE_SHARD,
         preprocess_candidate_shard_template,
-        retry_strategy=SHARD_RETRY,
     )
 
     with DAG(
@@ -216,7 +214,12 @@ def build_preprocess_candidates_dag(
 def build_preprocess_candidates_workflow(configs: WorkflowConfigs) -> Workflow:
     templates = get_template_factory(configs.templates)
 
-    with new_workflow(configs.screen.name, "preprocess-candidates") as workflow:
+    with new_workflow(
+        configs.screen.name,
+        "preprocess-candidates",
+        priority=configs.priority,
+        pod_priority_class_name=configs.pod_priority_class_name,
+    ) as workflow:
         preprocess_dag = build_preprocess_candidates_dag(templates, configs)
 
         with DAG(name=ENTRYPOINT_DAG):

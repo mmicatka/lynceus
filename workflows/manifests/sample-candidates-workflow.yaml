@@ -1,13 +1,13 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Workflow
 metadata:
-  generateName: hsp90-n-terminal-candidates-sample-
+  generateName: ptprb-10m-candidates-sample-
 spec:
   entrypoint: main-dag
   serviceAccountName: argo-workflow
   templates:
   - name: sample-candidates-dag
-    parallelism: 1
+    parallelism: 10
     dag:
       tasks:
       - name: subsample-candidates
@@ -534,9 +534,9 @@ spec:
           - name: source_prefix
             value: candidates/raw/shards/merged
           - name: parquet_prefix
-            value: candidates/1m/raw/
+            value: candidates/10m/raw/
           - name: num_samples
-            value: '1953'
+            value: '19531'
   - name: subsample-candidates
     volumes:
     - name: lynceus
@@ -551,7 +551,7 @@ spec:
       - name: num_samples
     retryStrategy:
       limit: 3
-      retryPolicy: OnFailure
+      retryPolicy: Always
     script:
       image: registry.nebula.lan:5000/lynceus/candidates:0.1.0
       imagePullPolicy: Always
@@ -574,7 +574,7 @@ spec:
         import os
         import subprocess
         source_root = os.path.join(base_path, source_prefix)
-        subprocess.run(['sample-candidates', '--input', os.path.join(source_root, source), '--source-root', source_root, '--output', os.path.join(base_path, parquet_prefix, source), '--num-samples', str(num_samples)], check=True)
+        subprocess.run(['sample-candidate-shard', '--input', os.path.join(source_root, source), '--source-root', source_root, '--output', os.path.join(base_path, parquet_prefix, source), '--num-samples', str(num_samples)], check=True)
       command:
       - python
       volumeMounts:
@@ -582,11 +582,11 @@ spec:
         mountPath: /mnt/lynceus
       resources:
         limits:
-          cpu: '8'
-          memory: 8Gi
+          cpu: '2'
+          memory: 2Gi
         requests:
-          cpu: '8'
-          memory: 8Gi
+          cpu: '2'
+          memory: 2Gi
   - name: main-dag
     dag:
       tasks:

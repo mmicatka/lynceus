@@ -30,13 +30,10 @@ os.environ["NUMEXPR_NUM_THREADS"] = "1"
 os.environ["VECLIB_MAXIMUM_THREADS"] = "1"
 
 STAGED_OUTPUT_TRANSFERS = 1
-
 RUN_TIME_KEY = "run_time"
-
+NUM_ROWS_KEY = "num_rows"
 MANIFEST_FILE_SUFFIX = ".manifest.json"
-
 MAX_TASKS_PER_CHILD = 100
-
 DROPPED_COLUMNS = ["conformer", "smiles"]
 
 logger = get_lynceus_logger()
@@ -49,20 +46,23 @@ rdBase.DisableLog("rdApp.*")
 _WORKER_GENERATORS: dict[str, FeatureGenerator] | None = None
 
 
+def _manifest_path(manifest_dir: Path, output_path: Path) -> Path:
+    return manifest_dir / f"{output_path.stem}{MANIFEST_FILE_SUFFIX}"
+
+
 def _input_manifest(
     input_path: str,
-    output_path: str,
+    manifest_path: Path,
     source_root: Path,
     expected_state: dict,
 ) -> Manifest:
-    manifest_path = Path(output_path).with_suffix(MANIFEST_FILE_SUFFIX)
     return Manifest(filepath=manifest_path, data=expected_state).set_source_files(
         [input_path], source_root
     )
 
 
-def _already_generated(manifest: Manifest, output_path: str) -> bool:
-    return Path(output_path).is_file() and manifest.exists_superset()
+def _already_generated(manifest: Manifest, output_path: Path) -> bool:
+    return output_path.is_file() and manifest.exists_superset()
 
 
 def _init_worker(generator_names: list[str]) -> None:
@@ -230,8 +230,15 @@ def _generate_via_staged_output(
     "--output",
     "output_path",
     required=True,
-    type=str,
+    type=click.Path(dir_okay=False, path_type=Path),
     help="Path to the output Parquet file.",
+)
+@click.option(
+    "--manifest-dir",
+    "manifest_dir",
+    required=True,
+    type=click.Path(file_okay=False, path_type=Path),
+    help="Directory the shard manifest is written to, named after the output file.",
 )
 @click.option(
     "--batch-size",
@@ -278,7 +285,8 @@ def _generate_via_staged_output(
 def featurize_candidate_shard(
     source_root: Path,
     input_path: str,
-    output_path: str,
+    output_path: Path,
+    manifest_dir: Path,
     batch_size: int,
     chunk_size: int,
     num_workers: int,
@@ -299,7 +307,12 @@ def featurize_candidate_shard(
         "features": sorted(feature_names),
         "expected_fields": sorted(expected_fields),
     }
-    manifest = _input_manifest(input_path, output_path, source_root, expected_state)
+    manifest = _input_manifest(
+        input_path,
+        _manifest_path(manifest_dir, output_path),
+        source_root,
+        expected_state,
+    )
 
     try:
         if _already_generated(manifest, output_path):
@@ -337,6 +350,7 @@ def featurize_candidate_shard(
 
     elapsed_time = time.perf_counter() - start_time
     manifest.data[RUN_TIME_KEY] = str(datetime.timedelta(seconds=elapsed_time))
+    manifest.data[NUM_ROWS_KEY] = pq.ParquetFile(input_path).metadata.num_rows
     manifest.save()
 
     logger.info("Finished generating features", manifest=manifest.data)

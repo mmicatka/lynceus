@@ -65,40 +65,42 @@ def stream_tables(
 
 
 def aligned_chunks(
-    features_files: list[str],
-    conformers_files: list[str],
+    featurized_files: list[str],
+    preprocessed_files: list[str],
     id_column: str,
     batch_size: int,
 ) -> Iterator[tuple[pa.Table, pa.Table]]:
-    features = stream_tables(features_files, None, batch_size)
-    conformers = stream_tables(
-        conformers_files, [id_column, CONFORMER_COLUMN], batch_size
+    featurized = stream_tables(featurized_files, None, batch_size)
+    preprocessed = stream_tables(
+        preprocessed_files, [id_column, CONFORMER_COLUMN], batch_size
     )
-    for features_chunk, conformers_chunk in zip(features, conformers, strict=True):
-        if features_chunk.num_rows != conformers_chunk.num_rows:
-            raise ValueError("Features and conformers chunks differ in row count")
-        yield features_chunk, conformers_chunk
+    for featurized_chunk, preprocessed_chunk in zip(
+        featurized, preprocessed, strict=True
+    ):
+        if featurized_chunk.num_rows != preprocessed_chunk.num_rows:
+            raise ValueError("featurized and preprocessed chunks differ in row count")
+        yield featurized_chunk, preprocessed_chunk
 
 
 def select_aligned(
-    features: pa.Table,
-    conformers: pa.Table,
+    featurized: pa.Table,
+    preprocessed: pa.Table,
     local_positions: np.ndarray,
     id_column: str,
 ) -> pa.Table:
     indices = pa.array(local_positions, type=pa.int64())
-    selected_features = features.take(indices)
-    selected_conformers = conformers.take(indices)
-    if not selected_features[id_column].equals(selected_conformers[id_column]):
+    selected_featurized = featurized.take(indices)
+    selected_preprocessed = preprocessed.take(indices)
+    if not selected_featurized[id_column].equals(selected_preprocessed[id_column]):
         raise ValueError(f"Misaligned inputs: '{id_column}' differs between sides")
-    return selected_features.append_column(
-        CONFORMER_COLUMN, selected_conformers[CONFORMER_COLUMN]
+    return selected_featurized.append_column(
+        CONFORMER_COLUMN, selected_preprocessed[CONFORMER_COLUMN]
     )
 
 
 def write_aligned_selection(
-    features_files: list[str],
-    conformers_files: list[str],
+    featurized_files: list[str],
+    preprocessed_files: list[str],
     positions: np.ndarray,
     output_file: str,
     id_column: str,
@@ -110,13 +112,13 @@ def write_aligned_selection(
     writer: pq.ParquetWriter | None = None
     offset = 0
     try:
-        for features, conformers in aligned_chunks(
-            features_files, conformers_files, id_column, batch_size
+        for featurized, preprocessed in aligned_chunks(
+            featurized_files, preprocessed_files, id_column, batch_size
         ):
-            end = offset + features.num_rows
+            end = offset + featurized.num_rows
             lo, hi = np.searchsorted(positions, [offset, end])
             selected = select_aligned(
-                features, conformers, positions[lo:hi] - offset, id_column
+                featurized, preprocessed, positions[lo:hi] - offset, id_column
             )
             for name, values in extra.items():
                 selected = selected.append_column(name, pa.array(values[lo:hi]))

@@ -4,7 +4,7 @@
 from collections.abc import Callable
 from typing import Any
 
-from hera.workflows import DAG, Parameter, RetryStrategy, Task, Workflow
+from hera.workflows import DAG, Parameter, Task, Workflow
 from hera.workflows.models import ValueFrom
 
 from workflows.config.core import WorkflowConfigs
@@ -40,7 +40,6 @@ FEATURIZE_SHARD_DAG = "featurize-shard-dag"
 
 SOURCES_PARAM = "sources"
 SHARD_FILE_GLOB = "*.parquet"
-SHARD_RETRY = RetryStrategy(limit=3, retry_policy="OnFailure")
 
 FEATURIZED_KEY = "featurized"
 SAMPLE_KEY = "sample"
@@ -59,6 +58,10 @@ def _completed_fields(configs: WorkflowConfigs) -> dict[str, Any]:
 def _sources_expression(plan_task: Task) -> str:
     manifest = f"tasks['{plan_task.name}'].outputs.parameters.{MANIFEST_OUTPUT}"
     return f"{{{{=toJson(fromJSON({manifest}).sources)}}}}"
+
+
+def _sample_features(configs: WorkflowConfigs) -> list[str]:
+    return configs.candidates.samples[configs.screen.candidates].feature_names
 
 
 def _build_plan(templates: TemplateFactory) -> TaskFactory:
@@ -90,7 +93,7 @@ def _plan_task(plan: TaskFactory, sample_paths: SamplePaths, when: str) -> Task:
         when=when,
         arguments={
             "base_path": sample_paths.mount_path,
-            "input_prefix": sample_paths.raw,
+            "input_prefix": sample_paths.preprocessed_shards,
             "source_glob": SHARD_FILE_GLOB,
             "output_file": MANIFEST_PATH,
             "persist_file": sample_paths.featurized_manifest,
@@ -109,7 +112,7 @@ def _check_manifest_task(
             "base_path": sample_paths.mount_path,
             "manifest": sample_paths.featurized_manifest,
             "expect": json_arg(_completed_fields(configs)),
-            "source_globs": [f"{sample_paths.raw}/{SHARD_FILE_GLOB}"],
+            "source_globs": [f"{sample_paths.preprocessed_shards}/{SHARD_FILE_GLOB}"],
             "result_file": MATCHES_PATH,
         },
     )
@@ -136,11 +139,11 @@ def _update_manifest_task(
 def _build_featurize_shard_dag(
     templates: TemplateFactory,
     sample_paths: SamplePaths,
+    features: list[str],
 ) -> DAG:
     featurize_shard = templates.build(
         TemplateName.FEATURIZE_CANDIDATE_SHARD,
         featurize_candidate_shard_template,
-        retry_strategy=SHARD_RETRY,
     )
 
     with DAG(
@@ -151,9 +154,10 @@ def _build_featurize_shard_dag(
             arguments={
                 "base_path": sample_paths.mount_path,
                 "source": SOURCE_PARAM,
-                "input_prefix": sample_paths.raw,
+                "input_prefix": sample_paths.preprocessed_shards,
                 "output_prefix": sample_paths.featurized_shards,
                 "manifest_prefix": sample_paths.featurized_manifests,
+                "features": features,
             },
         )
 
@@ -163,9 +167,9 @@ def _build_featurize_shard_dag(
 def _build_fanout_dag(
     templates: TemplateFactory,
     sample_paths: SamplePaths,
+    features: list[str],
 ) -> DAG:
-    featurize_shard_dag = _build_featurize_shard_dag(templates, sample_paths)
-
+    featurize_shard_dag = _build_featurize_shard_dag(templates, sample_paths, features)
     with DAG(
         name=FEATURIZE_FANOUT_DAG,
         inputs=[Parameter(name=SOURCES_PARAM)],
@@ -185,6 +189,7 @@ def build_featurize_candidates_dag(
     configs: WorkflowConfigs,
 ) -> DAG:
     sample_paths = _sample_paths(configs)
+    features = _sample_features(configs)
 
     with DAG(name=FEATURIZE_CANDIDATES_DAG) as dag:
         verify_manifest = _build_verify_manifest(templates)
@@ -198,7 +203,7 @@ def build_featurize_candidates_dag(
 
         plan_task = _plan_task(plan, sample_paths, featurize_gate)
 
-        fanout_dag = _build_fanout_dag(templates, sample_paths)
+        fanout_dag = _build_fanout_dag(templates, sample_paths, features)
         fanout_task = fanout_dag(
             name="featurize-shards-fanout",
             when=featurize_gate,
@@ -216,7 +221,12 @@ def build_featurize_candidates_dag(
 def build_featurize_candidates_workflow(configs: WorkflowConfigs) -> Workflow:
     templates = get_template_factory(configs.templates)
 
-    with new_workflow(configs.screen.name, "featurize-candidates") as workflow:
+    with new_workflow(
+        configs.screen.name,
+        "featurize-candidates",
+        priority=configs.priority,
+        pod_priority_class_name=configs.pod_priority_class_name,
+    ) as workflow:
         featurize_dag = build_featurize_candidates_dag(templates, configs)
 
         with DAG(name=ENTRYPOINT_DAG):

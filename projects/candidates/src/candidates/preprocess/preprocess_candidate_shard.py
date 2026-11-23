@@ -44,8 +44,8 @@ MANIFEST_FILE_SUFFIX = ".manifest.json"
 NUM_ROWS_KEY = "num_rows"
 
 
-def _manifest_path(manifest_dir: Path, output_path: str) -> Path:
-    return manifest_dir / f"{Path(output_path).stem}{MANIFEST_FILE_SUFFIX}"
+def _manifest_path(manifest_dir: Path, output_path: Path) -> Path:
+    return manifest_dir / f"{output_path.stem}{MANIFEST_FILE_SUFFIX}"
 
 
 def _input_manifest(
@@ -59,8 +59,8 @@ def _input_manifest(
     )
 
 
-def _already_generated(manifest: Manifest, output_path: str) -> bool:
-    return Path(output_path).is_file() and manifest.exists_superset()
+def _already_generated(manifest: Manifest, output_path: Path) -> bool:
+    return output_path.is_file() and manifest.exists_superset()
 
 
 def _process_chunk(
@@ -189,8 +189,7 @@ def _generate_via_staged_output(
     "--output",
     "output_path",
     required=True,
-    type=str,
-    help="Path to the output Parquet file.",
+    type=click.Path(dir_okay=False, path_type=Path),
 )
 @click.option(
     "--manifest-dir",
@@ -234,8 +233,8 @@ def _generate_via_staged_output(
 def preprocess_candidate_shard(
     source_root: Path,
     input_path: str,
-    output_path: str,
-    manifest_dir: str,
+    output_path: Path,
+    manifest_dir: Path,
     batch_size: int,
     chunk_size: int,
     num_workers: int,
@@ -272,7 +271,7 @@ def preprocess_candidate_shard(
 
     _generate_via_staged_output(
         input_path,
-        Path(output_path),
+        output_path,
         batch_size,
         chunk_size,
         num_workers,

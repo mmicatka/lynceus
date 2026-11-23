@@ -34,3 +34,31 @@ roleRef:
   kind: Role
   name: argo-workflow-role
   apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: argo-postgres-secret-reader
+  namespace: REPLACE_ME_NAMESPACE
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames: ["argo-postgres-config"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: argo-postgres-secret-reader
+  namespace: REPLACE_ME_NAMESPACE
+subjects:
+  - kind: ServiceAccount
+    name: argo-workflows-workflow-controller
+    namespace: REPLACE_ME_NAMESPACE
+  - kind: ServiceAccount
+    name: argo-workflows-server
+    namespace: REPLACE_ME_NAMESPACE
+roleRef:
+  kind: Role
+  name: argo-postgres-secret-reader
+  apiGroup: rbac.authorization.k8s.io

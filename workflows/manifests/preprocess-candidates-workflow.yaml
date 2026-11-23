@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Workflow
 metadata:
-  generateName: hsp90-n-terminal-preprocess-candidates-
+  generateName: ptprb-10m-preprocess-candidates-
 spec:
   entrypoint: main-dag
   serviceAccountName: argo-workflow
@@ -16,11 +16,11 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: manifest
-            value: candidates/1m/preprocessed/plan.manifest.json
+            value: candidates/10m/preprocessed/plan.manifest.json
           - name: expect
-            value: '{"preprocessed":true,"sample":"1m"}'
+            value: '{"preprocessed":true,"sample":"10m"}'
           - name: source_globs
-            value: '["candidates/1m/raw/*.parquet"]'
+            value: '["candidates/10m/raw/*.parquet"]'
           - name: result_file
             value: /tmp/manifest_matches.txt
       - name: plan-preprocess
@@ -32,13 +32,13 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: input_prefix
-            value: candidates/1m/raw
+            value: candidates/10m/raw
           - name: source_glob
             value: '*.parquet'
           - name: output_file
             value: /tmp/manifest.json
           - name: persist_file
-            value: candidates/1m/preprocessed/plan.manifest.json
+            value: candidates/10m/preprocessed/plan.manifest.json
       - name: preprocess-shards-fanout
         depends: plan-preprocess
         template: preprocess-shards-fanout-dag
@@ -56,11 +56,11 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: source
-            value: candidates/1m/preprocessed/plan.manifest.json
+            value: candidates/10m/preprocessed/plan.manifest.json
           - name: output
-            value: candidates/1m/preprocessed/plan.manifest.json
+            value: candidates/10m/preprocessed/plan.manifest.json
           - name: fields
-            value: '{"preprocessed":true,"sample":"1m"}'
+            value: '{"preprocessed":true,"sample":"10m"}'
   - name: verify-manifest-preprocess-candidates
     volumes:
     - name: lynceus
@@ -80,7 +80,7 @@ spec:
           path: /tmp/manifest_matches.txt
     retryStrategy:
       limit: 3
-      retryPolicy: OnFailure
+      retryPolicy: Always
     script:
       image: registry.nebula.lan:5000/lynceus/candidates:0.1.0
       imagePullPolicy: Always
@@ -140,7 +140,7 @@ spec:
           path: /tmp/manifest.json
     retryStrategy:
       limit: 3
-      retryPolicy: OnFailure
+      retryPolicy: Always
     script:
       image: registry.nebula.lan:5000/lynceus/candidates:0.1.0
       imagePullPolicy: Always
@@ -188,7 +188,7 @@ spec:
       - name: fields
     retryStrategy:
       limit: 3
-      retryPolicy: OnFailure
+      retryPolicy: Always
     script:
       image: registry.nebula.lan:5000/lynceus/candidates:0.1.0
       imagePullPolicy: Always
@@ -245,7 +245,7 @@ spec:
         default: '25'
     retryStrategy:
       limit: 3
-      retryPolicy: OnFailure
+      retryPolicy: Always
     script:
       image: registry.nebula.lan:5000/lynceus/candidates:0.1.0
       imagePullPolicy: Always
@@ -300,11 +300,11 @@ spec:
           - name: source
             value: '{{inputs.parameters.source}}'
           - name: input_prefix
-            value: candidates/1m/raw
+            value: candidates/10m/raw
           - name: output_prefix
-            value: candidates/1m/preprocessed/shards
+            value: candidates/10m/preprocessed/shards
           - name: manifest_prefix
-            value: candidates/1m/preprocessed/manifests
+            value: candidates/10m/preprocessed/manifests
     inputs:
       parameters:
       - name: source

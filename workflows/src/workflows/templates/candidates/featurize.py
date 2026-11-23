@@ -6,6 +6,7 @@ def featurize_candidate_shard_template(
     source: str,
     input_prefix: str,
     output_prefix: str,
+    manifest_prefix: str,
     features: list[str],
     num_workers: str = "auto",
 ):
@@ -20,6 +21,8 @@ def featurize_candidate_shard_template(
         os.path.join(base_path, input_prefix, source),
         "--output",
         os.path.join(base_path, output_prefix, source),
+        "--manifest-dir",
+        os.path.join(base_path, manifest_prefix),
         "--num-workers",
         str(num_workers),
     ]

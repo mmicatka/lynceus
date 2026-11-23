@@ -3,6 +3,7 @@
 
 import datetime
 import time
+from collections.abc import Sequence
 from pathlib import Path
 
 import click
@@ -16,15 +17,17 @@ from lynceus_core.logging import get_lynceus_logger, wide_log
 from lynceus_core.manifest.common import Manifest
 from sklearn.model_selection import train_test_split
 
-from surrogate_model.common.cli import (
-    features_option,
-)
+from surrogate_model.common.cli import features_option
 from surrogate_model.common.data import (
     compute_labels,
     flatten_features,
     load_and_clean_data,
 )
-from surrogate_model.common.metrics import evaluation_metrics, predict_active
+from surrogate_model.common.metrics import (
+    DEFAULT_EVAL_PERCENTS,
+    evaluation_metrics,
+    predict_active,
+)
 from surrogate_model.common.threshold import get_validation_threshold
 
 RANDOM_SEED = 1000
@@ -54,21 +57,26 @@ def _already_trained(manifest: Manifest, model_path: str) -> bool:
     return Path(model_path).is_file() and manifest.exists_superset()
 
 
-def _expected_state(features: list[str], threshold: float) -> dict:
+def _expected_state(
+    features: list[str],
+    threshold: float,
+    eval_percents: Sequence[float],
+) -> dict:
     return {
         "features": list(features),
         "threshold": threshold,
         "seed": RANDOM_SEED,
+        "eval_percents": list(eval_percents),
     }
 
 
 def _prepare_dataset(
-    features_paths: list[str],
+    feature_paths: list[str],
     labels_paths: list[str],
     features: list[str],
     threshold: float,
 ) -> tuple[np.ndarray, np.ndarray]:
-    raw_features = pl.read_parquet(features_paths)
+    raw_features = pl.read_parquet(feature_paths)
     raw_labels = pl.read_parquet(labels_paths)
 
     df_cleaned = load_and_clean_data(raw_features, raw_labels)
@@ -81,9 +89,15 @@ def _prepare_dataset(
     return x, y_label
 
 
-def _evaluate_and_log(model, x, y_true, dataset_name: str) -> pl.DataFrame:
+def _evaluate_and_log(
+    model,
+    x,
+    y_true,
+    dataset_name: str,
+    eval_percents: Sequence[float],
+) -> pl.DataFrame:
     y_predict = predict_active(model=model, x=x)
-    metrics = evaluation_metrics(y_true, y_predict)
+    metrics = evaluation_metrics(y_true, y_predict, percents=eval_percents)
     logger.info(
         "Evaluation metrics generated", dataset_name=dataset_name, metrics=metrics
     )
@@ -101,6 +115,7 @@ def _train_and_evaluate(
     validation_labels_path: str,
     features: list[str],
     threshold: float,
+    eval_percents: Sequence[float] = DEFAULT_EVAL_PERCENTS,
 ) -> tuple[lgb.LGBMClassifier, dict]:
     x_initial, y_initial_label = _prepare_dataset(
         train_features_paths,
@@ -136,7 +151,11 @@ def _train_and_evaluate(
     )
 
     _evaluate_and_log(
-        model, x_initial_test, y_initial_test, dataset_name="Initial Split"
+        model,
+        x_initial_test,
+        y_initial_test,
+        dataset_name="Initial Split",
+        eval_percents=eval_percents,
     )
 
     x_validation, y_validation_label = _prepare_dataset(
@@ -147,7 +166,11 @@ def _train_and_evaluate(
     )
 
     validation_metrics = _evaluate_and_log(
-        model, x_validation, y_validation_label, dataset_name="Validation"
+        model,
+        x_validation,
+        y_validation_label,
+        dataset_name="Validation",
+        eval_percents=eval_percents,
     )
 
     results = {
@@ -186,7 +209,7 @@ def _save_via_staged_output(model, model_path: Path, scratch_dir: str | None) ->
     type=str,
     required=True,
     callback=split_paths,
-    help=f"{PATH_SEPARATOR}-separated paths to the input features files.",
+    help=f"{PATH_SEPARATOR}-separated paths to the input featurized files.",
 )
 @click.option(
     "--train-labels",
@@ -201,7 +224,7 @@ def _save_via_staged_output(model, model_path: Path, scratch_dir: str | None) ->
     "validation_features_path",
     type=str,
     required=True,
-    help="Path to the input features file.",
+    help="Path to the input featurized file.",
 )
 @click.option(
     "--validation-labels",
@@ -219,6 +242,15 @@ def _save_via_staged_output(model, model_path: Path, scratch_dir: str | None) ->
 )
 @features_option
 @click.option(
+    "--eval-percents",
+    "eval_percents",
+    type=click.FloatRange(min=0.0, min_open=True, max=1.0),
+    multiple=True,
+    default=DEFAULT_EVAL_PERCENTS,
+    show_default=True,
+    help="Fractions (in (0, 1]) of top predictions to evaluate metrics at.",
+)
+@click.option(
     "--scratch-dir",
     type=str,
     default=None,
@@ -234,6 +266,7 @@ def train_model(
     validation_labels_path: str,
     features: list[str],
     model_path: str,
+    eval_percents: list[float],
     scratch_dir: str | None,
 ) -> None:
     click.echo(
@@ -253,7 +286,7 @@ def train_model(
         ],
         model_path,
         source_root,
-        _expected_state(features, threshold),
+        _expected_state(features, threshold, eval_percents),
     )
 
     try:
@@ -280,6 +313,7 @@ def train_model(
         validation_labels_path,
         features,
         threshold,
+        eval_percents=eval_percents,
     )
 
     _save_via_staged_output(model, Path(model_path), scratch_dir)

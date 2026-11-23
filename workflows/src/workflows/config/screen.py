@@ -26,8 +26,6 @@ from workflows.config.common import (
     load_config,
 )
 
-WEIGHT_SUM_TOLERANCE = 1e-6
-
 Label = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 
 PdbId = Annotated[
@@ -36,6 +34,10 @@ PdbId = Annotated[
 ]
 
 Percent = Annotated[float, Field(gt=0, le=100)]
+TopFraction = Annotated[float, Field(ge=0, lt=1)]
+
+DEFAULT_TOP_FRACTION = 0.5
+WEIGHT_SUM_TOLERANCE = 1e-6
 
 
 def _require_unique(values: tuple[str, ...], label: str) -> tuple[str, ...]:
@@ -53,6 +55,15 @@ class RoundConfig(StrictModel):
     def total(self) -> int:
         return self.top + self.random
 
+    @classmethod
+    def random_only(cls, size: PositiveInt) -> Self:
+        return cls(top=0, random=size)
+
+    @classmethod
+    def split(cls, size: PositiveInt, top_fraction: TopFraction) -> Self:
+        top = int(size * top_fraction)
+        return cls(top=top, random=size - top)
+
 
 class HyperparametersConfig(StrictModel):
     num_leaves: PositiveInt = 31
@@ -63,18 +74,20 @@ class HyperparametersConfig(StrictModel):
 class SurrogateConfig(StrictModel):
     feature_types: FeatureTypes
     validation: PositiveInt
-    rounds: tuple[RoundConfig, ...] = Field(min_length=1)
+    samples_per_round: PositiveInt
+    num_rounds: PositiveInt
+    top_fraction: TopFraction = DEFAULT_TOP_FRACTION
     random_seed: int
     active_percentile: Percent
     hyperparameters: HyperparametersConfig = Field(
         default_factory=HyperparametersConfig
     )
 
-    @model_validator(mode="after")
-    def _first_round_is_random_only(self) -> Self:
-        if self.rounds[0].top != 0:
-            raise ValueError("rounds[0].top must be 0: no model exists before round 0")
-        return self
+    @property
+    def rounds(self) -> tuple[RoundConfig, ...]:
+        first = RoundConfig.random_only(self.samples_per_round)
+        rest = RoundConfig.split(self.samples_per_round, self.top_fraction)
+        return (first, *(rest for _ in range(self.num_rounds - 1)))
 
     @property
     def total_samples(self) -> int:

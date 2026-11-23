@@ -6,7 +6,7 @@ from .candidates import (
     featurize_candidate_shard_template,
     plan_shard_candidates_template,
     preprocess_candidate_shard_template,
-    sample_candidates_template,
+    sample_candidate_shard_template,
     shard_candidates_template,
 )
 from .common import (
@@ -20,7 +20,6 @@ from .common import (
 from .docking import run_docking_template
 from .surrogate import (
     plan_surrogate_sample_template,
-    surrogate_sample_by_prediction_template,
     surrogate_sample_template,
     surrogate_train_template,
 )
@@ -41,7 +40,7 @@ __all__ = [
     "featurize_candidate_shard_template",
     "plan_shard_candidates_template",
     "shard_candidates_template",
-    "sample_candidates_template",
+    "sample_candidate_shard_template",
     # docking
     "run_docking_template",
     # target
@@ -49,6 +48,5 @@ __all__ = [
     # surrogate
     "plan_surrogate_sample_template",
     "surrogate_sample_template",
-    "surrogate_sample_by_prediction_template",
     "surrogate_train_template",
 ]

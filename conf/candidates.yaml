@@ -17,8 +17,8 @@ candidate_pool:
     num_shards: 512
 
 samples:
-  1m:
-    num_samples: 1000000
+  100m:
+    num_samples: 100000000
     storage:
       raw: raw
       preprocessed: preprocessed
@@ -34,10 +34,27 @@ samples:
       - topological_torsion
       - usrcat
       - whim
-  100k:
-    num_samples: 100000
+  10m:
+    num_samples: 10000000
     storage:
-      raw: shards
+      raw: raw
+      preprocessed: preprocessed
+      featurized: featurized
+    feature_types:
+      - atom_pair
+      - autocorr
+      - descriptors
+      - ecfp
+      - functional_groups
+      - morse
+      - rdf
+      - topological_torsion
+      - usrcat
+      - whim
+  1m:
+    num_samples: 1000000
+    storage:
+      raw: raw
       preprocessed: preprocessed
       featurized: featurized
     feature_types:

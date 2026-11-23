@@ -1,0 +1,34 @@
+---
+name: hsp90-n-terminal
+
+candidates: 10m
+
+targets:
+  ensembles:
+    - id: "HSP90_N_Terminal"
+      members:
+        - pdb_id: 1UYM
+          weight: 0.5
+        - pdb_id: 1YET
+          weight: 0.5
+  min_pocket_score: 15.0
+
+filter:
+  surrogate:
+    active_percentile: 1.0
+    feature_types:
+      - atom_pair
+      - autocorr
+      - descriptors
+      - ecfp
+      - functional_groups
+      - morse
+      - rdf
+      - topological_torsion
+      - usrcat
+      - whim
+    random_seed: 1000
+    validation: 50000
+    samples_per_round: 10000
+    num_rounds: 4
+    top_fraction: 0.5

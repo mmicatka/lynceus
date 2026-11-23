@@ -1,7 +1,7 @@
 # workflows/src/workflows/registry/surrogate/sample_site.py
 
 
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 
 from hera.workflows import DAG, Parameter, Step, Task
 from hera.workflows.models import ValueFrom
@@ -16,9 +16,13 @@ from workflows.registry.common.manifest_gate import (
     MATCHES_PATH,
 )
 from workflows.registry.surrogate.common import (
-    PredictionSampleSpec,
-    RandomSampleSpec,
+    SampleSpec,
     SampleTemplates,
+    TaskFactory,
+)
+from workflows.registry.surrogate.dags.sample import (
+    SAMPLE_PARAMETERS,
+    build_sample_dag,
 )
 from workflows.registry.surrogate.layout import (
     SITE_PARAMETERS,
@@ -26,15 +30,9 @@ from workflows.registry.surrogate.layout import (
     SiteLayout,
     ref,
 )
-from workflows.registry.surrogate.sample import (
-    SAMPLE_PARAMETERS,
-    SampleSpec,
-    build_sample_dag,
-)
 from workflows.templates import (
     merge_shards_template,
     run_docking_template,
-    surrogate_sample_by_prediction_template,
     surrogate_sample_template,
     surrogate_train_template,
     verify_manifest_template,
@@ -47,8 +45,6 @@ SURROGATE_SITE_DAG = "surrogate-site-dag"
 
 STAGING_GLOB = "*.parquet"
 INPUT_PATH_KEY = "input_path"
-
-TaskFactory = Callable[..., Task]
 
 
 def _build_verify_manifest(templates: TemplateFactory) -> TaskFactory:
@@ -78,10 +74,10 @@ def _round_label(index: int) -> str:
 
 
 def _validation_spec(surrogate: SurrogateConfig) -> SampleSpec:
-    return RandomSampleSpec(
+    return SampleSpec(
         label=VALIDATION_LABEL,
         seed=surrogate.random_seed,
-        num_samples=surrogate.validation,
+        num_random=surrogate.validation,
     )
 
 
@@ -106,26 +102,32 @@ def _prior_round_labels(index: int) -> list[str]:
     return [_round_label(prior) for prior in range(index)]
 
 
+def _round_model_path(
+    index: int, round_config: RoundConfig, layout: SiteLayout
+) -> str | None:
+    if round_config.top == 0:
+        return None
+    if index == 0:
+        raise ValueError("Round 0 has no prior model, its top must be 0")
+    return layout.model_path(_round_label(index - 1))
+
+
 def _round_spec(
     index: int,
     round_config: RoundConfig,
     surrogate: SurrogateConfig,
     layout: SiteLayout,
 ) -> SampleSpec:
-    seed = surrogate.random_seed + 1 + index
-    if index == 0:
-        return RandomSampleSpec(
-            label=_round_label(index),
-            seed=seed,
-            num_samples=round_config.random,
-        )
-    return PredictionSampleSpec(
+    exclusions = layout.features_path_list(
+        [VALIDATION_LABEL, *_prior_round_labels(index)]
+    )
+    return SampleSpec(
         label=_round_label(index),
-        seed=seed,
-        model_path=layout.model_path(_round_label(index - 1)),
-        num_top=round_config.top,
+        seed=surrogate.random_seed + 1 + index,
         num_random=round_config.random,
-        exclude_inputs=layout.features_path_list(_prior_round_labels(index)),
+        num_top=round_config.top,
+        model_path=_round_model_path(index, round_config, layout),
+        exclude_inputs=tuple(exclusions),
     )
 
 
@@ -176,6 +178,30 @@ def _train(
     )
 
 
+def _build_sample_templates(templates: TemplateFactory) -> SampleTemplates:
+    return SampleTemplates(
+        sample=templates.build(
+            TemplateName.SURROGATE_SAMPLE_BY_PREDICTION,
+            surrogate_sample_template,
+        ),
+        merge_shards=templates.build(TemplateName.MERGE_SHARDS, merge_shards_template),
+        plan=templates.build(
+            TemplateName.PLAN_SURROGATE_SAMPLE,
+            plan_surrogate_sample_template,
+            outputs=[
+                Parameter(
+                    name=MANIFEST_OUTPUT,
+                    value_from=ValueFrom(path=MANIFEST_PATH),
+                )
+            ],
+        ),
+        verify_manifest=_build_verify_manifest(templates),
+        update_manifest=templates.build(
+            TemplateName.UPDATE_MANIFEST_SURROGATE, update_manifest_template
+        ),
+    )
+
+
 def build_surrogate_site_dag(
     templates: TemplateFactory,
     configs: WorkflowConfigs,
@@ -196,32 +222,7 @@ def build_surrogate_site_dag(
     surrogate_train = templates.build(
         TemplateName.SURROGATE_TRAIN, surrogate_train_template
     )
-    sample_templates = SampleTemplates(
-        sample={
-            RandomSampleSpec: templates.build(
-                TemplateName.SURROGATE_SAMPLE, surrogate_sample_template
-            ),
-            PredictionSampleSpec: templates.build(
-                TemplateName.SURROGATE_SAMPLE_BY_PREDICTION,
-                surrogate_sample_by_prediction_template,
-            ),
-        },
-        merge_shards=templates.build(TemplateName.MERGE_SHARDS, merge_shards_template),
-        plan=templates.build(
-            TemplateName.PLAN_SURROGATE_SAMPLE,
-            plan_surrogate_sample_template,
-            outputs=[
-                Parameter(
-                    name=MANIFEST_OUTPUT,
-                    value_from=ValueFrom(path=MANIFEST_PATH),
-                )
-            ],
-        ),
-        verify_manifest=_build_verify_manifest(templates),
-        update_manifest=templates.build(
-            TemplateName.UPDATE_MANIFEST_SURROGATE, update_manifest_template
-        ),
-    )
+    sample_templates = _build_sample_templates(templates)
 
     sample_dags = {
         spec.label: build_sample_dag(sample_templates, configs, layout, spec)
