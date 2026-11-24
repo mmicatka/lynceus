@@ -8,6 +8,7 @@ from workflows.config.candidates import CandidatesConfig
 from workflows.config.screen import ScreenConfig
 
 SCREENS_DIR = PurePosixPath("screens")
+VALIDATION_DIR = PurePosixPath("validation")
 TARGETS_DIR = "targets"
 TARGET_PDBS_DIR = "pdbs"
 TARGET_ENSEMBLES_DIR = "ensembles"
@@ -104,6 +105,10 @@ class WorkflowPaths:
     @property
     def surrogate(self) -> str:
         return str(self.screen_root / FILTER_DIR / SURROGATE_DIR)
+
+    @property
+    def validation(self) -> str:
+        return str(VALIDATION_DIR / self.screen.candidates)
 
     def state_path(self, filename: str) -> str:
         return self.volume_path(f"{self.manifests}/{filename}")

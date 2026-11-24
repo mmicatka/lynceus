@@ -6,6 +6,8 @@ from typing import Callable, Sequence
 
 from lynceus_core.manifest.common import MANIFEST_SUFFIX
 
+from workflows.config.screen import ValidationConfig
+
 FEATURES_FILENAME = "features.parquet"
 DOCKING_RESULTS_FILENAME = "docking.results.parquet"
 STAGING_DIRNAME = "staging"
@@ -26,6 +28,8 @@ class SiteLayout:
     surrogate_prefix: str
     target_prefix: str
     screen_name: str
+    validation_prefix: str
+    validation: ValidationConfig
 
     def _absolute(self, relative: str) -> str:
         return os.path.join(self.base_path, relative)
@@ -44,7 +48,16 @@ class SiteLayout:
     def site_prefix(self) -> str:
         return f"{self.surrogate_root}/{ref('ensemble')}/{ref('site_id')}"
 
+    @property
+    def validation_site_prefix(self) -> str:
+        return (
+            f"{self.validation_prefix}/{ref('ensemble')}/{ref('site_id')}"
+            f"/{self.validation.dirname}"
+        )
+
     def label_prefix(self, label: str) -> str:
+        if label == VALIDATION_LABEL:
+            return self.validation_site_prefix
         return f"{self.site_prefix}/{label}"
 
     def label_dir(self, label: str) -> str:

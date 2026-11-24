@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Workflow
 metadata:
-  generateName: ptprb-10m-targets-
+  generateName: ptprb-10m-100k-valid-5-rounds-5k-targets-
 spec:
   entrypoint: main-dag
   serviceAccountName: argo-workflow
@@ -110,7 +110,7 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: output_prefix
-            value: screens/ptprb-10m/targets/pdbs/PTPRB_Single
+            value: screens/ptprb-10m-100k-valid-5-rounds-5k/targets/pdbs/PTPRB_Single
       - name: generate-manifest-ptprb-single
         depends: download-pdbs-ptprb-single
         template: generate-protein-ensemble-manifest
@@ -119,9 +119,9 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: input_path
-            value: screens/ptprb-10m/targets/pdbs/PTPRB_Single
+            value: screens/ptprb-10m-100k-valid-5-rounds-5k/targets/pdbs/PTPRB_Single
           - name: output_path
-            value: screens/ptprb-10m/targets/ensembles/PTPRB_Single
+            value: screens/ptprb-10m-100k-valid-5-rounds-5k/targets/ensembles/PTPRB_Single
           - name: ensemble_id
             value: PTPRB_Single
           - name: structure_glob
@@ -178,7 +178,7 @@ spec:
         arguments:
           parameters:
           - name: ensemble_path
-            value: /mnt/lynceus/screens/ptprb-10m/targets/ensembles/PTPRB_Single
+            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/targets/ensembles/PTPRB_Single
           - name: min_pocket_score
             value: '10.0'
   - name: main-dag
