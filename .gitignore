@@ -16,3 +16,5 @@ ipython_config.py
 .env
 
 scratch/
+
+*.egg-info
