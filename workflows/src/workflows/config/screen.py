@@ -47,6 +47,15 @@ def _require_unique(values: tuple[str, ...], label: str) -> tuple[str, ...]:
     return values
 
 
+class ValidationConfig(StrictModel):
+    size: PositiveInt
+    seed: int
+
+    @property
+    def dirname(self) -> str:
+        return f"n{self.size}_seed{self.seed}"
+
+
 class RoundConfig(StrictModel):
     top: int = Field(ge=0)
     random: PositiveInt
@@ -73,7 +82,7 @@ class HyperparametersConfig(StrictModel):
 
 class SurrogateConfig(StrictModel):
     feature_types: FeatureTypes
-    validation: PositiveInt
+    validation: ValidationConfig
     samples_per_round: PositiveInt
     num_rounds: PositiveInt
     top_fraction: TopFraction = DEFAULT_TOP_FRACTION
@@ -91,7 +100,7 @@ class SurrogateConfig(StrictModel):
 
     @property
     def total_samples(self) -> int:
-        return self.validation + sum(round_.total for round_ in self.rounds)
+        return self.validation.size + sum(round_.total for round_ in self.rounds)
 
 
 class FilterConfig(StrictModel):

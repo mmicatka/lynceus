@@ -1,17 +1,21 @@
 # workflows/src/workflows/registry/surrogate/__init__.py
 
+
 import os
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from typing import Callable, Sequence
 
 from lynceus_core.manifest.common import MANIFEST_SUFFIX
+
+from workflows.config.paths import WorkflowPaths
 
 FEATURES_FILENAME = "features.parquet"
 DOCKING_RESULTS_FILENAME = "docking.results.parquet"
 STAGING_DIRNAME = "staging"
+ROUNDS_DIRNAME = "rounds"
+MODELS_DIRNAME = "models"
 VALIDATION_LABEL = "validation"
 SITE_PARAMETERS = ("ensemble", "site_id", "member_id", "center")
-SURROGATE_ENSEMBLES_DIRNAME = "ensembles"
 MODEL_FILENAME = "model.joblib"
 PATH_SEPARATOR = ","
 
@@ -22,30 +26,31 @@ def ref(name: str) -> str:
 
 @dataclass(frozen=True)
 class SiteLayout:
-    base_path: str
-    surrogate_prefix: str
-    target_prefix: str
-    screen_name: str
+    paths: WorkflowPaths
+
+    @property
+    def base_path(self) -> str:
+        return self.paths.mount_path
 
     def _absolute(self, relative: str) -> str:
         return os.path.join(self.base_path, relative)
 
     @property
     def ensemble_path(self) -> str:
-        return self._absolute(os.path.join(self.target_prefix, ref("ensemble")))
-
-    @property
-    def surrogate_root(self) -> str:
-        return (
-            f"{self.surrogate_prefix}/{self.screen_name}/{SURROGATE_ENSEMBLES_DIRNAME}"
-        )
+        return self._absolute(self.paths.target_structures(ref("ensemble")))
 
     @property
     def site_prefix(self) -> str:
-        return f"{self.surrogate_root}/{ref('ensemble')}/{ref('site_id')}"
+        return str(self.paths.surrogate_screen(ref("ensemble"), ref("site_id")))
+
+    @property
+    def validation_site_prefix(self) -> str:
+        return str(self.paths.validation_slice(ref("ensemble"), ref("site_id")))
 
     def label_prefix(self, label: str) -> str:
-        return f"{self.site_prefix}/{label}"
+        if label == VALIDATION_LABEL:
+            return self.validation_site_prefix
+        return f"{self.site_prefix}/{ROUNDS_DIRNAME}/{label}"
 
     def label_dir(self, label: str) -> str:
         return self._absolute(self.label_prefix(label))
@@ -75,7 +80,9 @@ class SiteLayout:
         return self.docking_results_path(label)
 
     def model_file(self, label: str) -> str:
-        return f"{self.label_prefix(label)}/{MODEL_FILENAME}"
+        if label == VALIDATION_LABEL:
+            raise ValueError("Validation split does not produce a model")
+        return f"{self.site_prefix}/{MODELS_DIRNAME}/{label}.{MODEL_FILENAME}"
 
     def model_path(self, label: str) -> str:
         return self._absolute(self.model_file(label))

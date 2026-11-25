@@ -1,0 +1,116 @@
+{
+    "features": [
+        "atom_pair",
+        "autocorr",
+        "descriptors",
+        "ecfp",
+        "functional_groups",
+        "morse",
+        "rdf",
+        "topological_torsion",
+        "usrcat",
+        "whim"
+    ],
+    "threshold": -7.992,
+    "seed": 1000,
+    "eval_percents": [
+        0.01,
+        0.05,
+        0.1,
+        0.25
+    ],
+    "source_files": [
+        {
+            "path": "screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/PTPRB_Single/2AHS:p2rank:1/round_0/docking.results.parquet",
+            "fingerprint": {
+                "size": 231151
+            }
+        },
+        {
+            "path": "screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/PTPRB_Single/2AHS:p2rank:1/round_0/features.parquet",
+            "fingerprint": {
+                "size": 74989880
+            }
+        },
+        {
+            "path": "screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/PTPRB_Single/2AHS:p2rank:1/round_1/docking.results.parquet",
+            "fingerprint": {
+                "size": 234347
+            }
+        },
+        {
+            "path": "screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/PTPRB_Single/2AHS:p2rank:1/round_1/features.parquet",
+            "fingerprint": {
+                "size": 74480938
+            }
+        },
+        {
+            "path": "screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/PTPRB_Single/2AHS:p2rank:1/round_2/docking.results.parquet",
+            "fingerprint": {
+                "size": 235238
+            }
+        },
+        {
+            "path": "screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/PTPRB_Single/2AHS:p2rank:1/round_2/features.parquet",
+            "fingerprint": {
+                "size": 74676539
+            }
+        },
+        {
+            "path": "screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/PTPRB_Single/2AHS:p2rank:1/round_3/docking.results.parquet",
+            "fingerprint": {
+                "size": 234607
+            }
+        },
+        {
+            "path": "screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/PTPRB_Single/2AHS:p2rank:1/round_3/features.parquet",
+            "fingerprint": {
+                "size": 74743797
+            }
+        },
+        {
+            "path": "screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/PTPRB_Single/2AHS:p2rank:1/validation/docking.results.parquet",
+            "fingerprint": {
+                "size": 1120730
+            }
+        },
+        {
+            "path": "screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/PTPRB_Single/2AHS:p2rank:1/validation/features.parquet",
+            "fingerprint": {
+                "size": 365992623
+            }
+        }
+    ],
+    "run_time": "0:01:46.216051",
+    "num_train_samples": 62002,
+    "metrics": [
+        {
+            "Top %": 1.0,
+            "Precision": 0.31157894736842107,
+            "Recall": 0.310598111227702,
+            "Num active caught": 296,
+            "Num active": 953
+        },
+        {
+            "Top %": 5.0,
+            "Precision": 0.13507258573532505,
+            "Recall": 0.6736621196222455,
+            "Num active caught": 642,
+            "Num active": 953
+        },
+        {
+            "Top %": 10.0,
+            "Precision": 0.08362259387819501,
+            "Recall": 0.8342077649527807,
+            "Num active caught": 795,
+            "Num active": 953
+        },
+        {
+            "Top %": 25.0,
+            "Precision": 0.03786444528587656,
+            "Recall": 0.944386149003148,
+            "Num active caught": 900,
+            "Num active": 953
+        }
+    ]
+}

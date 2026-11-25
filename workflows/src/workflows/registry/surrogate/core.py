@@ -31,7 +31,7 @@ def build_surrogate_workflow(configs: WorkflowConfigs) -> Workflow:
                 name="resolve-sites",
                 arguments={
                     "base_path": paths.mount_path,
-                    "ensembles_prefix": paths.target_ensembles,
+                    "ensembles_prefix": paths.ensembles,
                     "ensemble_ids": [e.id for e in configs.screen.targets.ensembles],
                 },
             )

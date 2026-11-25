@@ -1,0 +1,104 @@
+{
+    "features": [
+        "atom_pair",
+        "autocorr",
+        "descriptors",
+        "ecfp",
+        "functional_groups",
+        "morse",
+        "rdf",
+        "topological_torsion",
+        "usrcat",
+        "whim"
+    ],
+    "threshold": -7.992,
+    "seed": 1000,
+    "eval_percents": [
+        0.01,
+        0.05,
+        0.1,
+        0.25
+    ],
+    "source_files": [
+        {
+            "path": "screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/PTPRB_Single/2AHS:p2rank:1/round_0/docking.results.parquet",
+            "fingerprint": {
+                "size": 231151
+            }
+        },
+        {
+            "path": "screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/PTPRB_Single/2AHS:p2rank:1/round_0/features.parquet",
+            "fingerprint": {
+                "size": 74989880
+            }
+        },
+        {
+            "path": "screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/PTPRB_Single/2AHS:p2rank:1/round_1/docking.results.parquet",
+            "fingerprint": {
+                "size": 234347
+            }
+        },
+        {
+            "path": "screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/PTPRB_Single/2AHS:p2rank:1/round_1/features.parquet",
+            "fingerprint": {
+                "size": 74480938
+            }
+        },
+        {
+            "path": "screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/PTPRB_Single/2AHS:p2rank:1/round_2/docking.results.parquet",
+            "fingerprint": {
+                "size": 235238
+            }
+        },
+        {
+            "path": "screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/PTPRB_Single/2AHS:p2rank:1/round_2/features.parquet",
+            "fingerprint": {
+                "size": 74676539
+            }
+        },
+        {
+            "path": "screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/PTPRB_Single/2AHS:p2rank:1/validation/docking.results.parquet",
+            "fingerprint": {
+                "size": 1120730
+            }
+        },
+        {
+            "path": "screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/PTPRB_Single/2AHS:p2rank:1/validation/features.parquet",
+            "fingerprint": {
+                "size": 365992623
+            }
+        }
+    ],
+    "run_time": "0:01:32.253766",
+    "num_train_samples": 46472,
+    "metrics": [
+        {
+            "Top %": 1.0,
+            "Precision": 0.3063157894736842,
+            "Recall": 0.30535152151101785,
+            "Num active caught": 291,
+            "Num active": 953
+        },
+        {
+            "Top %": 5.0,
+            "Precision": 0.13507258573532505,
+            "Recall": 0.6736621196222455,
+            "Num active caught": 642,
+            "Num active": 953
+        },
+        {
+            "Top %": 10.0,
+            "Precision": 0.08425370779425687,
+            "Recall": 0.8405036726128017,
+            "Num active caught": 801,
+            "Num active": 953
+        },
+        {
+            "Top %": 25.0,
+            "Precision": 0.03811687492111574,
+            "Recall": 0.950682056663169,
+            "Num active caught": 906,
+            "Num active": 953
+        }
+    ]
+}

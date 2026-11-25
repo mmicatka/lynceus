@@ -1,0 +1,92 @@
+{
+    "features": [
+        "atom_pair",
+        "autocorr",
+        "descriptors",
+        "ecfp",
+        "functional_groups",
+        "morse",
+        "rdf",
+        "topological_torsion",
+        "usrcat",
+        "whim"
+    ],
+    "threshold": -7.992,
+    "seed": 1000,
+    "eval_percents": [
+        0.01,
+        0.05,
+        0.1,
+        0.25
+    ],
+    "source_files": [
+        {
+            "path": "screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/PTPRB_Single/2AHS:p2rank:1/round_0/docking.results.parquet",
+            "fingerprint": {
+                "size": 231151
+            }
+        },
+        {
+            "path": "screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/PTPRB_Single/2AHS:p2rank:1/round_0/features.parquet",
+            "fingerprint": {
+                "size": 74989880
+            }
+        },
+        {
+            "path": "screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/PTPRB_Single/2AHS:p2rank:1/round_1/docking.results.parquet",
+            "fingerprint": {
+                "size": 234347
+            }
+        },
+        {
+            "path": "screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/PTPRB_Single/2AHS:p2rank:1/round_1/features.parquet",
+            "fingerprint": {
+                "size": 74480938
+            }
+        },
+        {
+            "path": "screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/PTPRB_Single/2AHS:p2rank:1/validation/docking.results.parquet",
+            "fingerprint": {
+                "size": 1120730
+            }
+        },
+        {
+            "path": "screens/ptprb-10m/filter/surrogate/ptprb-10m/ensembles/PTPRB_Single/2AHS:p2rank:1/validation/features.parquet",
+            "fingerprint": {
+                "size": 365992623
+            }
+        }
+    ],
+    "run_time": "0:01:22.664492",
+    "num_train_samples": 30939,
+    "metrics": [
+        {
+            "Top %": 1.0,
+            "Precision": 0.3136842105263158,
+            "Recall": 0.3126967471143757,
+            "Num active caught": 298,
+            "Num active": 953
+        },
+        {
+            "Top %": 5.0,
+            "Precision": 0.1327582579423522,
+            "Recall": 0.6621196222455404,
+            "Num active caught": 631,
+            "Num active": 953
+        },
+        {
+            "Top %": 10.0,
+            "Precision": 0.08435889344693384,
+            "Recall": 0.8415529905561385,
+            "Num active caught": 802,
+            "Num active": 953
+        },
+        {
+            "Top %": 25.0,
+            "Precision": 0.03891623543270647,
+            "Recall": 0.9706190975865687,
+            "Num active caught": 925,
+            "Num active": 953
+        }
+    ]
+}

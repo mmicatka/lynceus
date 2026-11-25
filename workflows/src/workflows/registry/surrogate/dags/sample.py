@@ -4,7 +4,7 @@
 import glob
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 from hera.workflows import DAG, Parameter, Task
 
@@ -31,7 +31,7 @@ SAMPLED_KEY = "sampled"
 MERGED_KEY = "merged"
 
 
-def _sample_paths(configs: WorkflowConfigs) -> SamplePaths:
+def resolve_sample_paths(configs: WorkflowConfigs) -> SamplePaths:
     return configs.paths.sample(configs.screen.candidates)
 
 
@@ -47,7 +47,7 @@ def _plan_path(layout: SiteLayout, spec: SampleSpec) -> str:
     return str(Path(layout.manifest_path(spec.label)).with_suffix(PLAN_SUFFIX))
 
 
-def _state_path(layout: SiteLayout, spec: SampleSpec) -> str:
+def state_path(layout: SiteLayout, spec: SampleSpec) -> str:
     return str(Path(layout.manifest_path(spec.label)).with_suffix(STATE_SUFFIX))
 
 
@@ -98,7 +98,7 @@ def _plan_task(
     )
 
 
-def _check_task(
+def check_task(
     templates: SampleTemplates,
     configs: WorkflowConfigs,
     sample_paths: SamplePaths,
@@ -106,13 +106,18 @@ def _check_task(
     spec: SampleSpec,
     name: str,
     completion_key: str,
+    extra: Mapping[str, Any] | None = None,
 ) -> Task:
-    expected = {**_manifest_fields(configs, spec), completion_key: True}
+    expected = {
+        **_manifest_fields(configs, spec),
+        **(extra or {}),
+        completion_key: True,
+    }
     return templates.verify_manifest(
         name=name,
         arguments={
             "base_path": layout.base_path,
-            "manifest": _state_path(layout, spec),
+            "manifest": state_path(layout, spec),
             "expect": json_arg(expected),
             "source_globs": _source_globs(sample_paths, layout, spec),
             "result_file": MATCHES_PATH,
@@ -120,7 +125,7 @@ def _check_task(
     )
 
 
-def _update_manifest_task(
+def update_manifest_task(
     templates: SampleTemplates,
     layout: SiteLayout,
     spec: SampleSpec,
@@ -135,7 +140,7 @@ def _update_manifest_task(
         arguments={
             "base_path": layout.base_path,
             "source": source,
-            "output": _state_path(layout, spec),
+            "output": state_path(layout, spec),
             "fields": json_arg(fields),
         },
     )
@@ -189,7 +194,7 @@ def build_sample_dag(
     layout: SiteLayout,
     spec: SampleSpec,
 ) -> DAG:
-    sample_paths = _sample_paths(configs)
+    sample_paths = resolve_sample_paths(configs)
     fields = _manifest_fields(configs, spec)
 
     with DAG(
@@ -197,10 +202,10 @@ def build_sample_dag(
         inputs=[Parameter(name=name) for name in SAMPLE_PARAMETERS],
     ) as dag:
         plan_task = _plan_task(templates, sample_paths, layout, spec)
-        check_sampled = _check_task(
+        check_sampled = check_task(
             templates, configs, sample_paths, layout, spec, "check-sampled", SAMPLED_KEY
         )
-        check_merged = _check_task(
+        check_merged = check_task(
             templates, configs, sample_paths, layout, spec, "check-merged", MERGED_KEY
         )
         sample_gate = when_unmatched(check_sampled)
@@ -209,7 +214,7 @@ def build_sample_dag(
         sample_task = _sample_shards_task(
             templates, configs, sample_paths, layout, spec, sample_gate
         )
-        write_task = _update_manifest_task(
+        write_task = update_manifest_task(
             templates,
             layout,
             spec,
@@ -219,12 +224,12 @@ def build_sample_dag(
             sample_gate,
         )
         merge_task = _merge_samples_task(templates, layout, spec, merge_gate)
-        mark_task = _update_manifest_task(
+        mark_task = update_manifest_task(
             templates,
             layout,
             spec,
             "mark-merged",
-            _state_path(layout, spec),
+            state_path(layout, spec),
             {MERGED_KEY: True},
             merge_gate,
         )
