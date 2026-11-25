@@ -1,12 +1,10 @@
 [project]
 site_name = "Lynceus Documentation"
 site_url = "https://mmicatka.github.io/lynceus/"
-# site_description = "Your project description"
+site_description = "A modular computational platform for discovering molecules that bind to specific protein conformational states."
 site_author = "Mike Micatka"
-
-# copyright = "Copyright &copy; 2026 Your name"
-
-repo_url = "https://github.com/mmicatka/repo"
+copyright = "Copyright &copy; 2026 Mike Micatka"
+repo_url = "https://github.com/mmicatka/lynceus"
 
 nav = [
   "index.md",
