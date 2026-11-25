@@ -7,12 +7,11 @@ from pathlib import PurePosixPath
 from workflows.config.candidates import CandidatesConfig
 from workflows.config.screen import ScreenConfig
 
-SCREENS_DIR = PurePosixPath("screens")
-VALIDATION_DIR = PurePosixPath("validation")
-TARGETS_DIR = "targets"
+ENSEMBLES_DIR = PurePosixPath("ensembles")
+VALIDATION_DIR = "validation"
 TARGET_PDBS_DIR = "pdbs"
-TARGET_ENSEMBLES_DIR = "ensembles"
-FILTER_DIR = "filter"
+TARGET_STRUCTURES_DIR = "structures"
+BINDING_SITES_DIR = "binding_sites"
 SURROGATE_DIR = "surrogate"
 
 PLAN_MANIFEST_FILENAME = "plan.manifest.json"
@@ -66,49 +65,57 @@ class WorkflowPaths:
     def volume_path(self, relative: str) -> str:
         return _join(self.mount_path, relative)
 
-    @property
-    def screen_root(self) -> PurePosixPath:
-        return SCREENS_DIR / self.screen.name
+    def ensemble_root(self, ensemble_id: str) -> PurePosixPath:
+        return ENSEMBLES_DIR / ensemble_id
 
-    @property
-    def targets_root(self) -> PurePosixPath:
-        return self.screen_root / TARGETS_DIR
+    def target_pdbs(self, ensemble_id: str) -> str:
+        return str(self.ensemble_root(ensemble_id) / TARGET_PDBS_DIR)
 
-    @property
-    def target_pdbs(self) -> str:
-        return str(self.targets_root / TARGET_PDBS_DIR)
+    def target_structures(self, ensemble_id: str) -> str:
+        return str(self.ensemble_root(ensemble_id) / TARGET_STRUCTURES_DIR)
 
-    @property
-    def target_ensembles(self) -> str:
-        return str(self.targets_root / TARGET_ENSEMBLES_DIR)
+    def binding_sites(self, ensemble_id: str) -> str:
+        return str(self.ensemble_root(ensemble_id) / BINDING_SITES_DIR)
 
     @property
     def smiles(self) -> str:
-        pool = self.candidates.candidate_pool
-        return str(pool.smiles_prefix(self.candidates.root))
+        return str(self.candidates.candidate_pool.smiles_prefix(self.candidates.root))
 
     @property
     def staging(self) -> str:
-        pool = self.candidates.candidate_pool
-        return str(pool.staging_prefix(self.candidates.root))
+        return str(self.candidates.candidate_pool.staging_prefix(self.candidates.root))
 
     @property
     def merged(self) -> str:
-        pool = self.candidates.candidate_pool
-        return str(pool.merged_prefix(self.candidates.root))
+        return str(self.candidates.candidate_pool.merged_prefix(self.candidates.root))
 
     @property
     def manifests(self) -> str:
-        pool = self.candidates.candidate_pool
-        return str(pool.manifests_prefix(self.candidates.root))
+        return str(
+            self.candidates.candidate_pool.manifests_prefix(self.candidates.root)
+        )
 
     @property
-    def surrogate(self) -> str:
-        return str(self.screen_root / FILTER_DIR / SURROGATE_DIR)
+    def ensembles(self) -> str:
+        return str(ENSEMBLES_DIR)
 
-    @property
-    def validation(self) -> str:
-        return str(VALIDATION_DIR / self.screen.candidates)
+    def surrogate(self, ensemble_id: str) -> str:
+        return str(self.ensemble_root(ensemble_id) / SURROGATE_DIR)
+
+    def surrogate_site(self, ensemble_id: str, site_id: str) -> PurePosixPath:
+        return (
+            self.ensemble_root(ensemble_id)
+            / SURROGATE_DIR
+            / f"site_{site_id}"
+            / self.screen.candidates
+        )
+
+    def validation_slice(self, ensemble_id: str, site_id: str) -> PurePosixPath:
+        val_dirname = self.screen.filter.surrogate.validation.dirname
+        return self.surrogate_site(ensemble_id, site_id) / VALIDATION_DIR / val_dirname
+
+    def surrogate_screen(self, ensemble_id: str, site_id: str) -> PurePosixPath:
+        return self.surrogate_site(ensemble_id, site_id) / self.screen.name
 
     def state_path(self, filename: str) -> str:
         return self.volume_path(f"{self.manifests}/{filename}")

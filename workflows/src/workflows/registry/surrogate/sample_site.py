@@ -3,7 +3,7 @@
 
 from collections.abc import Sequence
 
-from hera.workflows import DAG, Parameter, Step, Task
+from hera.workflows import DAG, Parameter, Task
 from hera.workflows.models import ValueFrom
 
 from workflows.config.core import WorkflowConfigs
@@ -25,6 +25,7 @@ from workflows.registry.surrogate.dags import (
     as_task,
     build_sample_dag,
 )
+from workflows.registry.surrogate.dags.common import docking_arguments
 from workflows.registry.surrogate.dags.validation import build_validation_dag
 from workflows.registry.surrogate.layout import (
     SITE_PARAMETERS,
@@ -45,9 +46,6 @@ from workflows.templates.surrogate.sample import plan_surrogate_sample_template
 
 SURROGATE_SITE_DAG = "surrogate-site-dag"
 
-STAGING_GLOB = "*.parquet"
-INPUT_PATH_KEY = "input_path"
-
 
 def _build_verify_manifest(templates: TemplateFactory) -> TaskFactory:
     return templates.build(
@@ -57,18 +55,6 @@ def _build_verify_manifest(templates: TemplateFactory) -> TaskFactory:
             Parameter(name=MATCHES_OUTPUT, value_from=ValueFrom(path=MATCHES_PATH))
         ],
     )
-
-
-def _docking_arguments(spec: SampleSpec, layout: SiteLayout) -> dict:
-    return {
-        "base_path": layout.base_path,
-        "ensemble": layout.ensemble_path,
-        "member_id": ref("member_id"),
-        "ligands_path": layout.docking_input_path(spec.label),
-        "center": ref("center"),
-        "site_id": ref("site_id"),
-        "output_path": layout.label_dir(spec.label),
-    }
 
 
 def _round_label(index: int) -> str:
@@ -141,12 +127,6 @@ def _round_specs(surrogate: SurrogateConfig, layout: SiteLayout) -> list[SampleS
     ]
 
 
-def _as_task(created: Step | Task | None, name: str) -> Task:
-    if not isinstance(created, Task):
-        raise RuntimeError(f"Expected {name} to create a Task, got {type(created)}")
-    return created
-
-
 def _sample_and_dock(
     spec: SampleSpec,
     layout: SiteLayout,
@@ -154,7 +134,7 @@ def _sample_and_dock(
     dock: TaskFactory,
 ) -> tuple[Task, Task]:
     sample_name = f"sample-{spec.task_suffix}"
-    sample_task = _as_task(
+    sample_task = as_task(
         sample_dag(
             name=sample_name,
             arguments={name: ref(name) for name in SAMPLE_PARAMETERS},
@@ -163,7 +143,7 @@ def _sample_and_dock(
     )
     dock_task = dock(
         name=f"dock-{spec.task_suffix}",
-        arguments=_docking_arguments(spec, layout),
+        arguments=docking_arguments(spec, layout),
     )
     sample_task >> dock_task  # type: ignore
     return sample_task, dock_task
@@ -209,16 +189,8 @@ def build_surrogate_site_dag(
     templates: TemplateFactory,
     configs: WorkflowConfigs,
 ) -> DAG:
-    paths = configs.paths
     surrogate = configs.screen.filter.surrogate
-    layout = SiteLayout(
-        base_path=paths.mount_path,
-        surrogate_prefix=paths.surrogate,
-        target_prefix=paths.target_ensembles,
-        screen_name=configs.screen.name,
-        validation_prefix=paths.validation,
-        validation=surrogate.validation,
-    )
+    layout = SiteLayout(paths=configs.paths)
     validation_spec = _validation_spec(surrogate)
     round_specs = _round_specs(surrogate, layout)
 

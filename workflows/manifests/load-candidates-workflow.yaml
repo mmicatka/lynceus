@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Workflow
 metadata:
-  generateName: ptprb-10m-100k-valid-5-rounds-5k-candidates-
+  generateName: ptprb-10m-10k-valid-5-rounds-5k-candidates-
 spec:
   entrypoint: main-dag
   serviceAccountName: argo-workflow

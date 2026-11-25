@@ -21,10 +21,6 @@ def _task_name(stage: str, ensemble_id: str) -> str:
     return f"{stage}-{_slug(ensemble_id)}"
 
 
-def _ensemble_prefix(ensembles_prefix: str, ensemble_id: str) -> str:
-    return f"{ensembles_prefix}/{ensemble_id}"
-
-
 def build_detect_binding_sites_dag(
     templates: TemplateFactory,
     configs: WorkflowConfigs,
@@ -38,12 +34,14 @@ def build_detect_binding_sites_dag(
 
     with DAG(name=DETECT_BINDING_SITES_DAG) as detect_binding_sites_dag:
         for ensemble in targets.ensembles:
-            ensemble_prefix = _ensemble_prefix(paths.target_ensembles, ensemble.id)
-
             detect_binding_sites(
                 name=_task_name("detect-binding-sites", ensemble.id),
                 arguments={
-                    "ensemble_path": paths.volume_path(ensemble_prefix),
+                    "ensemble_path": paths.volume_path(
+                        paths.target_structures(ensemble.id)
+                    ),
+                    "ensemble_id": ensemble.id,
+                    "output_dir": paths.volume_path(paths.binding_sites(ensemble.id)),
                     "min_pocket_score": targets.min_pocket_score,
                 },
             )

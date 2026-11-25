@@ -318,6 +318,14 @@ def _filter_binding_sites(
     help="Ensemble identifier. Defaults to the ensemble folder name.",
 )
 @click.option(
+    "--output-dir",
+    "output_dir",
+    type=str,
+    default=None,
+    help="Directory to write binding site outputs."
+    " Defaults to <ensemble>/binding_sites.",
+)
+@click.option(
     "--min-pocket-score",
     "min_pocket_score",
     required=True,
@@ -336,6 +344,7 @@ def _filter_binding_sites(
 def detect_binding_sites(
     ensemble_path: str,
     ensemble_id: str | None,
+    output_dir: str | None,
     min_pocket_score: float,
     num_workers: int,
 ):
@@ -343,12 +352,11 @@ def detect_binding_sites(
 
     ensemble_dir = Path(ensemble_path)
     ensemble_id = ensemble_id or ensemble_dir.name
+    sites_dir = Path(output_dir) if output_dir else ensemble_dir / "binding_sites"
     manifest = _load_manifest(ensemble_dir)
 
-    output_path = str(ensemble_dir / "binding_sites" / "binding_sites.json")
-    filtered_output_path = str(
-        ensemble_dir / "binding_sites" / "binding_sites_filtered.json"
-    )
+    output_path = str(sites_dir / "binding_sites.json")
+    filtered_output_path = str(sites_dir / "binding_sites_filtered.json")
 
     all_sites = _get_all_binding_sites(
         output_path=output_path,

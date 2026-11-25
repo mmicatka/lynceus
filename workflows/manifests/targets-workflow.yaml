@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Workflow
 metadata:
-  generateName: ptprb-10m-100k-valid-5-rounds-5k-targets-
+  generateName: ptprb-10m-1m-valid-5-rounds-10k-targets-
 spec:
   entrypoint: main-dag
   serviceAccountName: argo-workflow
@@ -110,7 +110,7 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: output_prefix
-            value: screens/ptprb-10m-100k-valid-5-rounds-5k/targets/pdbs/PTPRB_Single
+            value: ensembles/PTPRB_Single/pdbs
       - name: generate-manifest-ptprb-single
         depends: download-pdbs-ptprb-single
         template: generate-protein-ensemble-manifest
@@ -119,9 +119,9 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: input_path
-            value: screens/ptprb-10m-100k-valid-5-rounds-5k/targets/pdbs/PTPRB_Single
+            value: ensembles/PTPRB_Single/pdbs
           - name: output_path
-            value: screens/ptprb-10m-100k-valid-5-rounds-5k/targets/ensembles/PTPRB_Single
+            value: ensembles/PTPRB_Single/structures
           - name: ensemble_id
             value: PTPRB_Single
           - name: structure_glob
@@ -134,6 +134,10 @@ spec:
     inputs:
       parameters:
       - name: ensemble_path
+      - name: ensemble_id
+        default: 'null'
+      - name: output_dir
+        default: 'null'
       - name: min_pocket_score
         default: '10.0'
       - name: num_workers
@@ -149,15 +153,24 @@ spec:
         import sys
         sys.path.append(os.getcwd())
         import json
+        try: ensemble_id = json.loads(r'''{{inputs.parameters.ensemble_id}}''')
+        except: ensemble_id = r'''{{inputs.parameters.ensemble_id}}'''
         try: ensemble_path = json.loads(r'''{{inputs.parameters.ensemble_path}}''')
         except: ensemble_path = r'''{{inputs.parameters.ensemble_path}}'''
         try: min_pocket_score = json.loads(r'''{{inputs.parameters.min_pocket_score}}''')
         except: min_pocket_score = r'''{{inputs.parameters.min_pocket_score}}'''
         try: num_workers = json.loads(r'''{{inputs.parameters.num_workers}}''')
         except: num_workers = r'''{{inputs.parameters.num_workers}}'''
+        try: output_dir = json.loads(r'''{{inputs.parameters.output_dir}}''')
+        except: output_dir = r'''{{inputs.parameters.output_dir}}'''
 
         import subprocess
-        subprocess.run(['detect-binding-sites', '--ensemble', str(ensemble_path), '--min-pocket-score', str(min_pocket_score), '--num-workers', str(num_workers)], check=True)
+        cmd = ['detect-binding-sites', '--ensemble', str(ensemble_path), '--min-pocket-score', str(min_pocket_score), '--num-workers', str(num_workers)]
+        if ensemble_id is not None:
+            cmd.extend(['--ensemble-id', str(ensemble_id)])
+        if output_dir is not None:
+            cmd.extend(['--output-dir', str(output_dir)])
+        subprocess.run(cmd, check=True)
       command:
       - python
       volumeMounts:
@@ -178,7 +191,11 @@ spec:
         arguments:
           parameters:
           - name: ensemble_path
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/targets/ensembles/PTPRB_Single
+            value: /mnt/lynceus/ensembles/PTPRB_Single/structures
+          - name: ensemble_id
+            value: PTPRB_Single
+          - name: output_dir
+            value: /mnt/lynceus/ensembles/PTPRB_Single/binding_sites
           - name: min_pocket_score
             value: '10.0'
   - name: main-dag

@@ -20,7 +20,7 @@ from lynceus_dock.common.types import (
 
 from .common import DockingProvider, ProviderNotAvailableError, parse_vina_output_pdbqt
 
-_DEFAULT_BATCH_SIZE = 1000
+_DEFAULT_BATCH_SIZE = 2000
 _DEFAULT_SEARCH_MODE = "balance"
 _DEFAULT_NUM_MODES = 9
 

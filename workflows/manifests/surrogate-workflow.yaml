@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Workflow
 metadata:
-  generateName: ptprb-10m-100k-valid-5-rounds-5k-surrogate-
+  generateName: ptprb-10m-100k-valid-5-rounds-10k-surrogate-
 spec:
   entrypoint: main-dag
   serviceAccountName: argo-workflow
@@ -538,7 +538,7 @@ spec:
           - name: preprocessed_prefix
             value: candidates/10m/preprocessed/shards
           - name: persist_file
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet.manifest.plan.json
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_0/features.parquet.manifest.plan.json
       - name: check-sampled
         depends: plan-sources
         template: verify-manifest-surrogate
@@ -547,12 +547,12 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: manifest
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet.manifest.state.json
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_0/features.parquet.manifest.state.json
           - name: expect
-            value: '{"exclude_inputs":["/mnt/lynceus/validation/10m/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/n100000_seed1000/features.parquet"],"model_path":"","num_random":10,"num_shards":512,"num_top":0,"sampled":true,"seed":1001}'
+            value: '{"exclude_inputs":["/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/validation/n100000_seed1000/features.parquet"],"model_path":"","num_random":20,"num_shards":512,"num_top":0,"sampled":true,"seed":1001}'
           - name: source_globs
             value: '["candidates/10m/featurized/*.parquet", "candidates/10m/preprocessed/*.parquet",
-              "validation/10m/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/n100000_seed1000/features.parquet"]'
+              "ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/validation/n100000_seed1000/features.parquet"]'
           - name: result_file
             value: /tmp/manifest_matches.txt
       - name: check-merged
@@ -563,12 +563,12 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: manifest
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet.manifest.state.json
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_0/features.parquet.manifest.state.json
           - name: expect
-            value: '{"exclude_inputs":["/mnt/lynceus/validation/10m/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/n100000_seed1000/features.parquet"],"merged":true,"model_path":"","num_random":10,"num_shards":512,"num_top":0,"seed":1001}'
+            value: '{"exclude_inputs":["/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/validation/n100000_seed1000/features.parquet"],"merged":true,"model_path":"","num_random":20,"num_shards":512,"num_top":0,"seed":1001}'
           - name: source_globs
             value: '["candidates/10m/featurized/*.parquet", "candidates/10m/preprocessed/*.parquet",
-              "validation/10m/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/n100000_seed1000/features.parquet"]'
+              "ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/validation/n100000_seed1000/features.parquet"]'
           - name: result_file
             value: /tmp/manifest_matches.txt
       - name: sample-shards
@@ -1099,17 +1099,17 @@ spec:
           - name: preprocessed_input_prefix
             value: candidates/10m/preprocessed/shards
           - name: output_prefix
-            value: screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/staging
+            value: ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_0/staging
           - name: seed
             value: '1001'
           - name: num_random
-            value: '10'
+            value: '20'
           - name: num_top
             value: '0'
           - name: model_path
             value: ''
           - name: exclude_inputs
-            value: '["/mnt/lynceus/validation/10m/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/n100000_seed1000/features.parquet"]'
+            value: '["/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/validation/n100000_seed1000/features.parquet"]'
       - name: write-manifest
         depends: sample-shards
         template: update-manifest-surrogate
@@ -1119,11 +1119,11 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: source
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet.manifest.plan.json
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_0/features.parquet.manifest.plan.json
           - name: output
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet.manifest.state.json
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_0/features.parquet.manifest.state.json
           - name: fields
-            value: '{"exclude_inputs":["/mnt/lynceus/validation/10m/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/n100000_seed1000/features.parquet"],"model_path":"","num_random":10,"num_shards":512,"num_top":0,"sampled":true,"seed":1001}'
+            value: '{"exclude_inputs":["/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/validation/n100000_seed1000/features.parquet"],"model_path":"","num_random":20,"num_shards":512,"num_top":0,"sampled":true,"seed":1001}'
       - name: merge-samples
         depends: write-manifest && check-merged
         template: merge-shards
@@ -1133,9 +1133,9 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: input_path
-            value: screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/staging
+            value: ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_0/staging
           - name: output_path
-            value: screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet
+            value: ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_0/features.parquet
       - name: mark-merged
         depends: merge-samples
         template: update-manifest-surrogate
@@ -1145,9 +1145,9 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: source
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet.manifest.state.json
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_0/features.parquet.manifest.state.json
           - name: output
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet.manifest.state.json
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_0/features.parquet.manifest.state.json
           - name: fields
             value: '{"merged":true}'
     inputs:
@@ -1168,9 +1168,9 @@ spec:
           - name: preprocessed_prefix
             value: candidates/10m/preprocessed/shards
           - name: persist_file
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet.manifest.plan.json
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_1/features.parquet.manifest.plan.json
           - name: model_path
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/model.joblib
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/models/round_0.model.joblib
       - name: check-sampled
         depends: plan-sources
         template: verify-manifest-surrogate
@@ -1179,14 +1179,14 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: manifest
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet.manifest.state.json
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_1/features.parquet.manifest.state.json
           - name: expect
-            value: '{"exclude_inputs":["/mnt/lynceus/validation/10m/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/n100000_seed1000/features.parquet","/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet"],"model_path":"/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/model.joblib","num_random":5,"num_shards":512,"num_top":5,"sampled":true,"seed":1002}'
+            value: '{"exclude_inputs":["/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/validation/n100000_seed1000/features.parquet","/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_0/features.parquet"],"model_path":"/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/models/round_0.model.joblib","num_random":10,"num_shards":512,"num_top":10,"sampled":true,"seed":1002}'
           - name: source_globs
             value: '["candidates/10m/featurized/*.parquet", "candidates/10m/preprocessed/*.parquet",
-              "screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/model.joblib",
-              "validation/10m/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/n100000_seed1000/features.parquet",
-              "screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet"]'
+              "ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/models/round_0.model.joblib",
+              "ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/validation/n100000_seed1000/features.parquet",
+              "ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_0/features.parquet"]'
           - name: result_file
             value: /tmp/manifest_matches.txt
       - name: check-merged
@@ -1197,14 +1197,14 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: manifest
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet.manifest.state.json
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_1/features.parquet.manifest.state.json
           - name: expect
-            value: '{"exclude_inputs":["/mnt/lynceus/validation/10m/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/n100000_seed1000/features.parquet","/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet"],"merged":true,"model_path":"/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/model.joblib","num_random":5,"num_shards":512,"num_top":5,"seed":1002}'
+            value: '{"exclude_inputs":["/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/validation/n100000_seed1000/features.parquet","/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_0/features.parquet"],"merged":true,"model_path":"/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/models/round_0.model.joblib","num_random":10,"num_shards":512,"num_top":10,"seed":1002}'
           - name: source_globs
             value: '["candidates/10m/featurized/*.parquet", "candidates/10m/preprocessed/*.parquet",
-              "screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/model.joblib",
-              "validation/10m/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/n100000_seed1000/features.parquet",
-              "screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet"]'
+              "ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/models/round_0.model.joblib",
+              "ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/validation/n100000_seed1000/features.parquet",
+              "ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_0/features.parquet"]'
           - name: result_file
             value: /tmp/manifest_matches.txt
       - name: sample-shards
@@ -1735,18 +1735,18 @@ spec:
           - name: preprocessed_input_prefix
             value: candidates/10m/preprocessed/shards
           - name: output_prefix
-            value: screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/staging
+            value: ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_1/staging
           - name: seed
             value: '1002'
           - name: num_random
-            value: '5'
+            value: '10'
           - name: num_top
-            value: '5'
+            value: '10'
           - name: model_path
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/model.joblib
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/models/round_0.model.joblib
           - name: exclude_inputs
-            value: '["/mnt/lynceus/validation/10m/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/n100000_seed1000/features.parquet",
-              "/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet"]'
+            value: '["/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/validation/n100000_seed1000/features.parquet",
+              "/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_0/features.parquet"]'
       - name: write-manifest
         depends: sample-shards
         template: update-manifest-surrogate
@@ -1756,11 +1756,11 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: source
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet.manifest.plan.json
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_1/features.parquet.manifest.plan.json
           - name: output
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet.manifest.state.json
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_1/features.parquet.manifest.state.json
           - name: fields
-            value: '{"exclude_inputs":["/mnt/lynceus/validation/10m/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/n100000_seed1000/features.parquet","/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet"],"model_path":"/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/model.joblib","num_random":5,"num_shards":512,"num_top":5,"sampled":true,"seed":1002}'
+            value: '{"exclude_inputs":["/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/validation/n100000_seed1000/features.parquet","/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_0/features.parquet"],"model_path":"/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/models/round_0.model.joblib","num_random":10,"num_shards":512,"num_top":10,"sampled":true,"seed":1002}'
       - name: merge-samples
         depends: write-manifest && check-merged
         template: merge-shards
@@ -1770,9 +1770,9 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: input_path
-            value: screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/staging
+            value: ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_1/staging
           - name: output_path
-            value: screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet
+            value: ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_1/features.parquet
       - name: mark-merged
         depends: merge-samples
         template: update-manifest-surrogate
@@ -1782,9 +1782,9 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: source
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet.manifest.state.json
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_1/features.parquet.manifest.state.json
           - name: output
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet.manifest.state.json
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_1/features.parquet.manifest.state.json
           - name: fields
             value: '{"merged":true}'
     inputs:
@@ -1805,9 +1805,9 @@ spec:
           - name: preprocessed_prefix
             value: candidates/10m/preprocessed/shards
           - name: persist_file
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet.manifest.plan.json
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_2/features.parquet.manifest.plan.json
           - name: model_path
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/model.joblib
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/models/round_1.model.joblib
       - name: check-sampled
         depends: plan-sources
         template: verify-manifest-surrogate
@@ -1816,15 +1816,15 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: manifest
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet.manifest.state.json
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_2/features.parquet.manifest.state.json
           - name: expect
-            value: '{"exclude_inputs":["/mnt/lynceus/validation/10m/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/n100000_seed1000/features.parquet","/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet","/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet"],"model_path":"/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/model.joblib","num_random":5,"num_shards":512,"num_top":5,"sampled":true,"seed":1003}'
+            value: '{"exclude_inputs":["/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/validation/n100000_seed1000/features.parquet","/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_0/features.parquet","/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_1/features.parquet"],"model_path":"/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/models/round_1.model.joblib","num_random":10,"num_shards":512,"num_top":10,"sampled":true,"seed":1003}'
           - name: source_globs
             value: '["candidates/10m/featurized/*.parquet", "candidates/10m/preprocessed/*.parquet",
-              "screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/model.joblib",
-              "validation/10m/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/n100000_seed1000/features.parquet",
-              "screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet",
-              "screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet"]'
+              "ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/models/round_1.model.joblib",
+              "ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/validation/n100000_seed1000/features.parquet",
+              "ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_0/features.parquet",
+              "ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_1/features.parquet"]'
           - name: result_file
             value: /tmp/manifest_matches.txt
       - name: check-merged
@@ -1835,15 +1835,15 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: manifest
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet.manifest.state.json
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_2/features.parquet.manifest.state.json
           - name: expect
-            value: '{"exclude_inputs":["/mnt/lynceus/validation/10m/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/n100000_seed1000/features.parquet","/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet","/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet"],"merged":true,"model_path":"/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/model.joblib","num_random":5,"num_shards":512,"num_top":5,"seed":1003}'
+            value: '{"exclude_inputs":["/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/validation/n100000_seed1000/features.parquet","/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_0/features.parquet","/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_1/features.parquet"],"merged":true,"model_path":"/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/models/round_1.model.joblib","num_random":10,"num_shards":512,"num_top":10,"seed":1003}'
           - name: source_globs
             value: '["candidates/10m/featurized/*.parquet", "candidates/10m/preprocessed/*.parquet",
-              "screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/model.joblib",
-              "validation/10m/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/n100000_seed1000/features.parquet",
-              "screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet",
-              "screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet"]'
+              "ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/models/round_1.model.joblib",
+              "ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/validation/n100000_seed1000/features.parquet",
+              "ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_0/features.parquet",
+              "ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_1/features.parquet"]'
           - name: result_file
             value: /tmp/manifest_matches.txt
       - name: sample-shards
@@ -2374,19 +2374,19 @@ spec:
           - name: preprocessed_input_prefix
             value: candidates/10m/preprocessed/shards
           - name: output_prefix
-            value: screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/staging
+            value: ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_2/staging
           - name: seed
             value: '1003'
           - name: num_random
-            value: '5'
+            value: '10'
           - name: num_top
-            value: '5'
+            value: '10'
           - name: model_path
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/model.joblib
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/models/round_1.model.joblib
           - name: exclude_inputs
-            value: '["/mnt/lynceus/validation/10m/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/n100000_seed1000/features.parquet",
-              "/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet",
-              "/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet"]'
+            value: '["/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/validation/n100000_seed1000/features.parquet",
+              "/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_0/features.parquet",
+              "/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_1/features.parquet"]'
       - name: write-manifest
         depends: sample-shards
         template: update-manifest-surrogate
@@ -2396,11 +2396,11 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: source
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet.manifest.plan.json
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_2/features.parquet.manifest.plan.json
           - name: output
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet.manifest.state.json
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_2/features.parquet.manifest.state.json
           - name: fields
-            value: '{"exclude_inputs":["/mnt/lynceus/validation/10m/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/n100000_seed1000/features.parquet","/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet","/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet"],"model_path":"/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/model.joblib","num_random":5,"num_shards":512,"num_top":5,"sampled":true,"seed":1003}'
+            value: '{"exclude_inputs":["/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/validation/n100000_seed1000/features.parquet","/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_0/features.parquet","/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_1/features.parquet"],"model_path":"/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/models/round_1.model.joblib","num_random":10,"num_shards":512,"num_top":10,"sampled":true,"seed":1003}'
       - name: merge-samples
         depends: write-manifest && check-merged
         template: merge-shards
@@ -2410,9 +2410,9 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: input_path
-            value: screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/staging
+            value: ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_2/staging
           - name: output_path
-            value: screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet
+            value: ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_2/features.parquet
       - name: mark-merged
         depends: merge-samples
         template: update-manifest-surrogate
@@ -2422,9 +2422,9 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: source
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet.manifest.state.json
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_2/features.parquet.manifest.state.json
           - name: output
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet.manifest.state.json
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_2/features.parquet.manifest.state.json
           - name: fields
             value: '{"merged":true}'
     inputs:
@@ -2445,9 +2445,9 @@ spec:
           - name: preprocessed_prefix
             value: candidates/10m/preprocessed/shards
           - name: persist_file
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/features.parquet.manifest.plan.json
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_3/features.parquet.manifest.plan.json
           - name: model_path
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/model.joblib
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/models/round_2.model.joblib
       - name: check-sampled
         depends: plan-sources
         template: verify-manifest-surrogate
@@ -2456,16 +2456,16 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: manifest
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/features.parquet.manifest.state.json
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_3/features.parquet.manifest.state.json
           - name: expect
-            value: '{"exclude_inputs":["/mnt/lynceus/validation/10m/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/n100000_seed1000/features.parquet","/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet","/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet","/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet"],"model_path":"/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/model.joblib","num_random":5,"num_shards":512,"num_top":5,"sampled":true,"seed":1004}'
+            value: '{"exclude_inputs":["/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/validation/n100000_seed1000/features.parquet","/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_0/features.parquet","/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_1/features.parquet","/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_2/features.parquet"],"model_path":"/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/models/round_2.model.joblib","num_random":10,"num_shards":512,"num_top":10,"sampled":true,"seed":1004}'
           - name: source_globs
             value: '["candidates/10m/featurized/*.parquet", "candidates/10m/preprocessed/*.parquet",
-              "screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/model.joblib",
-              "validation/10m/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/n100000_seed1000/features.parquet",
-              "screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet",
-              "screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet",
-              "screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet"]'
+              "ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/models/round_2.model.joblib",
+              "ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/validation/n100000_seed1000/features.parquet",
+              "ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_0/features.parquet",
+              "ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_1/features.parquet",
+              "ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_2/features.parquet"]'
           - name: result_file
             value: /tmp/manifest_matches.txt
       - name: check-merged
@@ -2476,16 +2476,16 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: manifest
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/features.parquet.manifest.state.json
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_3/features.parquet.manifest.state.json
           - name: expect
-            value: '{"exclude_inputs":["/mnt/lynceus/validation/10m/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/n100000_seed1000/features.parquet","/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet","/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet","/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet"],"merged":true,"model_path":"/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/model.joblib","num_random":5,"num_shards":512,"num_top":5,"seed":1004}'
+            value: '{"exclude_inputs":["/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/validation/n100000_seed1000/features.parquet","/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_0/features.parquet","/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_1/features.parquet","/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_2/features.parquet"],"merged":true,"model_path":"/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/models/round_2.model.joblib","num_random":10,"num_shards":512,"num_top":10,"seed":1004}'
           - name: source_globs
             value: '["candidates/10m/featurized/*.parquet", "candidates/10m/preprocessed/*.parquet",
-              "screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/model.joblib",
-              "validation/10m/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/n100000_seed1000/features.parquet",
-              "screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet",
-              "screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet",
-              "screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet"]'
+              "ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/models/round_2.model.joblib",
+              "ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/validation/n100000_seed1000/features.parquet",
+              "ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_0/features.parquet",
+              "ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_1/features.parquet",
+              "ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_2/features.parquet"]'
           - name: result_file
             value: /tmp/manifest_matches.txt
       - name: sample-shards
@@ -3016,20 +3016,20 @@ spec:
           - name: preprocessed_input_prefix
             value: candidates/10m/preprocessed/shards
           - name: output_prefix
-            value: screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/staging
+            value: ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_3/staging
           - name: seed
             value: '1004'
           - name: num_random
-            value: '5'
+            value: '10'
           - name: num_top
-            value: '5'
+            value: '10'
           - name: model_path
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/model.joblib
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/models/round_2.model.joblib
           - name: exclude_inputs
-            value: '["/mnt/lynceus/validation/10m/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/n100000_seed1000/features.parquet",
-              "/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet",
-              "/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet",
-              "/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet"]'
+            value: '["/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/validation/n100000_seed1000/features.parquet",
+              "/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_0/features.parquet",
+              "/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_1/features.parquet",
+              "/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_2/features.parquet"]'
       - name: write-manifest
         depends: sample-shards
         template: update-manifest-surrogate
@@ -3039,11 +3039,11 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: source
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/features.parquet.manifest.plan.json
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_3/features.parquet.manifest.plan.json
           - name: output
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/features.parquet.manifest.state.json
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_3/features.parquet.manifest.state.json
           - name: fields
-            value: '{"exclude_inputs":["/mnt/lynceus/validation/10m/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/n100000_seed1000/features.parquet","/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet","/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet","/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet"],"model_path":"/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/model.joblib","num_random":5,"num_shards":512,"num_top":5,"sampled":true,"seed":1004}'
+            value: '{"exclude_inputs":["/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/validation/n100000_seed1000/features.parquet","/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_0/features.parquet","/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_1/features.parquet","/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_2/features.parquet"],"model_path":"/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/models/round_2.model.joblib","num_random":10,"num_shards":512,"num_top":10,"sampled":true,"seed":1004}'
       - name: merge-samples
         depends: write-manifest && check-merged
         template: merge-shards
@@ -3053,9 +3053,9 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: input_path
-            value: screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/staging
+            value: ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_3/staging
           - name: output_path
-            value: screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/features.parquet
+            value: ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_3/features.parquet
       - name: mark-merged
         depends: merge-samples
         template: update-manifest-surrogate
@@ -3065,9 +3065,9 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: source
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/features.parquet.manifest.state.json
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_3/features.parquet.manifest.state.json
           - name: output
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/features.parquet.manifest.state.json
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_3/features.parquet.manifest.state.json
           - name: fields
             value: '{"merged":true}'
     inputs:
@@ -3088,9 +3088,9 @@ spec:
           - name: preprocessed_prefix
             value: candidates/10m/preprocessed/shards
           - name: persist_file
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/features.parquet.manifest.plan.json
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_4/features.parquet.manifest.plan.json
           - name: model_path
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/model.joblib
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/models/round_3.model.joblib
       - name: check-sampled
         depends: plan-sources
         template: verify-manifest-surrogate
@@ -3099,17 +3099,17 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: manifest
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/features.parquet.manifest.state.json
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_4/features.parquet.manifest.state.json
           - name: expect
-            value: '{"exclude_inputs":["/mnt/lynceus/validation/10m/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/n100000_seed1000/features.parquet","/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet","/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet","/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet","/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/features.parquet"],"model_path":"/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/model.joblib","num_random":5,"num_shards":512,"num_top":5,"sampled":true,"seed":1005}'
+            value: '{"exclude_inputs":["/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/validation/n100000_seed1000/features.parquet","/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_0/features.parquet","/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_1/features.parquet","/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_2/features.parquet","/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_3/features.parquet"],"model_path":"/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/models/round_3.model.joblib","num_random":10,"num_shards":512,"num_top":10,"sampled":true,"seed":1005}'
           - name: source_globs
             value: '["candidates/10m/featurized/*.parquet", "candidates/10m/preprocessed/*.parquet",
-              "screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/model.joblib",
-              "validation/10m/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/n100000_seed1000/features.parquet",
-              "screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet",
-              "screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet",
-              "screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet",
-              "screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/features.parquet"]'
+              "ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/models/round_3.model.joblib",
+              "ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/validation/n100000_seed1000/features.parquet",
+              "ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_0/features.parquet",
+              "ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_1/features.parquet",
+              "ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_2/features.parquet",
+              "ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_3/features.parquet"]'
           - name: result_file
             value: /tmp/manifest_matches.txt
       - name: check-merged
@@ -3120,17 +3120,17 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: manifest
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/features.parquet.manifest.state.json
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_4/features.parquet.manifest.state.json
           - name: expect
-            value: '{"exclude_inputs":["/mnt/lynceus/validation/10m/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/n100000_seed1000/features.parquet","/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet","/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet","/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet","/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/features.parquet"],"merged":true,"model_path":"/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/model.joblib","num_random":5,"num_shards":512,"num_top":5,"seed":1005}'
+            value: '{"exclude_inputs":["/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/validation/n100000_seed1000/features.parquet","/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_0/features.parquet","/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_1/features.parquet","/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_2/features.parquet","/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_3/features.parquet"],"merged":true,"model_path":"/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/models/round_3.model.joblib","num_random":10,"num_shards":512,"num_top":10,"seed":1005}'
           - name: source_globs
             value: '["candidates/10m/featurized/*.parquet", "candidates/10m/preprocessed/*.parquet",
-              "screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/model.joblib",
-              "validation/10m/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/n100000_seed1000/features.parquet",
-              "screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet",
-              "screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet",
-              "screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet",
-              "screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/features.parquet"]'
+              "ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/models/round_3.model.joblib",
+              "ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/validation/n100000_seed1000/features.parquet",
+              "ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_0/features.parquet",
+              "ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_1/features.parquet",
+              "ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_2/features.parquet",
+              "ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_3/features.parquet"]'
           - name: result_file
             value: /tmp/manifest_matches.txt
       - name: sample-shards
@@ -3661,21 +3661,21 @@ spec:
           - name: preprocessed_input_prefix
             value: candidates/10m/preprocessed/shards
           - name: output_prefix
-            value: screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/staging
+            value: ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_4/staging
           - name: seed
             value: '1005'
           - name: num_random
-            value: '5'
+            value: '10'
           - name: num_top
-            value: '5'
+            value: '10'
           - name: model_path
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/model.joblib
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/models/round_3.model.joblib
           - name: exclude_inputs
-            value: '["/mnt/lynceus/validation/10m/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/n100000_seed1000/features.parquet",
-              "/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet",
-              "/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet",
-              "/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet",
-              "/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/features.parquet"]'
+            value: '["/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/validation/n100000_seed1000/features.parquet",
+              "/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_0/features.parquet",
+              "/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_1/features.parquet",
+              "/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_2/features.parquet",
+              "/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_3/features.parquet"]'
       - name: write-manifest
         depends: sample-shards
         template: update-manifest-surrogate
@@ -3685,11 +3685,11 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: source
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/features.parquet.manifest.plan.json
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_4/features.parquet.manifest.plan.json
           - name: output
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/features.parquet.manifest.state.json
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_4/features.parquet.manifest.state.json
           - name: fields
-            value: '{"exclude_inputs":["/mnt/lynceus/validation/10m/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/n100000_seed1000/features.parquet","/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet","/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet","/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet","/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/features.parquet"],"model_path":"/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/model.joblib","num_random":5,"num_shards":512,"num_top":5,"sampled":true,"seed":1005}'
+            value: '{"exclude_inputs":["/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/validation/n100000_seed1000/features.parquet","/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_0/features.parquet","/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_1/features.parquet","/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_2/features.parquet","/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_3/features.parquet"],"model_path":"/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/models/round_3.model.joblib","num_random":10,"num_shards":512,"num_top":10,"sampled":true,"seed":1005}'
       - name: merge-samples
         depends: write-manifest && check-merged
         template: merge-shards
@@ -3699,9 +3699,9 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: input_path
-            value: screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/staging
+            value: ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_4/staging
           - name: output_path
-            value: screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/features.parquet
+            value: ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_4/features.parquet
       - name: mark-merged
         depends: merge-samples
         template: update-manifest-surrogate
@@ -3711,9 +3711,9 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: source
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/features.parquet.manifest.state.json
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_4/features.parquet.manifest.state.json
           - name: output
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/features.parquet.manifest.state.json
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_4/features.parquet.manifest.state.json
           - name: fields
             value: '{"merged":true}'
     inputs:
@@ -3734,7 +3734,7 @@ spec:
           - name: preprocessed_prefix
             value: candidates/10m/preprocessed/shards
           - name: persist_file
-            value: /mnt/lynceus/validation/10m/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/n100000_seed1000/features.parquet.manifest.plan.json
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/validation/n100000_seed1000/features.parquet.manifest.plan.json
       - name: check-sampled
         depends: plan-sources
         template: verify-manifest-surrogate
@@ -3743,7 +3743,7 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: manifest
-            value: /mnt/lynceus/validation/10m/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/n100000_seed1000/features.parquet.manifest.state.json
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/validation/n100000_seed1000/features.parquet.manifest.state.json
           - name: expect
             value: '{"exclude_inputs":[],"model_path":"","num_random":196,"num_shards":512,"num_top":0,"sampled":true,"seed":1000}'
           - name: source_globs
@@ -3758,7 +3758,7 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: manifest
-            value: /mnt/lynceus/validation/10m/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/n100000_seed1000/features.parquet.manifest.state.json
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/validation/n100000_seed1000/features.parquet.manifest.state.json
           - name: expect
             value: '{"exclude_inputs":[],"merged":true,"model_path":"","num_random":196,"num_shards":512,"num_top":0,"seed":1000}'
           - name: source_globs
@@ -4293,7 +4293,7 @@ spec:
           - name: preprocessed_input_prefix
             value: candidates/10m/preprocessed/shards
           - name: output_prefix
-            value: validation/10m/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/n100000_seed1000/staging
+            value: ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/validation/n100000_seed1000/staging
           - name: seed
             value: '1000'
           - name: num_random
@@ -4313,9 +4313,9 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: source
-            value: /mnt/lynceus/validation/10m/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/n100000_seed1000/features.parquet.manifest.plan.json
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/validation/n100000_seed1000/features.parquet.manifest.plan.json
           - name: output
-            value: /mnt/lynceus/validation/10m/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/n100000_seed1000/features.parquet.manifest.state.json
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/validation/n100000_seed1000/features.parquet.manifest.state.json
           - name: fields
             value: '{"exclude_inputs":[],"model_path":"","num_random":196,"num_shards":512,"num_top":0,"sampled":true,"seed":1000}'
       - name: merge-samples
@@ -4327,9 +4327,9 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: input_path
-            value: validation/10m/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/n100000_seed1000/staging
+            value: ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/validation/n100000_seed1000/staging
           - name: output_path
-            value: validation/10m/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/n100000_seed1000/features.parquet
+            value: ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/validation/n100000_seed1000/features.parquet
       - name: mark-merged
         depends: merge-samples
         template: update-manifest-surrogate
@@ -4339,9 +4339,9 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: source
-            value: /mnt/lynceus/validation/10m/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/n100000_seed1000/features.parquet.manifest.state.json
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/validation/n100000_seed1000/features.parquet.manifest.state.json
           - name: output
-            value: /mnt/lynceus/validation/10m/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/n100000_seed1000/features.parquet.manifest.state.json
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/validation/n100000_seed1000/features.parquet.manifest.state.json
           - name: fields
             value: '{"merged":true}'
     inputs:
@@ -4367,7 +4367,7 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: manifest
-            value: /mnt/lynceus/validation/10m/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/n100000_seed1000/features.parquet.manifest.state.json
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/validation/n100000_seed1000/features.parquet.manifest.state.json
           - name: expect
             value: '{"center":"{{inputs.parameters.center}}","docked":true,"exclude_inputs":[],"member_id":"{{inputs.parameters.member_id}}","model_path":"","num_random":196,"num_shards":512,"num_top":0,"seed":1000}'
           - name: source_globs
@@ -4383,17 +4383,17 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: ensemble
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/targets/ensembles/{{inputs.parameters.ensemble}}
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/structures
           - name: member_id
             value: '{{inputs.parameters.member_id}}'
           - name: ligands_path
-            value: /mnt/lynceus/validation/10m/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/n100000_seed1000/features.parquet
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/validation/n100000_seed1000/features.parquet
           - name: center
             value: '{{inputs.parameters.center}}'
           - name: site_id
             value: '{{inputs.parameters.site_id}}'
           - name: output_path
-            value: /mnt/lynceus/validation/10m/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/n100000_seed1000
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/validation/n100000_seed1000
       - name: mark-docked
         depends: dock
         template: update-manifest-surrogate
@@ -4403,9 +4403,9 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: source
-            value: /mnt/lynceus/validation/10m/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/n100000_seed1000/features.parquet.manifest.state.json
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/validation/n100000_seed1000/features.parquet.manifest.state.json
           - name: output
-            value: /mnt/lynceus/validation/10m/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/n100000_seed1000/features.parquet.manifest.state.json
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/validation/n100000_seed1000/features.parquet.manifest.state.json
           - name: fields
             value: '{"center":"{{inputs.parameters.center}}","docked":true,"member_id":"{{inputs.parameters.member_id}}"}'
     inputs:
@@ -4446,17 +4446,17 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: ensemble
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/targets/ensembles/{{inputs.parameters.ensemble}}
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/structures
           - name: member_id
             value: '{{inputs.parameters.member_id}}'
           - name: ligands_path
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_0/features.parquet
           - name: center
             value: '{{inputs.parameters.center}}'
           - name: site_id
             value: '{{inputs.parameters.site_id}}'
           - name: output_path
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_0
       - name: train-round-0
         depends: dock-round-0
         template: surrogate-train
@@ -4465,15 +4465,15 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: train_features
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_0/features.parquet
           - name: train_labels
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/docking.results.parquet
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_0/docking.results.parquet
           - name: validation_features
-            value: /mnt/lynceus/validation/10m/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/n100000_seed1000/features.parquet
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/validation/n100000_seed1000/features.parquet
           - name: validation_labels
-            value: /mnt/lynceus/validation/10m/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/n100000_seed1000/docking.results.parquet
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/validation/n100000_seed1000/docking.results.parquet
           - name: model_path
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/model.joblib
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/models/round_0.model.joblib
       - name: sample-round-1
         depends: train-round-0
         template: sample-dag-round-1
@@ -4491,17 +4491,17 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: ensemble
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/targets/ensembles/{{inputs.parameters.ensemble}}
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/structures
           - name: member_id
             value: '{{inputs.parameters.member_id}}'
           - name: ligands_path
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_1/features.parquet
           - name: center
             value: '{{inputs.parameters.center}}'
           - name: site_id
             value: '{{inputs.parameters.site_id}}'
           - name: output_path
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_1
       - name: train-round-1
         depends: dock-round-1
         template: surrogate-train
@@ -4510,15 +4510,15 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: train_features
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet,/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_0/features.parquet,/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_1/features.parquet
           - name: train_labels
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/docking.results.parquet,/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/docking.results.parquet
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_0/docking.results.parquet,/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_1/docking.results.parquet
           - name: validation_features
-            value: /mnt/lynceus/validation/10m/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/n100000_seed1000/features.parquet
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/validation/n100000_seed1000/features.parquet
           - name: validation_labels
-            value: /mnt/lynceus/validation/10m/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/n100000_seed1000/docking.results.parquet
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/validation/n100000_seed1000/docking.results.parquet
           - name: model_path
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/model.joblib
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/models/round_1.model.joblib
       - name: sample-round-2
         depends: train-round-1
         template: sample-dag-round-2
@@ -4536,17 +4536,17 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: ensemble
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/targets/ensembles/{{inputs.parameters.ensemble}}
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/structures
           - name: member_id
             value: '{{inputs.parameters.member_id}}'
           - name: ligands_path
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_2/features.parquet
           - name: center
             value: '{{inputs.parameters.center}}'
           - name: site_id
             value: '{{inputs.parameters.site_id}}'
           - name: output_path
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_2
       - name: train-round-2
         depends: dock-round-2
         template: surrogate-train
@@ -4555,15 +4555,15 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: train_features
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet,/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet,/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_0/features.parquet,/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_1/features.parquet,/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_2/features.parquet
           - name: train_labels
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/docking.results.parquet,/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/docking.results.parquet,/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/docking.results.parquet
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_0/docking.results.parquet,/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_1/docking.results.parquet,/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_2/docking.results.parquet
           - name: validation_features
-            value: /mnt/lynceus/validation/10m/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/n100000_seed1000/features.parquet
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/validation/n100000_seed1000/features.parquet
           - name: validation_labels
-            value: /mnt/lynceus/validation/10m/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/n100000_seed1000/docking.results.parquet
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/validation/n100000_seed1000/docking.results.parquet
           - name: model_path
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/model.joblib
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/models/round_2.model.joblib
       - name: sample-round-3
         depends: train-round-2
         template: sample-dag-round-3
@@ -4581,17 +4581,17 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: ensemble
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/targets/ensembles/{{inputs.parameters.ensemble}}
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/structures
           - name: member_id
             value: '{{inputs.parameters.member_id}}'
           - name: ligands_path
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/features.parquet
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_3/features.parquet
           - name: center
             value: '{{inputs.parameters.center}}'
           - name: site_id
             value: '{{inputs.parameters.site_id}}'
           - name: output_path
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_3
       - name: train-round-3
         depends: dock-round-3
         template: surrogate-train
@@ -4600,15 +4600,15 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: train_features
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet,/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet,/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet,/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/features.parquet
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_0/features.parquet,/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_1/features.parquet,/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_2/features.parquet,/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_3/features.parquet
           - name: train_labels
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/docking.results.parquet,/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/docking.results.parquet,/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/docking.results.parquet,/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/docking.results.parquet
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_0/docking.results.parquet,/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_1/docking.results.parquet,/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_2/docking.results.parquet,/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_3/docking.results.parquet
           - name: validation_features
-            value: /mnt/lynceus/validation/10m/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/n100000_seed1000/features.parquet
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/validation/n100000_seed1000/features.parquet
           - name: validation_labels
-            value: /mnt/lynceus/validation/10m/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/n100000_seed1000/docking.results.parquet
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/validation/n100000_seed1000/docking.results.parquet
           - name: model_path
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/model.joblib
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/models/round_3.model.joblib
       - name: sample-round-4
         depends: train-round-3
         template: sample-dag-round-4
@@ -4626,17 +4626,17 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: ensemble
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/targets/ensembles/{{inputs.parameters.ensemble}}
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/structures
           - name: member_id
             value: '{{inputs.parameters.member_id}}'
           - name: ligands_path
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/features.parquet
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_4/features.parquet
           - name: center
             value: '{{inputs.parameters.center}}'
           - name: site_id
             value: '{{inputs.parameters.site_id}}'
           - name: output_path
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_4
       - name: train-round-4
         depends: dock-round-4
         template: surrogate-train
@@ -4645,15 +4645,15 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: train_features
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/features.parquet,/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/features.parquet,/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/features.parquet,/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/features.parquet,/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/features.parquet
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_0/features.parquet,/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_1/features.parquet,/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_2/features.parquet,/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_3/features.parquet,/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_4/features.parquet
           - name: train_labels
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_0/docking.results.parquet,/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_1/docking.results.parquet,/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_2/docking.results.parquet,/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_3/docking.results.parquet,/mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/docking.results.parquet
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_0/docking.results.parquet,/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_1/docking.results.parquet,/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_2/docking.results.parquet,/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_3/docking.results.parquet,/mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/rounds/round_4/docking.results.parquet
           - name: validation_features
-            value: /mnt/lynceus/validation/10m/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/n100000_seed1000/features.parquet
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/validation/n100000_seed1000/features.parquet
           - name: validation_labels
-            value: /mnt/lynceus/validation/10m/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/n100000_seed1000/docking.results.parquet
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/validation/n100000_seed1000/docking.results.parquet
           - name: model_path
-            value: /mnt/lynceus/screens/ptprb-10m-100k-valid-5-rounds-5k/filter/surrogate/ptprb-10m-100k-valid-5-rounds-5k/ensembles/{{inputs.parameters.ensemble}}/{{inputs.parameters.site_id}}/round_4/model.joblib
+            value: /mnt/lynceus/ensembles/{{inputs.parameters.ensemble}}/surrogate/site_{{inputs.parameters.site_id}}/10m/ptprb-10m-100k-valid-5-rounds-10k/models/round_4.model.joblib
     inputs:
       parameters:
       - name: ensemble
@@ -4670,7 +4670,7 @@ spec:
           - name: base_path
             value: /mnt/lynceus
           - name: ensembles_prefix
-            value: screens/ptprb-10m-100k-valid-5-rounds-5k/targets/ensembles
+            value: ensembles
           - name: ensemble_ids
             value: '["PTPRB_Single"]'
       - name: surrogate-site
