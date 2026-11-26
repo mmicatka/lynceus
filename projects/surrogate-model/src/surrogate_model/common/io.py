@@ -4,15 +4,46 @@
 import glob
 import os
 from collections.abc import Iterable, Iterator
+from pathlib import Path
+from typing import Any
 
+import joblib
 import numpy as np
 import pyarrow as pa
 import pyarrow.parquet as pq
+from lynceus_core.io.staged_io import staged_output
+from lynceus_core.logging import get_lynceus_logger
+
+from surrogate_model.common.model import ProbabilisticClassifier
 
 PARQUET_PATTERN = "*.parquet"
 CONFORMER_COLUMN = "conformer"
 COMPRESSION = "zstd"
 DEFAULT_BATCH_SIZE = 50_000
+
+STAGED_MODEL_TRANSFERS = 1
+logger = get_lynceus_logger()
+
+
+def save_model(model: ProbabilisticClassifier[Any], path: Path) -> None:
+    logger.info("Saving model", path=str(path))
+    with open(path, "wb") as f:
+        joblib.dump(model, f)
+    logger.info("Model saved successfully", path=str(path))
+
+
+def save_model_staged(
+    model: ProbabilisticClassifier[Any],
+    model_path: str | Path,
+    scratch_dir: str | None,
+) -> None:
+    target = Path(model_path)
+    with staged_output(
+        target.parent,
+        transfers=STAGED_MODEL_TRANSFERS,
+        scratch_dir=scratch_dir,
+    ) as local_output:
+        save_model(model, local_output / target.name)
 
 
 def resolve_parquet_files(pattern: str) -> list[str]:
