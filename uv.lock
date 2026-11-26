@@ -2102,21 +2102,35 @@ name = "notebooks"
 version = "0.1.0"
 source = { editable = "notebooks" }
 dependencies = [
+    { name = "joblib" },
     { name = "jupyter" },
+    { name = "lightgbm" },
+    { name = "lynceus-core" },
     { name = "matplotlib" },
+    { name = "numpy" },
     { name = "polars" },
     { name = "pyarrow" },
+    { name = "scikit-fingerprints" },
+    { name = "scipy" },
     { name = "seaborn" },
+    { name = "surrogate-model" },
     { name = "tabulate" },
 ]
 
 [package.metadata]
 requires-dist = [
+    { name = "joblib", specifier = ">=1.6.0" },
     { name = "jupyter", specifier = ">=1.1.1" },
+    { name = "lightgbm", specifier = ">=4.7.0" },
+    { name = "lynceus-core", editable = "libs/lynceus-core" },
     { name = "matplotlib", specifier = ">=3.11.2" },
+    { name = "numpy", specifier = ">=2.5.4" },
     { name = "polars", specifier = ">=2.0.0" },
     { name = "pyarrow", specifier = ">=26.0.0" },
+    { name = "scikit-fingerprints", specifier = ">=2.1.0" },
+    { name = "scipy", specifier = ">=1.18.1" },
     { name = "seaborn", specifier = ">=0.13.2" },
+    { name = "surrogate-model", editable = "projects/surrogate-model" },
     { name = "tabulate", specifier = ">=0.10.0" },
 ]
 

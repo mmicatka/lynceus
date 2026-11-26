@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Workflow
 metadata:
-  generateName: ptprb-10m-1m-valid-5-rounds-10k-targets-
+  generateName: pgk2-10m-100k-valid-5-rounds-10k-targets-
 spec:
   entrypoint: main-dag
   serviceAccountName: argo-workflow
@@ -101,29 +101,29 @@ spec:
   - name: load-targets
     dag:
       tasks:
-      - name: download-pdbs-ptprb-single
+      - name: download-pdbs-pgk2-single
         template: download-pdbs
         arguments:
           parameters:
           - name: pdb_ids
-            value: 2AHS
+            value: 6IIU
           - name: base_path
             value: /mnt/lynceus
           - name: output_prefix
-            value: ensembles/PTPRB_Single/pdbs
-      - name: generate-manifest-ptprb-single
-        depends: download-pdbs-ptprb-single
+            value: ensembles/PGK2_Single/pdbs
+      - name: generate-manifest-pgk2-single
+        depends: download-pdbs-pgk2-single
         template: generate-protein-ensemble-manifest
         arguments:
           parameters:
           - name: base_path
             value: /mnt/lynceus
           - name: input_path
-            value: ensembles/PTPRB_Single/pdbs
+            value: ensembles/PGK2_Single/pdbs
           - name: output_path
-            value: ensembles/PTPRB_Single/structures
+            value: ensembles/PGK2_Single/structures
           - name: ensemble_id
-            value: PTPRB_Single
+            value: PGK2_Single
           - name: structure_glob
             value: '*'
   - name: detect-binding-sites
@@ -186,16 +186,16 @@ spec:
   - name: detect-binding-sites-dag
     dag:
       tasks:
-      - name: detect-binding-sites-ptprb-single
+      - name: detect-binding-sites-pgk2-single
         template: detect-binding-sites
         arguments:
           parameters:
           - name: ensemble_path
-            value: /mnt/lynceus/ensembles/PTPRB_Single/structures
+            value: /mnt/lynceus/ensembles/PGK2_Single/structures
           - name: ensemble_id
-            value: PTPRB_Single
+            value: PGK2_Single
           - name: output_dir
-            value: /mnt/lynceus/ensembles/PTPRB_Single/binding_sites
+            value: /mnt/lynceus/ensembles/PGK2_Single/binding_sites
           - name: min_pocket_score
             value: '10.0'
   - name: main-dag

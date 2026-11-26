@@ -3,10 +3,21 @@ name = "notebooks"
 version = "0.1.0"
 requires-python = ">=3.14"
 dependencies = [
+    "joblib>=1.6.0",
     "jupyter>=1.1.1",
+    "lightgbm>=4.7.0",
+    "lynceus-core",
     "matplotlib>=3.11.2",
+    "numpy>=2.5.4",
     "polars>=2.0.0",
     "pyarrow>=26.0.0",
+    "scikit-fingerprints>=2.1.0",
+    "scipy>=1.18.1",
     "seaborn>=0.13.2",
     "tabulate>=0.10.0",
+    "surrogate-model",
 ]
+
+[tool.uv.sources]
+lynceus-core = { workspace = true }
+surrogate-model = { workspace = true }

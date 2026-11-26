@@ -1,7 +1,7 @@
-# libs/lynceus-core/src/lynceus_core/__init__.py
+# libs/lynceus-core/src/lynceus_core/features.py
 
 
-FEATURE_COLS = [
+MOLECULAR_FEATURES = [
     "atom_pair",
     "autocorr",
     "descriptors",
