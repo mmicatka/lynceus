@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Workflow
 metadata:
-  generateName: ptprb-10m-1m-valid-5-rounds-10k-targets-
+  generateName: p38a-dfg-ensemble-10m-targets-
 spec:
   entrypoint: main-dag
   serviceAccountName: argo-workflow
@@ -101,29 +101,29 @@ spec:
   - name: load-targets
     dag:
       tasks:
-      - name: download-pdbs-ptprb-single
+      - name: download-pdbs-mapk14-dfg
         template: download-pdbs
         arguments:
           parameters:
           - name: pdb_ids
-            value: 2AHS
+            value: 1A9U,1BL7,3ZYA,3HLL,4EH9,1KV2,9CJ5
           - name: base_path
             value: /mnt/lynceus
           - name: output_prefix
-            value: ensembles/PTPRB_Single/pdbs
-      - name: generate-manifest-ptprb-single
-        depends: download-pdbs-ptprb-single
+            value: ensembles/MAPK14_DFG/pdbs
+      - name: generate-manifest-mapk14-dfg
+        depends: download-pdbs-mapk14-dfg
         template: generate-protein-ensemble-manifest
         arguments:
           parameters:
           - name: base_path
             value: /mnt/lynceus
           - name: input_path
-            value: ensembles/PTPRB_Single/pdbs
+            value: ensembles/MAPK14_DFG/pdbs
           - name: output_path
-            value: ensembles/PTPRB_Single/structures
+            value: ensembles/MAPK14_DFG/structures
           - name: ensemble_id
-            value: PTPRB_Single
+            value: MAPK14_DFG
           - name: structure_glob
             value: '*'
   - name: detect-binding-sites
@@ -186,16 +186,16 @@ spec:
   - name: detect-binding-sites-dag
     dag:
       tasks:
-      - name: detect-binding-sites-ptprb-single
+      - name: detect-binding-sites-mapk14-dfg
         template: detect-binding-sites
         arguments:
           parameters:
           - name: ensemble_path
-            value: /mnt/lynceus/ensembles/PTPRB_Single/structures
+            value: /mnt/lynceus/ensembles/MAPK14_DFG/structures
           - name: ensemble_id
-            value: PTPRB_Single
+            value: MAPK14_DFG
           - name: output_dir
-            value: /mnt/lynceus/ensembles/PTPRB_Single/binding_sites
+            value: /mnt/lynceus/ensembles/MAPK14_DFG/binding_sites
           - name: min_pocket_score
             value: '10.0'
   - name: main-dag

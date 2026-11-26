@@ -58,7 +58,7 @@ def _build_verify_manifest(templates: TemplateFactory) -> TaskFactory:
 
 
 def _round_label(index: int) -> str:
-    return f"round_{index}"
+    return f"round_{index + 1}"
 
 
 def _validation_spec(surrogate: SurrogateConfig) -> SampleSpec:

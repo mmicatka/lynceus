@@ -6,7 +6,7 @@ IMAGE_PREFIX := $(REGISTRY)/lynceus
 TEMPLATES_CONFIG ?= conf/templates.yaml
 CANDIDATES_CONFIG ?= conf/candidates.yaml
 
-SCREEN_CONFIG ?= conf/screen/ptprb/ptprb-10m-10k-valid-5-rounds-10k.yaml
+SCREEN_CONFIG ?= conf/screen/ptprb/ptprb-10m-100k-valid-5-rounds-10k.yaml
 
 NAMESPACE ?= workflows
 VERSION ?= 0.1.0

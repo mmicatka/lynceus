@@ -17,6 +17,7 @@
         "bierner.markdown-mermaid",
         "charliermarsh.ruff",
         "davidanson.vscode-markdownlint",
+        "esbenp.prettier-vscode",
         "mechatroner.rainbow-csv",
         "ms-azuretools.vscode-docker",
         "ms-python.python",
@@ -29,6 +30,9 @@
         "terminal.integrated.stickyScroll.enabled": false,
         "terminal.integrated.defaultProfile.linux": "zsh",
         "editor.formatOnSave": true,
+        "[json]": {
+          "editor.defaultFormatter": "esbenp.prettier-vscode"
+        },
         "[markdown]": {
           "editor.defaultFormatter": "DavidAnson.vscode-markdownlint"
         },
@@ -38,6 +42,12 @@
             "source.fixAll.ruff": "explicit",
             "source.organizeImports.ruff": "explicit"
           }
+        },
+        "notebook.defaultFormatter": "charliermarsh.ruff",
+        "notebook.formatOnSave.enabled": true,
+        "notebook.codeActionsOnSave": {
+          "notebook.source.fixAll": "explicit",
+          "notebook.source.organizeImports": "explicit"
         },
         "[toml]": {
           "editor.defaultFormatter": "tamasfe.even-better-toml"

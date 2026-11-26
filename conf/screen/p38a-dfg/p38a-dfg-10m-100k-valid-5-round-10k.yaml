@@ -1,0 +1,46 @@
+---
+name: p38a-dfg-ensemble-10m
+
+candidates: 10m
+
+targets:
+  ensembles:
+    - id: "MAPK14_DFG"
+      members:
+        - pdb_id: 1A9U
+          weight: 0.10
+        - pdb_id: 1BL7
+          weight: 0.10
+        - pdb_id: 3ZYA
+          weight: 0.10
+        - pdb_id: 3HLL
+          weight: 0.10
+        - pdb_id: 4EH9
+          weight: 0.20
+        - pdb_id: 1KV2
+          weight: 0.20
+        - pdb_id: 9CJ5
+          weight: 0.20
+  min_pocket_score: 10.0
+
+filter:
+  surrogate:
+    active_percentile: 1.0
+    feature_types:
+      - atom_pair
+      - autocorr
+      - descriptors
+      - ecfp
+      - functional_groups
+      - morse
+      - rdf
+      - topological_torsion
+      - usrcat
+      - whim
+    random_seed: 1000
+    validation:
+      size: 100000
+      seed: 1000
+    samples_per_round: 10000
+    num_rounds: 5
+    top_fraction: 0.5
