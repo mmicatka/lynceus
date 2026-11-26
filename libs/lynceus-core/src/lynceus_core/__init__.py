@@ -1,7 +1,7 @@
 # libs/lynceus-core/src/lynceus_core/__init__.py
 
 from .cli import MemoryLimit, NumWorkers
-from .features import FEATURE_COLS
+from .features import MOLECULAR_FEATURES
 from .io import plan_batches, staged_input, staged_io, staged_output
 from .logging import get_lynceus_logger, wide_log
 from .manifest import MANIFEST_SUFFIX, Manifest, update_manifest, verify_manifest
@@ -9,7 +9,7 @@ from .plan import generate_plan
 from .shards import merge_shards
 
 __all__ = [
-    "FEATURE_COLS",
+    "MOLECULAR_FEATURES",
     # logging
     "get_lynceus_logger",
     "wide_log",

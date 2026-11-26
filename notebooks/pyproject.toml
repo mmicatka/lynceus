@@ -6,6 +6,7 @@ dependencies = [
     "joblib>=1.6.0",
     "jupyter>=1.1.1",
     "lightgbm>=4.7.0",
+    "lynceus-core",
     "matplotlib>=3.11.2",
     "numpy>=2.5.4",
     "polars>=2.0.0",
@@ -18,4 +19,5 @@ dependencies = [
 ]
 
 [tool.uv.sources]
+lynceus-core = { workspace = true }
 surrogate-model = { workspace = true }
