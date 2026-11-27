@@ -22,6 +22,8 @@ targets:
         - pdb_id: 9CJ5
           weight: 0.20
   min_pocket_score: 10.0
+  dedup:
+    jaccard_threshold: 0.5
 
 filter:
   surrogate:

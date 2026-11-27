@@ -11,6 +11,7 @@ nav = [
   { "System Architecture" = [
     "architecture/index.md",
     { "Candidates" = "architecture/candidates.md" },
+    { "Targets" = "architecture/targets.md" },
     { "Surrogate Model" = "architecture/surrogate.md" },
   ] },
   { "Usage" = "usage/index.md" },

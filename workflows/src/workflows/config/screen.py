@@ -35,9 +35,15 @@ PdbId = Annotated[
 
 Percent = Annotated[float, Field(gt=0, le=100)]
 TopFraction = Annotated[float, Field(ge=0, lt=1)]
+UnitFraction = Annotated[float, Field(gt=0, le=1)]
 
 DEFAULT_TOP_FRACTION = 0.5
 WEIGHT_SUM_TOLERANCE = 1e-6
+
+DEFAULT_JACCARD_THRESHOLD = 0.5
+DEFAULT_CONSENSUS_FRACTION = 0.5
+DEFAULT_CONTAINMENT_THRESHOLD = 0.9
+DEFAULT_MIN_REFERENCE_COVERAGE = 0.9
 
 
 def _require_unique(values: tuple[str, ...], label: str) -> tuple[str, ...]:
@@ -133,6 +139,22 @@ class EnsembleConfig(StrictModel):
         return {member.pdb_id: member.weight for member in self.members}
 
 
+class DedupConfig(StrictModel):
+    jaccard_threshold: UnitFraction = DEFAULT_JACCARD_THRESHOLD
+    consensus_fraction: UnitFraction = DEFAULT_CONSENSUS_FRACTION
+    containment_threshold: UnitFraction = DEFAULT_CONTAINMENT_THRESHOLD
+    min_reference_coverage: UnitFraction = DEFAULT_MIN_REFERENCE_COVERAGE
+
+    @model_validator(mode="after")
+    def _validate_thresholds(self) -> Self:
+        if self.containment_threshold < self.jaccard_threshold:
+            raise ValueError(
+                "containment_threshold must be >= jaccard_threshold, got "
+                f"{self.containment_threshold} < {self.jaccard_threshold}"
+            )
+        return self
+
+
 class TargetConfig(StrictModel):
     ensembles: Annotated[
         tuple[EnsembleConfig, ...],
@@ -145,6 +167,7 @@ class TargetConfig(StrictModel):
         ),
     ]
     min_pocket_score: NonNegativeFloat
+    dedup: DedupConfig = Field(default_factory=DedupConfig)
 
 
 class ScreenConfig(StrictModel):
