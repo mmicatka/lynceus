@@ -21,3 +21,6 @@ dependencies = [
 [tool.uv.sources]
 lynceus-core = { workspace = true }
 surrogate-model = { workspace = true }
+
+[tool.uv]
+package = false

@@ -43,3 +43,22 @@ def compute_labels(raw: pl.Series | np.ndarray, threshold: float) -> np.ndarray:
     labels = (raw <= threshold).astype(int)
 
     return labels
+
+
+def prepare_dataset(
+    feature_paths: list[str],
+    labels_paths: list[str],
+    features: list[str],
+    threshold: float,
+) -> tuple[np.ndarray, np.ndarray]:
+    raw_features = pl.read_parquet(feature_paths)
+    raw_labels = pl.read_parquet(labels_paths)
+
+    df_cleaned = load_and_clean_data(raw_features, raw_labels)
+
+    x = flatten_features(df_cleaned, features)
+    y_raw = df_cleaned["affinity_kcal_mol"]
+
+    y_label = compute_labels(y_raw, threshold=threshold)
+
+    return x, y_label
